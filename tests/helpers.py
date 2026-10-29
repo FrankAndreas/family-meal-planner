@@ -30,3 +30,9 @@ def create_recipe(client, headers, title="Älplermagronen", **fields) -> dict:
     response = client.post("/api/recipes", json=recipe_body(title, **fields), headers=headers)
     assert response.status_code == 201, response.text
     return response.json()
+
+
+def plan(client, headers, day, slot="dinner", **fields) -> dict:
+    response = client.post("/api/plan/entries", json={"date": str(day), "slot": slot, **fields}, headers=headers)
+    assert response.status_code == 201, response.text
+    return response.json()

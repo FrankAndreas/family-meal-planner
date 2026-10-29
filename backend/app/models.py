@@ -1,6 +1,6 @@
 import enum
 
-from sqlalchemy import JSON, Column, DateTime, Enum, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, Boolean, Column, Date, DateTime, Enum, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
 
 from .database import Base
@@ -115,3 +115,37 @@ class Favorite(Base):
     recipe_id = Column(Integer, ForeignKey("recipes.id", ondelete="CASCADE"), primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
     created_at = Column(DateTime, default=utcnow, nullable=False)
+
+
+class PlanEntry(Base):
+    """A recipe or a note in one slot of one day. Entries belong to a date, never to a week: changing the first day
+    of the week only regroups them."""
+
+    __tablename__ = "plan_entries"
+
+    id = Column(Integer, primary_key=True)
+    date = Column(Date, nullable=False, index=True)
+    # breakfast, snack, lunch or dinner
+    slot = Column(String(10), nullable=False)
+    position = Column(Integer, nullable=False, default=0)
+    # Recipes are only ever soft-deleted, so the entry keeps pointing at one
+    recipe_id = Column(Integer, ForeignKey("recipes.id", ondelete="RESTRICT"))
+    note = Column(String(200))
+    people = Column(Float)
+    # False: marked "not eaten" (when closing the week); it then doesn't count as eaten
+    eaten = Column(Boolean, nullable=False, default=True)
+    created_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"))
+    created_at = Column(DateTime, default=utcnow, nullable=False)
+
+    recipe = relationship("Recipe")
+
+
+class WeekClosure(Base):
+    """A week someone closed. The range is stored, so a later change of the first day doesn't move it."""
+
+    __tablename__ = "week_closures"
+
+    start = Column(Date, primary_key=True)
+    end = Column(Date, nullable=False)
+    closed_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"))
+    closed_at = Column(DateTime, default=utcnow, nullable=False)

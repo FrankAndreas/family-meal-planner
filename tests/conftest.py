@@ -53,3 +53,20 @@ def client():
 @pytest.fixture
 def admin_headers(client):
     return login(client)
+
+
+@pytest.fixture
+def today(monkeypatch):
+    """Fix "today" (default Friday 2026-10-30); call the fixture's result with another date to move it."""
+    from datetime import date
+
+    from app import timeutil
+
+    current = {"day": date(2026, 10, 30)}
+    monkeypatch.setattr(timeutil, "today", lambda: current["day"])
+
+    def set_day(day):
+        current["day"] = day
+
+    set_day.day = lambda: current["day"]
+    return set_day

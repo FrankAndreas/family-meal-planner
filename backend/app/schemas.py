@@ -1,6 +1,7 @@
+import datetime as dt
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator, model_validator
 
 from .models import UserRole
 from .units import UNITS
@@ -192,3 +193,56 @@ class RatingIn(BaseModel):
 
 class FavoriteIn(BaseModel):
     favorite: bool
+
+
+Slot = Literal["breakfast", "snack", "lunch", "dinner"]
+People = Annotated[float, Field(ge=0.5, le=100)]
+Note = Annotated[str, StringConstraints(strip_whitespace=True, max_length=200)]
+
+
+class EntryIn(BaseModel):
+    date: dt.date
+    slot: Slot
+    recipe_id: int | None = None
+    note: Note | None = None
+    people: People | None = None
+
+    @model_validator(mode="after")
+    def recipe_or_note(self):
+        if self.note == "":
+            self.note = None
+        if (self.recipe_id is None) == (self.note is None):
+            raise ValueError("recipe_or_note")
+        return self
+
+
+class EntryPatch(BaseModel):
+    date: dt.date | None = None
+    slot: Slot | None = None
+    position: Annotated[int, Field(ge=0)] | None = None
+    people: People | None = None
+    note: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)] | None = None
+    eaten: bool | None = None
+
+
+class EntryOut(BaseModel):
+    id: int
+    date: dt.date
+    slot: Slot
+    position: int
+    recipe: RecipeSummary | None
+    recipe_deleted: bool
+    note: str | None
+    people: float | None
+    eaten: bool
+
+
+class WeekOut(BaseModel):
+    start: dt.date
+    end: dt.date
+    days: list[dt.date]
+    today: dt.date
+    entries: list[EntryOut]
+    closed: bool
+    planned_slots: int
+    total_slots: int

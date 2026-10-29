@@ -164,3 +164,56 @@ def test_save_draft_as_recipe(client, admin_headers, world):
     assert client.get("/api/inbox", headers=admin_headers).json() == []
     again = client.post("/api/recipes", json={**body, "inbox_item_id": item}, headers=admin_headers)
     assert again.status_code == 400 and again.json()["detail"] == "draft_not_ready"
+
+
+def test_mail_footer_link_does_not_block_the_screenshots(client, admin_headers, world):
+    pages, calls = world
+    pages["https://aka.ms/getoutlook"] = _html("no-recipe.html")
+    item = _mail(client, admin_headers, text="Rezept\n\nGet Outlook https://aka.ms/getoutlook", images=[("1.png", png())])
+    client.post(f"/api/inbox/{item}/process", headers=admin_headers)
+    got = _item(client, admin_headers, item)
+    assert got["status"] == "draft"
+    # One call, with the picture, not about Outlook's page
+    assert len(calls) == 1 and [p["type"] for p in calls[0]] == ["text", "image_url"]
+
+
+def test_page_the_ai_cant_read_falls_back_to_the_mail(client, admin_headers, world, monkeypatch):
+    pages, calls = world
+    pages["https://blog.example/x"] = _html("no-recipe.html")
+    answers = [json.dumps({"title": ""}), json.dumps(GOOD)]
+
+    class Picky:
+        def complete(self, content):
+            calls.append(content)
+            return ai.Answer(answers.pop(0), 10)
+
+    monkeypatch.setattr(importer.ai, "client_for", lambda settings: Picky())
+    item = _mail(client, admin_headers, text="Reis kochen, siehe https://blog.example/x")
+    client.post(f"/api/inbox/{item}/process", headers=admin_headers)
+    got = _item(client, admin_headers, item)
+    assert got["status"] == "draft" and got["draft"]["title"] == "Mail-Risotto" and len(calls) == 2
+
+
+def test_broken_link_skipped(client, admin_headers, world):
+    pages, calls = world
+    pages["https://www.swissmilk.ch/r"] = _html("swissmilk-like.html")
+    item = _mail(client, admin_headers, text="http://a..b/ http://x.ch:abc/ http://[::1/ https://www.swissmilk.ch/r")
+    client.post(f"/api/inbox/{item}/process", headers=admin_headers)
+    assert _item(client, admin_headers, item)["draft"]["title"] == "Älplermagronen"
+
+
+def test_unreadable_image_doesnt_shift_the_photo(client, admin_headers, world, monkeypatch):
+    _, calls = world
+    answer = {**GOOD, "image_index": 0}
+    monkeypatch.setattr(importer.ai, "client_for", lambda settings: type("C", (), {"complete": lambda self, c: ai.Answer(json.dumps(answer), 1)})())
+    item = _mail(client, admin_headers, text="x", images=[("broken.png", b"not a png"), ("food.png", png())])
+    client.post(f"/api/inbox/{item}/process", headers=admin_headers)
+    # Only food.png reached the AI, so its index 0 is attachment 1
+    assert _item(client, admin_headers, item)["draft"]["image_attachment"] == 1
+
+
+def test_at_most_ten_pictures_per_call(client, admin_headers, world):
+    _, calls = world
+    item = _mail(client, admin_headers, text="x", images=[(f"{n}.png", png()) for n in range(12)])
+    client.post(f"/api/inbox/{item}/process", headers=admin_headers)
+    assert len([p for p in calls[0] if p["type"] == "image_url"]) == 10

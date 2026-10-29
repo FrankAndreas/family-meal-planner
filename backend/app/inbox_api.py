@@ -22,6 +22,8 @@ logger = logging.getLogger(__name__)
 
 MAX_BYTES = 25 * 1024 * 1024
 THUMB_SIDE = 320
+# Pictures only, never SVG: an SVG opened in a tab of its own could run script with the app's login
+RASTER_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp", "image/heic", "image/heif"}
 # Processing that never finished (e.g. the backend restarted meanwhile) counts as failed after this
 STUCK_AFTER = timedelta(minutes=10)
 
@@ -180,7 +182,7 @@ def process_item(item_id: int, parent: models.User = Depends(auth.require_parent
 
 def _image_attachment(item: models.InboxItem, index: int) -> tuple[str, bytes]:
     found = mail.attachment(raw_path(item).read_bytes(), index) if item.kind == "mail" else None
-    if found is None or not found[0].startswith("image/"):
+    if found is None or found[0] not in RASTER_TYPES:
         raise api_error(404, "attachment_not_found")
     return found
 

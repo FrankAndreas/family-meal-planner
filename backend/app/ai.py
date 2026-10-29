@@ -38,6 +38,8 @@ IMAGE_SIDE = 2000
 MAX_INGREDIENTS = 100
 MAX_STEPS = 60
 MAX_TEXT = 20_000
+# Pictures per call: a long Facebook recipe fits in a few screenshots; more only costs
+MAX_IMAGES = 10
 
 
 @dataclass(frozen=True)
@@ -225,6 +227,13 @@ def _str(value, limit: int) -> str:
     return " ".join(str(value or "").split())[:limit] if not isinstance(value, (dict, list)) else ""
 
 
+def _list(value) -> list:
+    """What the AI should have sent as a list: a lone string counts as one item, anything else as none."""
+    if isinstance(value, list):
+        return value
+    return [value] if isinstance(value, str) and value.strip() else []
+
+
 def _number(value, low: float, high: float) -> float | None:
     try:
         number = float(value)
@@ -238,7 +247,7 @@ def validate_draft(answer: str) -> dict:
     if not isinstance(data, dict) or not _str(data.get("title"), 200):
         raise AiFailed("no recipe")
     ingredients = []
-    for item in (data.get("ingredients") or [])[:MAX_INGREDIENTS]:
+    for item in _list(data.get("ingredients"))[:MAX_INGREDIENTS]:
         if not isinstance(item, dict) or not _str(item.get("name"), 200):
             continue
         unit = item.get("unit")
@@ -260,21 +269,29 @@ def validate_draft(answer: str) -> dict:
         "prep_minutes": int(minutes["prep_minutes"]) if minutes["prep_minutes"] is not None else None,
         "cook_minutes": int(minutes["cook_minutes"]) if minutes["cook_minutes"] is not None else None,
         "ingredients": ingredients,
-        "steps": [s for s in (_str(step, 2000) for step in (data.get("steps") or [])[:MAX_STEPS]) if s],
-        "tags": [t for t in (_str(tag, 40) for tag in (data.get("tags") or [])[:5]) if t],
+        "steps": [s for s in (_str(step, 2000) for step in _list(data.get("steps"))[:MAX_STEPS]) if s],
+        "tags": [t for t in (_str(tag, 40) for tag in _list(data.get("tags"))[:5]) if t],
         "notes": _str(data.get("notes"), 2000),
-        "uncertain": [u for u in (_str(x, 200) for x in (data.get("uncertain") or [])[:20]) if u],
+        "uncertain": [u for u in (_str(x, 200) for x in _list(data.get("uncertain"))[:20]) if u],
         "image_index": image_index if isinstance(image_index, int) and not isinstance(image_index, bool) else None,
         "language": language if language in ("de", "en") else None,
     }
 
 
-def recipe_from_ai(client: AiClient, *, text: str, images: list[bytes] = ()) -> tuple[dict, str, int | None]:
-    """The draft, the raw answer (kept as part of the original) and the tokens the service reported."""
+def recipe_from_ai(
+    client: AiClient, *, text: str, images: list[bytes] = ()
+) -> tuple[dict, str, int | None, list[int]]:
+    """The draft, the raw answer (kept as part of the original), the tokens the service reported, and which of the
+    given images were sent (positions): the AI's image_index counts only those."""
     content = [{"type": "text", "text": RECIPE_PROMPT.format(units=", ".join(UNITS)) + text[:MAX_TEXT]}]
-    content += [part for part in map(_image_part, images) if part]
+    sent: list[int] = []
+    for position, data in enumerate(images):
+        part = _image_part(data)
+        if part and len(sent) < MAX_IMAGES:
+            content.append(part)
+            sent.append(position)
     answer = client.complete(content)
-    return validate_draft(answer.text), answer.text, answer.tokens
+    return validate_draft(answer.text), answer.text, answer.tokens, sent
 
 
 @router.get("/ai/status")

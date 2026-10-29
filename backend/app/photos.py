@@ -33,7 +33,7 @@ def store_photo(data: bytes) -> str:
     try:
         with Image.open(io.BytesIO(data)) as source:
             image = ImageOps.exif_transpose(source).convert("RGB")
-    except (UnidentifiedImageError, OSError, ValueError):
+    except (UnidentifiedImageError, OSError, ValueError, Image.DecompressionBombError):
         raise api_error(400, "photo_unreadable")
     image.thumbnail((MAX_SIDE, MAX_SIDE))
     name = f"{uuid.uuid4().hex}.jpg"

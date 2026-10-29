@@ -90,3 +90,12 @@ def test_too_large(client, admin_headers, monkeypatch):
 def test_upload_needs_login(client, admin_headers):
     r = create_recipe(client, admin_headers)
     assert _upload(client, {}, r["id"], _jpeg()).status_code == 401
+
+
+def test_decompression_bomb_refused(client, admin_headers, monkeypatch):
+    from PIL import Image
+
+    monkeypatch.setattr(Image, "MAX_IMAGE_PIXELS", 1000)
+    r = create_recipe(client, admin_headers)
+    response = _upload(client, admin_headers, r["id"], _jpeg())
+    assert response.status_code == 400 and response.json()["detail"] == "photo_unreadable"

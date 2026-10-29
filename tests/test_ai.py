@@ -138,7 +138,14 @@ def test_recipe_from_ai_sends_text_and_images():
 
     from mails import png
 
-    draft, raw, tokens = ai.recipe_from_ai(Recorder(), text="Risotto für 4", images=[png(size=(4000, 3000)), png()])
+    draft, raw, tokens, sent = ai.recipe_from_ai(Recorder(), text="Risotto für 4", images=[png(size=(4000, 3000)), png()])
     kinds = [part["type"] for part in seen["content"]]
     assert kinds == ["text", "image_url", "image_url"] and "Risotto für 4" in seen["content"][0]["text"]
-    assert draft["title"] == "Risotto" and tokens == 1234 and json.loads(raw)["title"] == "Risotto"
+    assert sent == [0, 1] and draft["title"] == "Risotto" and tokens == 1234 and json.loads(raw)["title"] == "Risotto"
+
+
+def test_strings_where_lists_belong():
+    answer = {**GOOD, "tags": "vegi", "steps": "Reis andünsten. Dann Bouillon.", "uncertain": "Menge?", "ingredients": {"x": 1}}
+    draft = ai.validate_draft(json.dumps(answer))
+    assert draft["tags"] == ["vegi"] and draft["steps"] == ["Reis andünsten. Dann Bouillon."]
+    assert draft["uncertain"] == ["Menge?"] and draft["ingredients"] == []

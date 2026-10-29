@@ -98,3 +98,9 @@ def test_image_when_asked(net):
 def test_http_error(net):
     with pytest.raises(fetch.FetchFailed):
         fetch.fetch("https://public.example/missing")
+
+
+@pytest.mark.parametrize("url", ["http://a..b/", "http://x.ch:abc/", "http://[::1/", "http://[x"])
+def test_malformed_urls_refused(net, url):
+    with pytest.raises(fetch.FetchRefused):
+        fetch.fetch(url)

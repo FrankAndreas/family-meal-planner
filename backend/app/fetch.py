@@ -85,14 +85,17 @@ def _open(scheme: str, host: str, port: int, target: str, ip: str, timeout: floa
 
 
 def _checked(url: str) -> tuple[str, str, int, str, str]:
-    parts = urlsplit(url)
-    scheme = parts.scheme.lower()
-    if scheme not in ("http", "https") or not parts.hostname:
-        raise FetchRefused(url)
-    port = parts.port or (443 if scheme == "https" else 80)
-    if port not in (80, 443):
-        raise FetchRefused(url)
-    addresses = _resolve(parts.hostname, port)
+    # A malformed address (bad port, broken brackets, empty labels) is refused like an unsafe one
+    try:
+        parts = urlsplit(url)
+        scheme = parts.scheme.lower()
+        host = parts.hostname
+        port = parts.port or (443 if scheme == "https" else 80)
+        if scheme not in ("http", "https") or not host or port not in (80, 443):
+            raise FetchRefused(url)
+        addresses = _resolve(host, port)
+    except (ValueError, UnicodeError) as error:
+        raise FetchRefused(url) from error
     if not addresses:
         raise FetchFailed("dns")
     for address in addresses:
@@ -103,7 +106,7 @@ def _checked(url: str) -> tuple[str, str, int, str, str]:
         if not ip.is_global:
             raise FetchRefused(url)
     target = (parts.path or "/") + (f"?{parts.query}" if parts.query else "")
-    return scheme, parts.hostname, port, target, addresses[0]
+    return scheme, host, port, target, addresses[0]
 
 
 def fetch(url: str, accept: tuple[str, ...] = PAGE_TYPES) -> Page:

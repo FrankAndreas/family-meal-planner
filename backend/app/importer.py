@@ -63,16 +63,19 @@ def _photo(url: str | None) -> str | None:
 
 
 def _followable(link: str) -> bool:
-    host = (urlsplit(link).hostname or "").lower()
+    try:
+        host = (urlsplit(link).hostname or "").lower()
+    except ValueError:
+        return False
     return not any(host == wall or host.endswith("." + wall) for wall in LOGIN_WALLS)
 
 
-def _ask_ai(db, item, user, text: str, images: list[bytes]) -> tuple[dict, str]:
+def _ask_ai(db, item, user, text: str, images: list[bytes]) -> tuple[dict, str, list[int]]:
     call = ai.take_call(db, user, "import", item_id=item.id)
-    draft, raw, tokens = ai.recipe_from_ai(ai.client_for(ai.Settings.from_env()), text=text, images=images)
+    draft, raw, tokens, sent = ai.recipe_from_ai(ai.client_for(ai.Settings.from_env()), text=text, images=images)
     call.tokens = tokens
     db.commit()
-    return draft, raw
+    return draft, raw, sent
 
 
 def process(db, item: models.InboxItem, user: models.User) -> None:
@@ -98,20 +101,30 @@ def process(db, item: models.InboxItem, user: models.User) -> None:
             return
         page_without_recipe = page_without_recipe or page
 
-    if page_without_recipe is not None:
+    # A page without recipe data: the AI reads it, unless the mail brings pictures (screenshots are the recipe;
+    # a link in a mail footer isn't). If the AI finds nothing on the page, the mail itself is still tried.
+    mail_has_pictures = content is not None and bool(content.images)
+    if page_without_recipe is not None and not mail_has_pictures:
         text, _ = mail.html_text(page_without_recipe.text)
-        draft, raw = _ask_ai(db, item, user, text, [])
-        draft["source_url"] = page_without_recipe.url
-        _finish(db, item, draft, raw)
-        return
+        try:
+            draft, raw, _ = _ask_ai(db, item, user, text, [])
+        except ai.AiFailed:
+            if content is None or not content.text.strip():
+                raise
+        else:
+            draft.pop("image_index", None)
+            draft["source_url"] = page_without_recipe.url
+            _finish(db, item, draft, raw)
+            return
 
     if content is not None and (content.text.strip() or content.images):
         text = f"Betreff: {item.subject}\n\n{content.text}"
-        draft, raw = _ask_ai(db, item, user, text, [data for _, data in content.images])
+        draft, raw, sent = _ask_ai(db, item, user, text, [data for _, data in content.images])
         index = draft.pop("image_index", None)
-        # The picture the AI named, else the first: as an attachment index, decoded again when saving
-        if content.images:
-            chosen = index if isinstance(index, int) and 0 <= index < len(content.images) else 0
+        # The picture the AI named (counted among those it got), else the first it got: as an attachment index,
+        # decoded again when saving
+        if sent:
+            chosen = sent[index] if isinstance(index, int) and 0 <= index < len(sent) else sent[0]
             draft["image_attachment"] = content.images[chosen][0]
         draft["source_url"] = links[0] if links else None
         _finish(db, item, draft, raw)

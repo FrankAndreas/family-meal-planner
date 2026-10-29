@@ -130,3 +130,19 @@ def test_parent_link_records_when_processing_began(client, admin_headers, monkey
     monkeypatch.setattr(importer, "start", lambda item_id, user_id: None)
     item = client.post("/api/inbox/urls", json={"url": "https://fooby.ch/r/2"}, headers=admin_headers).json()
     assert db.get(models.InboxItem, item["id"]).processing_since is not None
+
+
+def test_malformed_pasted_link(client, admin_headers):
+    response = client.post("/api/inbox/urls", json={"url": "http://[x"}, headers=admin_headers)
+    assert response.status_code == 422 and "not_a_web_link" in response.text
+
+
+def test_svg_attachment_not_served(client, admin_headers, monkeypatch):
+    from mails import build_mail
+
+    monkeypatch.setenv("INBOUND_SECRET", "s")
+    client.post("/api/emails", json={"address": "papa@x.ch"}, headers=admin_headers)
+    svg = b'<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>'
+    raw = build_mail(from_addr="papa@x.ch", attachments=[("x.svg", svg, "image/svg+xml")])
+    item = client.post("/api/inbound", content=raw, headers={"X-Inbound-Secret": "s"}).json()["id"]
+    assert client.get(f"/api/inbox/{item}/attachments/0", headers=admin_headers).status_code == 404

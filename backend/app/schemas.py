@@ -1,5 +1,6 @@
 import datetime as dt
 import re
+from urllib.parse import urlsplit
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator, model_validator
@@ -300,7 +301,12 @@ class UrlIn(BaseModel):
     @field_validator("url")
     @classmethod
     def web_link(cls, url: str) -> str:
-        if not url.lower().startswith(("http://", "https://")):
+        try:
+            parts = urlsplit(url)
+            ok = parts.scheme.lower() in ("http", "https") and bool(parts.hostname) and parts.port in (None, 80, 443)
+        except ValueError:
+            ok = False
+        if not ok:
             raise ValueError("not_a_web_link")
         return url
 

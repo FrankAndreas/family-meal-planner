@@ -34,6 +34,8 @@ German by default, English per person.
 **Getting recipes in**
 - **By mail:** share a Facebook post, a screenshot or a link to `rezepte@<your domain>` (Cloudflare Email Worker).
   Only registered family addresses are accepted.
+- **By photo:** on the Rezepte page, photograph a recipe (the back of a pack, a cookbook page), one or several
+  photos per recipe. A parent's photos are read by the AI at once; a child's wait in the Posteingang.
 - **By link:** on the Rezepte page or in the Posteingang, paste a recipe page (Swissmilk, Fooby, Betty Bossi, most blogs). Their built-in recipe data is read
   without any AI.
 - **Nothing is read before a parent taps "Verarbeiten".** Then links are followed, and only if needed the AI

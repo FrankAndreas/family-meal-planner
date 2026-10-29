@@ -228,3 +228,20 @@ def test_at_most_ten_pictures_per_call(client, admin_headers, world):
     item = _mail(client, admin_headers, text="x", images=[(f"{n}.png", png()) for n in range(12)])
     client.post(f"/api/inbox/{item}/process", headers=admin_headers)
     assert len([p for p in calls[0] if p["type"] == "image_url"]) == 10
+
+
+def test_scan_becomes_a_recipe(client, admin_headers, world):
+    _, calls = world
+    files = [("files", ("1.png", png(), "image/png")), ("files", ("2.png", png((1, 2, 3)), "image/png"))]
+    item = client.post("/api/inbox/scans", files=files, headers=admin_headers).json()["id"]
+    got = _item(client, admin_headers, item)
+    assert got["status"] == "draft" and got["draft"]["title"] == "Mail-Risotto"
+    assert len(calls) == 1
+    draft = got["draft"]
+    body = {k: draft[k] for k in ("title", "servings", "servings_unit", "ingredients", "steps", "tags")}
+    recipe = client.post("/api/recipes", json={**body, "inbox_item_id": item}, headers=admin_headers).json()
+    assert recipe["source_kind"] == "scan" and recipe["photo_url"]
+    assert recipe["source_mail"]["kind"] == "scan"
+    # Saved again from the editor, as it came back
+    again = client.put(f"/api/recipes/{recipe['id']}", json={**body, "source_kind": "scan"}, headers=admin_headers)
+    assert again.status_code == 200, again.text

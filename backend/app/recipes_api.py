@@ -221,7 +221,7 @@ def _draft_photo(item: models.InboxItem) -> str | None:
     draft = item.draft or {}
     if draft.get("photo") and photos.photo_path(draft["photo"]):
         return draft["photo"]
-    if item.kind == "mail" and draft.get("image_attachment") is not None:
+    if item.kind in ("mail", "scan") and draft.get("image_attachment") is not None:
         from . import mail
         from .inbox_api import raw_path
 

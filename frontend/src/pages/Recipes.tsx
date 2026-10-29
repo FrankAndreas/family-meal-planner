@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
 import api, { errorMessage } from '../api';
+import ScanRecipe from '../components/inbox/ScanRecipe';
 import UrlPaste from '../components/inbox/UrlPaste';
 import RecipeCard from '../components/recipes/RecipeCard';
 import { fetchRecipes, type RecipeSummary } from '../recipes';
@@ -10,7 +11,9 @@ import { BUTTON, BUTTON_SECONDARY, ERROR, INPUT } from '../ui';
 export default function Recipes() {
     const { t } = useTranslation();
     const navigate = useNavigate();
-    const [pasting, setPasting] = useState(false);
+    // Getting a recipe in other than typing it: from a link, or photographed
+    const [panel, setPanel] = useState<'link' | 'scan' | null>(null);
+    const toggle = (which: 'link' | 'scan') => setPanel(panel === which ? null : which);
     const [recipes, setRecipes] = useState<RecipeSummary[] | null>(null);
     const [tags, setTags] = useState<{ name: string; count: number }[]>([]);
     const [q, setQ] = useState('');
@@ -47,7 +50,10 @@ export default function Recipes() {
         <div className="space-y-5">
             <div className="flex flex-wrap items-center gap-3">
                 <h1 className="mr-auto text-2xl">{t('nav.recipes')}</h1>
-                <button type="button" className={BUTTON_SECONDARY} aria-expanded={pasting} onClick={() => setPasting(!pasting)}>
+                <button type="button" className={BUTTON_SECONDARY} aria-expanded={panel === 'scan'} onClick={() => toggle('scan')}>
+                    {t('recipes.scan')}
+                </button>
+                <button type="button" className={BUTTON_SECONDARY} aria-expanded={panel === 'link'} onClick={() => toggle('link')}>
                     {t('recipes.importFromLink')}
                 </button>
                 <Link to="/rezepte/neu" className={BUTTON}>
@@ -55,7 +61,8 @@ export default function Recipes() {
                 </Link>
             </div>
             {/* Same as in the inbox: the draft shows up there (a parent's link is read at once) */}
-            {pasting && <UrlPaste onAdded={() => navigate('/posteingang')} />}
+            {panel === 'link' && <UrlPaste onAdded={() => navigate('/posteingang')} />}
+            {panel === 'scan' && <ScanRecipe onDone={() => navigate('/posteingang')} />}
             <div className="flex flex-wrap items-center gap-3">
                 <input
                     className={`${INPUT} max-w-sm`}

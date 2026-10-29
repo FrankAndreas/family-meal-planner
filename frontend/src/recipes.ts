@@ -33,7 +33,7 @@ export interface Recipe extends RecipeSummary {
     cook_minutes: number | null;
     steps: string[];
     notes: string;
-    source_kind: 'manual' | 'url' | 'mail';
+    source_kind: 'manual' | 'url' | 'mail' | 'scan';
     source_url: string | null;
     language: 'de' | 'en' | null;
     created_by_name: string | null;
@@ -44,7 +44,7 @@ export interface Recipe extends RecipeSummary {
     factor: number;
     inbox_item_id: number | null;
     // The mail or pasted link it was saved from
-    source_mail: { id: number; kind: 'mail' | 'url'; user_name: string | null; received_at: string } | null;
+    source_mail: { id: number; kind: 'mail' | 'url' | 'scan'; user_name: string | null; received_at: string } | null;
     // The text before an AI translation
     original: {
         title: string;

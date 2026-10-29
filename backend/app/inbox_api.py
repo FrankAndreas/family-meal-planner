@@ -3,16 +3,18 @@
 import hmac
 import io
 import logging
+from email.message import EmailMessage
+from email.utils import formatdate, make_msgid
 from urllib.parse import urlsplit
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, Depends, Request, Response, UploadFile
 from fastapi.responses import FileResponse
 from PIL import Image, ImageOps, UnidentifiedImageError
 from sqlalchemy.orm import Session
 
-from . import auth, config, importer, mail, models, photos, schemas  # noqa: F401  (photos: HEIC opener)
+from . import ai, auth, config, importer, mail, models, photos, schemas  # noqa: F401  (photos: HEIC opener)
 from .database import get_db
 from .errors import api_error
 from .timeutil import utcnow
@@ -161,6 +163,53 @@ def add_url(body: schemas.UrlIn, user: models.User = Depends(auth.get_current_us
     return item_out(item)
 
 
+@router.post("/inbox/scans", response_model=schemas.InboxItemOut, status_code=201)
+async def add_scan(
+    files: list[UploadFile], user: models.User = Depends(auth.get_current_user), db: Session = Depends(get_db)
+):
+    """Photos of one recipe taken in the app (the back of a pack, a cookbook page). Kept as a mail with the photos
+    attached, so it is processed and shown like one. A parent's scan is the release: it is read right away."""
+    if len(files) > ai.MAX_IMAGES:
+        raise api_error(400, "scan_too_many")
+    message = EmailMessage()
+    message["Subject"] = datetime.now().strftime("Scan %d.%m.%Y %H:%M")
+    message["Date"] = formatdate()
+    message["Message-ID"] = make_msgid(domain="scan.invalid")
+    message.set_content("")
+    total = 0
+    for number, file in enumerate(files, 1):
+        kind = (file.content_type or "").lower()
+        if kind not in RASTER_TYPES:
+            raise api_error(400, "scan_not_image")
+        data = await file.read(MAX_BYTES + 1)
+        total += len(data)
+        if total > MAX_BYTES:
+            raise api_error(413, "scan_too_big")
+        maintype, subtype = kind.split("/")
+        message.add_attachment(data, maintype=maintype, subtype=subtype, filename=f"scan-{number}.{subtype}")
+    raw = message.as_bytes()
+    summary = mail.summarize(raw)
+    parent = user.role == models.UserRole.PARENT
+    item = models.InboxItem(
+        kind="scan",
+        status="processing" if parent else "waiting",
+        user_id=user.id,
+        subject=summary.subject,
+        message_id=summary.message_id,
+        attachments=summary.attachments,
+        size=len(raw),
+    )
+    if parent:
+        item.processing_since = utcnow()
+    db.add(item)
+    db.flush()
+    raw_path(item).write_bytes(raw)
+    db.commit()
+    if parent:
+        importer.start(item.id, user.id)
+    return item_out(item)
+
+
 @router.get("/inbox/{item_id}", response_model=schemas.InboxItemDetail)
 def read_item(item_id: int, user: models.User = Depends(auth.get_current_user), db: Session = Depends(get_db)):
     item = visible_item(db, item_id, user)
@@ -181,7 +230,7 @@ def process_item(item_id: int, parent: models.User = Depends(auth.require_parent
 
 
 def _image_attachment(item: models.InboxItem, index: int) -> tuple[str, bytes]:
-    found = mail.attachment(raw_path(item).read_bytes(), index) if item.kind == "mail" else None
+    found = mail.attachment(raw_path(item).read_bytes(), index) if item.kind in ("mail", "scan") else None
     if found is None or found[0] not in RASTER_TYPES:
         raise api_error(404, "attachment_not_found")
     return found

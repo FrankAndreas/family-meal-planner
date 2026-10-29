@@ -30,6 +30,9 @@ function IngredientLine({ ingredient }: { ingredient: Ingredient }) {
     );
 }
 
+// How a recipe from the inbox came in
+const SOURCE_TEXT = { mail: 'recipes.sourceByMail', url: 'recipes.sourceByLink', scan: 'recipes.sourceByScan' } as const;
+
 export default function RecipeView() {
     const { t } = useTranslation();
     const { id } = useParams();
@@ -159,7 +162,7 @@ export default function RecipeView() {
                             )}
                             {recipe.source_url && recipe.source_mail && ' · '}
                             {recipe.source_mail &&
-                                t(recipe.source_mail.kind === 'mail' ? 'recipes.sourceByMail' : 'recipes.sourceByLink', {
+                                t(SOURCE_TEXT[recipe.source_mail.kind], {
                                     name: recipe.source_mail.user_name ?? '?',
                                     date: format(parseISO(`${recipe.source_mail.received_at}Z`), 'd.M.yyyy'),
                                 })}

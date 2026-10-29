@@ -5,6 +5,8 @@ import io
 import logging
 from urllib.parse import urlsplit
 
+from datetime import timedelta
+
 from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import FileResponse
 from PIL import Image, ImageOps, UnidentifiedImageError
@@ -20,6 +22,8 @@ logger = logging.getLogger(__name__)
 
 MAX_BYTES = 25 * 1024 * 1024
 THUMB_SIDE = 320
+# Processing that never finished (e.g. the backend restarted meanwhile) counts as failed after this
+STUCK_AFTER = timedelta(minutes=10)
 
 
 def inbox_dir():
@@ -48,8 +52,18 @@ def item_out(item: models.InboxItem) -> schemas.InboxItemOut:
     )
 
 
+def _unstick(db: Session) -> None:
+    stuck = db.query(models.InboxItem).filter(
+        models.InboxItem.status == "processing", models.InboxItem.processing_since < utcnow() - STUCK_AFTER
+    )
+    for item in stuck:
+        item.status, item.error, item.processing_since = "failed", "ai_failed", None
+    db.commit()
+
+
 def visible_item(db: Session, item_id: int, user: models.User) -> models.InboxItem:
     """An item the person may see: parents all, children their own."""
+    _unstick(db)
     item = db.get(models.InboxItem, item_id)
     if item is None or (user.role != models.UserRole.PARENT and item.user_id != user.id):
         raise api_error(404, "item_not_found")
@@ -102,6 +116,7 @@ async def receive_mail(request: Request, db: Session = Depends(get_db)):
 
 @router.get("/inbox", response_model=list[schemas.InboxItemOut])
 def list_items(user: models.User = Depends(auth.get_current_user), db: Session = Depends(get_db)):
+    _unstick(db)
     query = db.query(models.InboxItem).filter(models.InboxItem.status != "done")
     if user.role != models.UserRole.PARENT:
         query = query.filter(models.InboxItem.user_id == user.id)
@@ -141,6 +156,25 @@ def add_url(body: schemas.UrlIn, user: models.User = Depends(auth.get_current_us
     db.commit()
     if parent:
         importer.start(item.id, user.id)
+    return item_out(item)
+
+
+@router.get("/inbox/{item_id}", response_model=schemas.InboxItemDetail)
+def read_item(item_id: int, user: models.User = Depends(auth.get_current_user), db: Session = Depends(get_db)):
+    item = visible_item(db, item_id, user)
+    return schemas.InboxItemDetail(**item_out(item).model_dump(), draft=item.draft, ai_raw=item.ai_raw)
+
+
+@router.post("/inbox/{item_id}/process", response_model=schemas.InboxItemOut, status_code=202)
+def process_item(item_id: int, parent: models.User = Depends(auth.require_parent), db: Session = Depends(get_db)):
+    """The release: only now is the mail read, are links fetched and may the AI see it."""
+    item = visible_item(db, item_id, parent)
+    if item.status in ("processing", "done"):
+        raise api_error(409, "item_busy")
+    item.status, item.error, item.processing_since = "processing", None, utcnow()
+    db.commit()
+    importer.start(item.id, parent.id)
+    db.refresh(item)
     return item_out(item)
 
 

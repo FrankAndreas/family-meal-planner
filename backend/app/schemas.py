@@ -113,6 +113,8 @@ class RecipeIn(BaseModel):
     source_kind: Literal["manual", "url", "mail"] = "manual"
     source_url: Annotated[str, StringConstraints(strip_whitespace=True, max_length=1000)] | None = None
     language: Literal["de", "en"] | None = None
+    # Saving a draft from the inbox: the item it came from (its photo is taken over, the item is done)
+    inbox_item_id: int | None = None
 
     @field_validator("servings_unit")
     @classmethod
@@ -183,6 +185,8 @@ class RecipeOut(RecipeSummary):
     ratings: list[RatingOut]
     people: float | None
     factor: float
+    inbox_item_id: int | None
+    original: dict | None
 
 
 class TagCount(BaseModel):
@@ -299,3 +303,8 @@ class UrlIn(BaseModel):
         if not url.lower().startswith(("http://", "https://")):
             raise ValueError("not_a_web_link")
         return url
+
+
+class InboxItemDetail(InboxItemOut):
+    draft: dict | None
+    ai_raw: str | None

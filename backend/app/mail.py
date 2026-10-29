@@ -5,8 +5,10 @@ import email
 import email.policy
 import email.utils
 import hashlib
+import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from html.parser import HTMLParser
 
 
 @dataclass
@@ -85,3 +87,83 @@ def attachment(raw: bytes, index: int) -> tuple[str, bytes] | None:
         return None
     part = parts[index]
     return part.get_content_type(), part.get_payload(decode=True) or b""
+
+
+@dataclass
+class MailContent:
+    text: str
+    links: list[str]
+    # (attachment index, bytes) of the image attachments, in order
+    images: list[tuple[int, bytes]]
+
+
+class _Text(HTMLParser):
+    """Visible text and link targets of an HTML mail part."""
+
+    def __init__(self):
+        super().__init__()
+        self.parts: list[str] = []
+        self.links: list[str] = []
+        self._skip = 0
+
+    def handle_starttag(self, tag, attrs):
+        if tag in ("script", "style"):
+            self._skip += 1
+        if tag == "a":
+            href = dict(attrs).get("href") or ""
+            if href.lower().startswith(("http://", "https://")):
+                self.links.append(href)
+        if tag in ("br", "p", "div", "li", "tr", "h1", "h2", "h3"):
+            self.parts.append("\n")
+
+    def handle_endtag(self, tag):
+        if tag in ("script", "style") and self._skip:
+            self._skip -= 1
+
+    def handle_data(self, data):
+        if not self._skip:
+            self.parts.append(data)
+
+
+def html_text(page: str) -> tuple[str, list[str]]:
+    parser = _Text()
+    try:
+        parser.feed(page)
+    except Exception:
+        pass
+    lines = (" ".join(line.split()) for line in "".join(parser.parts).splitlines())
+    return "\n".join(line for line in lines if line), parser.links
+
+
+LINK = re.compile(r"https?://[^\s<>\"')\]]+", re.I)
+
+
+def content(raw: bytes) -> MailContent:
+    """The whole mail, decoded: only when a parent processes it."""
+    message = _parse(raw)
+    plain = html = ""
+    for part in message.walk():
+        if part.is_multipart() or part.get_content_disposition() == "attachment":
+            continue
+        try:
+            if part.get_content_type() == "text/plain" and not plain:
+                plain = part.get_content()
+            elif part.get_content_type() == "text/html" and not html:
+                html = part.get_content()
+        except Exception:
+            continue
+    html_body, html_links = html_text(html) if html else ("", [])
+    text = plain or html_body
+    links: list[str] = []
+    for link in LINK.findall(text) + html_links:
+        link = link.rstrip(".,;:!?")
+        if link not in links:
+            links.append(link)
+    images = []
+    for index, part in enumerate(_attachment_parts(message)):
+        try:
+            if part.get_content_type().startswith("image/"):
+                images.append((index, part.get_payload(decode=True) or b""))
+        except Exception:
+            continue
+    return MailContent(text.strip(), links, images)

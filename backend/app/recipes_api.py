@@ -1,6 +1,6 @@
 import unicodedata
 
-from fastapi import APIRouter, Depends, Query, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session, selectinload
 
@@ -104,6 +104,8 @@ def recipe_out(
         ratings=[schemas.RatingOut(user_id=r.user_id, name=r.user.name, stars=r.stars) for r in ratings],
         people=people,
         factor=factor,
+        inbox_item_id=db.query(models.InboxItem.id).filter(models.InboxItem.recipe_id == recipe.id).scalar(),
+        original=recipe.original,
     )
 
 
@@ -157,7 +159,7 @@ def normalize_tags(db: Session, tags: list[str], except_id: int | None = None) -
 
 
 def _apply(db: Session, recipe: models.Recipe, body: schemas.RecipeIn) -> None:
-    data = body.model_dump(exclude={"ingredients", "tags"})
+    data = body.model_dump(exclude={"ingredients", "tags", "inbox_item_id"})
     for key, value in data.items():
         setattr(recipe, key, value)
     recipe.tags = normalize_tags(db, body.tags, except_id=recipe.id)
@@ -188,11 +190,42 @@ def list_recipes(
 def create_recipe(
     body: schemas.RecipeIn, me: models.User = Depends(auth.get_current_user), db: Session = Depends(get_db)
 ):
+    item = None
+    if body.inbox_item_id is not None:
+        item = db.get(models.InboxItem, body.inbox_item_id)
+        if item is None or (me.role != models.UserRole.PARENT and item.user_id != me.id):
+            raise api_error(404, "item_not_found")
+        if item.status != "draft":
+            raise api_error(400, "draft_not_ready")
     recipe = models.Recipe(created_by=me.id)
     _apply(db, recipe, body)
+    if item is not None:
+        recipe.source_kind = item.kind
+        recipe.photo = _draft_photo(item)
     db.add(recipe)
+    db.flush()
+    if item is not None:
+        item.status, item.recipe_id = "done", recipe.id
     db.commit()
     return recipe_out(db, recipe, me)
+
+
+def _draft_photo(item: models.InboxItem) -> str | None:
+    """The draft's photo: fetched from the recipe page already, or the mail picture the AI chose."""
+    draft = item.draft or {}
+    if draft.get("photo") and photos.photo_path(draft["photo"]):
+        return draft["photo"]
+    if item.kind == "mail" and draft.get("image_attachment") is not None:
+        from . import mail
+        from .inbox_api import raw_path
+
+        found = mail.attachment(raw_path(item).read_bytes(), draft["image_attachment"])
+        if found and found[0].startswith("image/"):
+            try:
+                return photos.store_photo(found[1])
+            except HTTPException:
+                return None
+    return None
 
 
 @router.get("/recipes/{recipe_id}", response_model=schemas.RecipeOut)

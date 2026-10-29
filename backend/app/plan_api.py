@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session, selectinload
 from . import auth, models, schemas, stats, timeutil
 from .database import get_db
 from .errors import api_error
-from .recipes_api import _Votes, get_recipe
+from .recipes_api import Votes, get_recipe
 from .settings_store import get_settings
 from .weeks import week_days, week_start_of
 
@@ -28,7 +28,7 @@ def _entries(db: Session, first: date, last: date) -> list[models.PlanEntry]:
 
 
 def entries_out(db: Session, entries: list[models.PlanEntry], me: models.User) -> list[schemas.EntryOut]:
-    votes = _Votes(db, sorted({e.recipe_id for e in entries if e.recipe_id is not None}))
+    votes = Votes(db, sorted({e.recipe_id for e in entries if e.recipe_id is not None}))
     return [
         schemas.EntryOut(
             id=e.id,

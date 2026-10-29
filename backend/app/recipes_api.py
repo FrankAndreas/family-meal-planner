@@ -31,7 +31,7 @@ def _total_minutes(recipe: models.Recipe) -> int | None:
     return (recipe.prep_minutes or 0) + (recipe.cook_minutes or 0)
 
 
-class _Votes:
+class Votes:
     """Ratings and favourites of many recipes, loaded in two queries (for lists)."""
 
     def __init__(self, db: Session, recipe_ids: list[int]):
@@ -76,7 +76,7 @@ def recipe_out(
         if people is None
         else scaling.factor(recipe.servings, recipe.servings_unit, people, get_settings(db).family_size)
     )
-    votes = _Votes(db, [recipe.id])
+    votes = Votes(db, [recipe.id])
     ratings = sorted(votes.ratings[recipe.id], key=lambda r: r.user.name_key)
     return schemas.RecipeOut(
         **votes.summary(recipe, me),
@@ -114,7 +114,7 @@ def get_recipe(db: Session, recipe_id: int, *, allow_deleted: bool = False) -> m
     return recipe
 
 
-def _live_recipes(db: Session) -> list[models.Recipe]:
+def live_recipes(db: Session) -> list[models.Recipe]:
     return (
         db.query(models.Recipe)
         .filter(models.Recipe.deleted_at.is_(None))
@@ -123,11 +123,28 @@ def _live_recipes(db: Session) -> list[models.Recipe]:
     )
 
 
+def filter_recipes(recipes: list[models.Recipe], q: str, tag: str) -> list[models.Recipe]:
+    """`q` in the title, a tag or an ingredient; `tag` one of the tags. Both ignore case and accents."""
+    if q.strip():
+        needle = sort_key(q.strip())
+        recipes = [
+            r
+            for r in recipes
+            if needle in sort_key(r.title)
+            or any(needle in sort_key(t) for t in r.tags)
+            or any(needle in sort_key(i.name) for i in r.ingredients)
+        ]
+    if tag.strip():
+        wanted = sort_key(tag.strip())
+        recipes = [r for r in recipes if any(sort_key(t) == wanted for t in r.tags)]
+    return recipes
+
+
 def normalize_tags(db: Session, tags: list[str], except_id: int | None = None) -> list[str]:
     """Tags without blanks and duplicates; a tag the family already uses in another case keeps that spelling
     ("vegi" becomes "Vegi"), so the tag filter lists it once."""
     known: dict[str, str] = {}
-    for recipe in _live_recipes(db):
+    for recipe in live_recipes(db):
         if recipe.id != except_id:
             for tag in recipe.tags:
                 known.setdefault(tag.casefold(), tag)
@@ -157,20 +174,8 @@ def list_recipes(
     me: models.User = Depends(auth.get_current_user),
     db: Session = Depends(get_db),
 ):
-    recipes = _live_recipes(db)
-    if q.strip():
-        needle = sort_key(q.strip())
-        recipes = [
-            r
-            for r in recipes
-            if needle in sort_key(r.title)
-            or any(needle in sort_key(t) for t in r.tags)
-            or any(needle in sort_key(i.name) for i in r.ingredients)
-        ]
-    if tag.strip():
-        wanted = sort_key(tag.strip())
-        recipes = [r for r in recipes if any(sort_key(t) == wanted for t in r.tags)]
-    votes = _Votes(db, [r.id for r in recipes])
+    recipes = filter_recipes(live_recipes(db), q, tag)
+    votes = Votes(db, [r.id for r in recipes])
     if favorites == "mine":
         recipes = [r for r in recipes if me.id in votes.favorites[r.id]]
     elif favorites == "any":
@@ -224,7 +229,7 @@ def delete_recipe(
 @router.get("/tags", response_model=list[schemas.TagCount])
 def list_tags(_user: models.User = Depends(auth.get_current_user), db: Session = Depends(get_db)):
     counts: dict[str, int] = {}
-    for recipe in _live_recipes(db):
+    for recipe in live_recipes(db):
         for tag in recipe.tags:
             counts[tag] = counts.get(tag, 0) + 1
     return [{"name": name, "count": count} for name, count in sorted(counts.items(), key=lambda kv: sort_key(kv[0]))]

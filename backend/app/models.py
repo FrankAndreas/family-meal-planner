@@ -70,6 +70,8 @@ class Recipe(Base):
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)
     # Deleted recipes stay, so the history can still name them
     deleted_at = Column(DateTime)
+    # The text before an AI translation (title, ingredient names and notes, steps, notes, language), else None
+    original = Column(JSON)
 
     creator = relationship("User")
     ingredients = relationship(
@@ -149,3 +151,66 @@ class WeekClosure(Base):
     end = Column(Date, nullable=False)
     closed_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"))
     closed_at = Column(DateTime, default=utcnow, nullable=False)
+
+
+class UserEmail(Base):
+    """An address a family member sends recipes from; mail from any other address is refused."""
+
+    __tablename__ = "user_emails"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    # Lowercase
+    address = Column(String(200), nullable=False, unique=True)
+
+    user = relationship("User")
+
+
+class InboxItem(Base):
+    """A mail or a pasted link waiting to become a recipe. Nothing in it is read beyond the headers until a parent
+    processes it."""
+
+    __tablename__ = "inbox_items"
+
+    id = Column(Integer, primary_key=True)
+    # mail or url
+    kind = Column(String(10), nullable=False)
+    # waiting, processing, draft, failed, done
+    status = Column(String(12), nullable=False, default="waiting")
+    # Who sent the mail or pasted the link
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"))
+    from_addr = Column(String(200), nullable=False, default="")
+    subject = Column(String(300), nullable=False, default="")
+    url = Column(String(1000))
+    message_id = Column(String(500), unique=True)
+    received_at = Column(DateTime, default=utcnow, nullable=False)
+    # [{index, name, type, size}] from the MIME structure, without decoding
+    attachments = Column(JSON, nullable=False, default=list)
+    size = Column(Integer, nullable=False, default=0)
+    # An error code (errors.* in the frontend) of the last processing
+    error = Column(String(100))
+    # The recipe draft processing produced, for a person to check
+    draft = Column(JSON)
+    # The AI's answer as it came, kept as part of the original
+    ai_raw = Column(Text)
+    recipe_id = Column(Integer, ForeignKey("recipes.id", ondelete="SET NULL"))
+    processing_since = Column(DateTime)
+
+    user = relationship("User")
+
+
+class AiCall(Base):
+    """One call to the AI service: the hourly limit counts these, and they are the usage log parents see."""
+
+    __tablename__ = "ai_calls"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"))
+    at = Column(DateTime, default=utcnow, nullable=False, index=True)
+    # import or translate
+    purpose = Column(String(20), nullable=False)
+    item_id = Column(Integer)
+    recipe_id = Column(Integer)
+    tokens = Column(Integer)
+
+    user = relationship("User")

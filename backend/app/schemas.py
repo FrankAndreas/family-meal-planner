@@ -1,4 +1,5 @@
 import datetime as dt
+import re
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator, model_validator
@@ -254,3 +255,36 @@ class WeekOut(BaseModel):
 
 class CloseIn(BaseModel):
     start: dt.date
+
+
+class EmailIn(BaseModel):
+    address: Annotated[str, StringConstraints(strip_whitespace=True, to_lower=True, max_length=200)]
+    user_id: int | None = None
+
+    @field_validator("address")
+    @classmethod
+    def looks_like_mail(cls, address: str) -> str:
+        if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", address):
+            raise ValueError("invalid_email")
+        return address
+
+
+class EmailOut(BaseModel):
+    id: int
+    user_id: int
+    user_name: str
+    address: str
+
+
+class InboxItemOut(BaseModel):
+    id: int
+    kind: str
+    status: str
+    user_name: str | None
+    from_addr: str
+    subject: str
+    url: str | None
+    received_at: dt.datetime
+    attachments: list[dict]
+    error: str | None
+    recipe_id: int | None

@@ -10,6 +10,9 @@ os.environ["DATA_DIR"] = _tmp
 os.environ["SECRET_KEY"] = "test-secret-key-only-for-the-test-suite"
 os.environ["INITIAL_ADMIN_PIN"] = "1234"
 os.environ["DEFAULT_LANGUAGE"] = "de"
+# Optional integrations start switched off; tests that need them set the variables with monkeypatch
+for _name in ("INBOUND_SECRET", "INFOMANIAK_AI_TOKEN", "INFOMANIAK_AI_PRODUCT_ID", "AI_MODEL", "AI_CALLS_PER_HOUR", "AI_FAKE"):
+    os.environ.pop(_name, None)
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 

@@ -125,6 +125,8 @@ const en: typeof de = {
         removeRow: 'Remove',
         lastEaten: 'last eaten {{when}}',
         neverEaten: 'never eaten yet',
+        lastEatenOn_one: 'Last eaten on {{date}} · eaten once',
+        lastEatenOn_other: 'Last eaten on {{date}} · eaten {{count}} times',
         save: 'Save recipe',
     },
     units: {
@@ -179,6 +181,17 @@ const en: typeof de = {
         move: 'Move',
         remove: 'Remove',
         close: 'Close',
+    },
+    close: {
+        title: 'Close the week',
+        intro: 'Untick what you didn’t eat, and rate what you had.',
+        eatenLabel: 'Eaten: {{title}}',
+        instead: 'Instead…',
+    },
+    history: {
+        none: 'No past weeks yet.',
+        closed: 'closed',
+        older: 'Load older weeks',
     },
     errors: {
         generic: 'Something went wrong. Please try again.',

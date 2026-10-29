@@ -124,6 +124,8 @@ const de = {
         removeRow: 'Entfernen',
         lastEaten: 'zuletzt {{when}}',
         neverEaten: 'noch nie gegessen',
+        lastEatenOn_one: 'Zuletzt gegessen am {{date}} · {{count}}× gegessen',
+        lastEatenOn_other: 'Zuletzt gegessen am {{date}} · {{count}}× gegessen',
         save: 'Rezept speichern',
     },
     units: {
@@ -178,6 +180,17 @@ const de = {
         move: 'Verschieben',
         remove: 'Entfernen',
         close: 'Schliessen',
+    },
+    close: {
+        title: 'Woche abschliessen',
+        intro: 'Hake ab, was ihr nicht gegessen habt, und bewerte, was es gab.',
+        eatenLabel: 'Gegessen: {{title}}',
+        instead: 'Stattdessen…',
+    },
+    history: {
+        none: 'Noch keine vergangenen Wochen.',
+        closed: 'abgeschlossen',
+        older: 'Ältere Wochen laden',
     },
     errors: {
         generic: 'Etwas ist schiefgelaufen. Bitte versuche es nochmals.',

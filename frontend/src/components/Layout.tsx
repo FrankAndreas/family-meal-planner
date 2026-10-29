@@ -5,6 +5,7 @@ import { useAuth } from '../AuthContext';
 const NAV = [
     { to: '/', key: 'nav.plan', icon: '📅', end: true },
     { to: '/rezepte', key: 'nav.recipes', icon: '📖', end: false },
+    { to: '/verlauf', key: 'nav.history', icon: '🕘', end: false },
     { to: '/einstellungen', key: 'nav.settings', icon: '⚙️', end: false },
 ] as const;
 

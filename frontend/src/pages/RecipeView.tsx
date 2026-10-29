@@ -1,3 +1,4 @@
+import { format, parseISO } from 'date-fns';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
@@ -37,6 +38,13 @@ export default function RecipeView() {
     const [recipe, setRecipe] = useState<Recipe | null>(null);
     const [people, setPeople] = useState<number | null>(Number(search.get('personen')) || null);
     const [error, setError] = useState('');
+    const [eatenOn, setEatenOn] = useState<string[]>([]);
+
+    useEffect(() => {
+        api.get<string[]>(`/api/recipes/${id}/history`)
+            .then((r) => setEatenOn(r.data))
+            .catch(() => {});
+    }, [id]);
 
     // First load without people, to learn the recipe's own yield; then every change of people asks again
     useEffect(() => {
@@ -113,6 +121,23 @@ export default function RecipeView() {
                             </a>
                         ) : null}
                     </div>
+                    {recipe.last_eaten ? (
+                        <details className="text-sm text-slate-300">
+                            <summary className="cursor-pointer">
+                                {t('recipes.lastEatenOn', {
+                                    date: format(parseISO(recipe.last_eaten), 'd.M.yyyy'),
+                                    count: recipe.times_eaten,
+                                })}
+                            </summary>
+                            <ul className="mt-1 flex flex-wrap gap-x-3 text-slate-400">
+                                {eatenOn.map((day) => (
+                                    <li key={day}>{format(parseISO(day), 'd.M.yyyy')}</li>
+                                ))}
+                            </ul>
+                        </details>
+                    ) : (
+                        <p className="text-sm text-slate-400">{t('recipes.neverEaten')}</p>
+                    )}
                     {recipe.tags.length > 0 && (
                         <div className="flex flex-wrap gap-2">
                             {recipe.tags.map((tag) => (

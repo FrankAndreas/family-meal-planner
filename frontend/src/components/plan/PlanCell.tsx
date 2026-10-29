@@ -1,5 +1,7 @@
+import { useDroppable } from '@dnd-kit/core';
 import { useTranslation } from 'react-i18next';
 import { type PlanEntry, type Slot, weekdayKey } from '../../plan';
+import Draggable from './Draggable';
 import EntryChip from './EntryChip';
 
 export type CellMode = 'plan' | 'move' | 'idle';
@@ -20,15 +22,23 @@ export default function PlanCell({ day, slot, entries, mode, past, familySize, o
     const place = t('plan.place', { day: t(`weekdays.${weekdayKey(day)}`), slot: t(`plan.slots.${slot}`) });
     const label = mode === 'plan' ? t('plan.planOn', { place }) : mode === 'move' ? t('plan.moveTo', { place }) : t('plan.addTo', { place });
     const target = mode !== 'idle';
+    const { setNodeRef, isOver } = useDroppable({ id: `cell|${day}|${slot}` });
     return (
         <div
+            ref={setNodeRef}
             data-testid={`cell-${weekdayKey(day)}-${slot}`}
             className={`flex min-h-20 flex-col gap-1 rounded-lg border p-1 ${
-                target ? 'border-cyan-400/50 bg-cyan-400/5' : 'border-dashed border-white/10'
+                isOver
+                    ? 'border-fuchsia-300 bg-fuchsia-400/10'
+                    : target
+                      ? 'border-cyan-400/50 bg-cyan-400/5'
+                      : 'border-dashed border-white/10'
             } ${past ? 'opacity-60' : ''}`}
         >
             {entries.map((entry) => (
-                <EntryChip key={entry.id} entry={entry} familySize={familySize} onOpen={() => onOpenEntry(entry)} />
+                <Draggable key={entry.id} id={`entry|${entry.id}`}>
+                    <EntryChip entry={entry} familySize={familySize} onOpen={() => onOpenEntry(entry)} />
+                </Draggable>
             ))}
             {/* The free part of the cell: plan the picked recipe here, move here, or add a note */}
             <button

@@ -5,6 +5,7 @@ import { fetchSuggestions, type SuggestionTab } from '../../plan';
 import type { RecipeSummary } from '../../recipes';
 import { ERROR, INPUT } from '../../ui';
 import RecipeCard from '../recipes/RecipeCard';
+import Draggable from './Draggable';
 
 const TABS: SuggestionTab[] = ['favorites', 'long_ago', 'new', 'again'];
 
@@ -69,13 +70,14 @@ export default function SuggestionPanel({ selectedId, onPick, version }: Suggest
             <div className="flex-1 space-y-2 overflow-y-auto pr-1">
                 {recipes?.length === 0 && <p className="p-2 text-sm text-slate-400">{t(`plan.empty.${tab}`)}</p>}
                 {recipes?.map((recipe) => (
-                    <RecipeCard
-                        key={recipe.id}
-                        recipe={recipe}
-                        compact
-                        selected={recipe.id === selectedId}
-                        onClick={() => onPick(recipe)}
-                    />
+                    <Draggable key={recipe.id} id={`recipe|${recipe.id}|${recipe.title}`}>
+                        <RecipeCard
+                            recipe={recipe}
+                            compact
+                            selected={recipe.id === selectedId}
+                            onClick={() => onPick(recipe)}
+                        />
+                    </Draggable>
                 ))}
             </div>
             {selectedId !== null && <p className="text-xs text-cyan-300">{t('plan.pickCell')}</p>}

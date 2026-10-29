@@ -73,3 +73,32 @@ test('a child sees what a parent planned', async ({ page, request }) => {
     await page.goto(`/?woche=${week}`);
     await expect(page.getByTestId('cell-sat-breakfast')).toContainText('Zopf');
 });
+
+async function drag(page: import('@playwright/test').Page, from: import('@playwright/test').Locator, to: import('@playwright/test').Locator) {
+    const a = (await from.boundingBox())!;
+    const b = (await to.boundingBox())!;
+    await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(a.x + a.width / 2 + 12, a.y + a.height / 2, { steps: 3 });
+    await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2, { steps: 10 });
+    await page.mouse.up();
+}
+
+test('drag a suggestion into the week, and an entry to another day', async ({ page, request }) => {
+    const parent = await newPerson(request);
+    const recipe = await createRecipe(request, parent);
+    await call(request, parent, 'PUT', `/recipes/${recipe.id}/favorite`, { favorite: true });
+    await login(page, parent.name);
+    await page.goto(`/?woche=${ownWeek()}`);
+    const card = page.getByRole('complementary').getByRole('button', { name: recipe.title });
+    await drag(page, card, page.getByTestId('cell-tue-dinner'));
+    await expect(page.getByTestId('cell-tue-dinner')).toContainText(recipe.title);
+
+    const chip = page.getByTestId('cell-tue-dinner').getByRole('button', { name: recipe.title });
+    await drag(page, chip, page.getByTestId('cell-wed-lunch'));
+    await expect(page.getByTestId('cell-wed-lunch')).toContainText(recipe.title);
+    await expect(page.getByTestId('cell-tue-dinner')).not.toContainText(recipe.title);
+    // A drag is not a tap: no menu opened, nothing picked
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await expect(card).toHaveAttribute('aria-pressed', 'false');
+});

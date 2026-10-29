@@ -1,3 +1,13 @@
+import {
+    DndContext,
+    DragOverlay,
+    MouseSensor,
+    TouchSensor,
+    useSensor,
+    useSensors,
+    type DragEndEvent,
+    type DragStartEvent,
+} from '@dnd-kit/core';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
@@ -23,6 +33,13 @@ export default function PlanPage() {
     const [menuEntry, setMenuEntry] = useState<PlanEntry | null>(null);
     const [noteCell, setNoteCell] = useState<{ day: string; slot: Slot } | null>(null);
     const [version, setVersion] = useState(0);
+    const [dragging, setDragging] = useState<string | null>(null);
+    // A small move starts a drag with the mouse; on a touch screen a short hold does, so a tap stays a tap
+    // (tap-tap planning) and a swipe still scrolls the suggestions
+    const sensors = useSensors(
+        useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
+        useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
+    );
     const [error, setError] = useState('');
     const requested = search.get('woche');
 
@@ -86,6 +103,23 @@ export default function PlanPage() {
         }
     };
 
+    const dragTitle = (id: string) => {
+        const [kind, key, title] = id.split('|');
+        if (kind === 'recipe') return title;
+        const entry = week?.entries.find((e) => e.id === Number(key));
+        return entry?.recipe?.title ?? entry?.note ?? '';
+    };
+
+    const onDragStart = (event: DragStartEvent) => setDragging(String(event.active.id));
+    const onDragEnd = (event: DragEndEvent) => {
+        setDragging(null);
+        if (!event.over) return;
+        const [kind, key] = String(event.active.id).split('|');
+        const [, day, slot] = String(event.over.id).split('|') as [string, string, Slot];
+        if (kind === 'recipe') run(() => addEntry({ date: day, slot, recipe_id: Number(key) }));
+        else run(() => updateEntry(Number(key), { date: day, slot }));
+    };
+
     if (!week) return error ? <p className={ERROR}>{error}</p> : <p className="text-slate-400">{t('common.loading')}</p>;
 
     const mode = moving ? 'move' : picked ? 'plan' : 'idle';
@@ -104,17 +138,31 @@ export default function PlanPage() {
                     </button>
                 </p>
             )}
-            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_17rem]">
-                <WeekGrid week={week} mode={mode} familySize={familySize} onCell={onCell} onOpenEntry={setMenuEntry} />
-                <SuggestionPanel
-                    selectedId={picked?.id ?? null}
-                    version={version}
-                    onPick={(recipe) => {
-                        setMoving(null);
-                        setPicked(picked?.id === recipe.id ? null : recipe);
-                    }}
-                />
-            </div>
+            <DndContext
+                sensors={sensors}
+                onDragStart={onDragStart}
+                onDragEnd={onDragEnd}
+                onDragCancel={() => setDragging(null)}
+            >
+                <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_17rem]">
+                    <WeekGrid week={week} mode={mode} familySize={familySize} onCell={onCell} onOpenEntry={setMenuEntry} />
+                    <SuggestionPanel
+                        selectedId={picked?.id ?? null}
+                        version={version}
+                        onPick={(recipe) => {
+                            setMoving(null);
+                            setPicked(picked?.id === recipe.id ? null : recipe);
+                        }}
+                    />
+                </div>
+                <DragOverlay dropAnimation={null}>
+                    {dragging && (
+                        <div className="rounded-md border border-fuchsia-300 bg-slate-900/90 px-2 py-1 text-xs shadow-lg">
+                            {dragTitle(dragging)}
+                        </div>
+                    )}
+                </DragOverlay>
+            </DndContext>
             {noteCell && (
                 <NoteDialog
                     place={place(noteCell.day, noteCell.slot)}

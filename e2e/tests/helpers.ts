@@ -31,16 +31,41 @@ export async function newPerson(request: APIRequestContext, role: 'PARENT' | 'CH
     return { name, token: await token(request, name, PIN) };
 }
 
-// Log in through the login page, and collect errors in the browser console (the test checks they are empty)
+const pageErrors = new WeakMap<Page, string[]>();
+
+// Log in through the login page, and collect errors in the browser console (the test checks they are empty).
+// The listeners go on once per page: a test that logs in twice would otherwise accept each dialog twice.
 export async function login(page: Page, name: string, pin = PIN): Promise<string[]> {
-    const errors: string[] = [];
-    page.on('pageerror', e => errors.push(String(e)));
-    page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
-    page.on('dialog', d => d.accept());
+    let errors = pageErrors.get(page);
+    if (!errors) {
+        const collected: string[] = [];
+        errors = collected;
+        pageErrors.set(page, collected);
+        page.on('pageerror', e => collected.push(String(e)));
+        page.on('console', m => { if (m.type() === 'error') collected.push(m.text()); });
+        page.on('dialog', d => d.accept());
+    }
     await page.goto('/login');
     await page.getByRole('button', { name, exact: true }).click();
     await page.locator('#pin').fill(pin);
     await page.locator('button[type=submit]').click();
     await expect(page.getByRole('button', { name: /log out|abmelden/i })).toBeVisible();
     return errors;
+}
+
+// A recipe made through the API, for tests that are about something else than typing one in
+export async function createRecipe(request: APIRequestContext, person: Person, fields: Record<string, unknown> = {}) {
+    const response = await request.post(`${API}/recipes`, {
+        data: {
+            title: uniqueName('Rezept '),
+            servings: 4,
+            ingredients: [{ amount: 400, unit: 'g', name: 'Hörnli' }],
+            steps: ['Kochen'],
+            tags: [],
+            ...fields,
+        },
+        headers: { Authorization: `Bearer ${person.token}` },
+    });
+    expect(response.ok(), await response.text()).toBeTruthy();
+    return response.json();
 }

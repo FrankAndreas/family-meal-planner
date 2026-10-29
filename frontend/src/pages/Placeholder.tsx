@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { CARD } from '../ui';
 
 // A page that later plans fill (week plan, recipes)
-export default function Placeholder({ titleKey }: { titleKey: 'nav.plan' | 'nav.recipes' }) {
+export default function Placeholder({ titleKey }: { titleKey: 'nav.plan' }) {
     const { t } = useTranslation();
     return (
         <section className={CARD}>

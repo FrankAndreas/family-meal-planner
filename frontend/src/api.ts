@@ -1,8 +1,8 @@
 import axios from 'axios';
 import i18n from './i18n';
 
-// Same origin: Vite (dev) or nginx (Docker) forwards /api to the backend
-const api = axios.create();
+// Same origin: Vite (dev) or nginx (Docker) forwards /api to the backend; the browser tests set VITE_API_URL
+const api = axios.create({ baseURL: import.meta.env.VITE_API_URL || undefined });
 
 api.interceptors.request.use((config) => {
     const token = localStorage.getItem('token');
@@ -16,7 +16,7 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
     (response) => response,
     (error) => {
-        const isLogin = error.config?.url === '/api/token';
+        const isLogin = error.config?.url?.endsWith('/api/token');
         if (error.response?.status === 401 && !isLogin && localStorage.getItem('token')) {
             localStorage.removeItem('token');
             window.location.href = '/login';

@@ -1,0 +1,54 @@
+import { defineConfig, devices } from '@playwright/test';
+import path from 'node:path';
+import { PYTHON as python } from './tests/helpers';
+
+// The tests start their own backend (fresh SQLite database, admin PIN 1111) and frontend on ports of their own,
+// so a dev server on 8000/5173 and its data are never touched. E2E_PYTHON: the Python with the backend's packages.
+export const BACKEND = 'http://localhost:8100';
+export const FRONTEND = 'http://localhost:3100';
+const database = path.resolve(__dirname, '.tmp', 'e2e.db');
+
+export default defineConfig({
+    testDir: './tests',
+    // One backend and database for all tests; each test works with people of its own
+    workers: 1,
+    retries: process.env.CI ? 1 : 0,
+    reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
+    use: {
+        baseURL: FRONTEND,
+        // The tests find elements by their English texts (one test switches to German itself)
+        locale: 'en-US',
+        trace: 'retain-on-failure',
+        screenshot: 'only-on-failure',
+    },
+    projects: [
+        // The Friday planning happens on an iPad-sized screen in landscape
+        { name: 'tablet', use: { ...devices['Desktop Chrome'], viewport: { width: 1180, height: 820 }, hasTouch: true } },
+        { name: 'phone', use: { ...devices['Pixel 7'] }, testMatch: /login\.spec\.ts/ },
+    ],
+    webServer: [
+        {
+            command: `mkdir -p "${path.dirname(database)}" && rm -f "${database}" && "${python}" -m uvicorn app.main:app --port 8100`,
+            cwd: path.resolve(__dirname, '..', 'backend'),
+            url: `${BACKEND}/health`,
+            env: {
+                DATABASE_URL: `sqlite:///${database}`,
+                DATA_DIR: path.dirname(database),
+                INITIAL_ADMIN_PIN: '1111',
+                SECRET_KEY: 'e2e-only-key-not-used-anywhere-else',
+                CORS_ORIGINS: FRONTEND,
+                DEFAULT_LANGUAGE: 'en',
+            },
+            reuseExistingServer: false,
+            timeout: 60_000,
+        },
+        {
+            command: 'npx vite --port 3100 --strictPort',
+            cwd: path.resolve(__dirname, '..', 'frontend'),
+            url: FRONTEND,
+            env: { VITE_API_URL: BACKEND },
+            reuseExistingServer: false,
+            timeout: 60_000,
+        },
+    ],
+});

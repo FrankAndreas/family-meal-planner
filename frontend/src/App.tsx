@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from './AuthContext';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 import Placeholder from './pages/Placeholder';
+import SettingsPage from './pages/SettingsPage';
 
 function RequireAuth({ children }: { children: ReactElement }) {
     const { t } = useTranslation();
@@ -28,7 +29,7 @@ export default function App() {
                     >
                         <Route index element={<Placeholder titleKey="nav.plan" />} />
                         <Route path="rezepte" element={<Placeholder titleKey="nav.recipes" />} />
-                        <Route path="einstellungen" element={<Placeholder titleKey="nav.settings" />} />
+                        <Route path="einstellungen" element={<SettingsPage />} />
                     </Route>
                     <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>

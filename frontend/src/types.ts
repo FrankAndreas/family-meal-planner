@@ -21,3 +21,6 @@ export interface FamilySettings {
     // Python weekday: 0 = Monday ... 6 = Sunday
     week_start: number;
 }
+
+// Python weekday number (0 = Monday) → locale key under weekdays.*
+export const WEEKDAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const;

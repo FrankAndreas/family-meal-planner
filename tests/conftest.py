@@ -25,6 +25,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 from app import database, models  # noqa: E402
 from app.main import app  # noqa: E402
 from app.seed import seed_admin  # noqa: E402
+from helpers import login  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
@@ -47,3 +48,8 @@ def db():
 @pytest.fixture
 def client():
     return TestClient(app)
+
+
+@pytest.fixture
+def admin_headers(client):
+    return login(client)

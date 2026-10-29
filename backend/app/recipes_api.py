@@ -1,0 +1,210 @@
+import unicodedata
+
+from fastapi import APIRouter, Depends, Query
+from sqlalchemy.orm import Session, selectinload
+
+from . import auth, models, schemas
+from .database import get_db
+from .errors import api_error
+from .timeutil import utcnow
+from .units import UNITS
+
+router = APIRouter(tags=["recipes"])
+
+
+def sort_key(text: str) -> str:
+    """Alphabetical the way people expect it: "Älplermagronen" next to "Apfelwähe", not after "Zopf"."""
+    decomposed = unicodedata.normalize("NFKD", text.casefold())
+    return "".join(c for c in decomposed if not unicodedata.combining(c))
+
+
+def _photo_url(recipe: models.Recipe) -> str | None:
+    return f"/api/photos/{recipe.photo}" if recipe.photo else None
+
+
+def _total_minutes(recipe: models.Recipe) -> int | None:
+    if recipe.prep_minutes is None and recipe.cook_minutes is None:
+        return None
+    return (recipe.prep_minutes or 0) + (recipe.cook_minutes or 0)
+
+
+class _Votes:
+    """Ratings and favourites of many recipes, loaded in two queries (for lists)."""
+
+    def __init__(self, db: Session, recipe_ids: list[int]):
+        self.ratings: dict[int, list[models.Rating]] = {rid: [] for rid in recipe_ids}
+        self.favorites: dict[int, set[int]] = {rid: set() for rid in recipe_ids}
+        if not recipe_ids:
+            return
+        query = db.query(models.Rating).options(selectinload(models.Rating.user))
+        for rating in query.filter(models.Rating.recipe_id.in_(recipe_ids)):
+            self.ratings[rating.recipe_id].append(rating)
+        for fav in db.query(models.Favorite).filter(models.Favorite.recipe_id.in_(recipe_ids)):
+            self.favorites[fav.recipe_id].add(fav.user_id)
+
+    def summary(self, recipe: models.Recipe, me: models.User) -> dict:
+        ratings = self.ratings[recipe.id]
+        favorites = self.favorites[recipe.id]
+        return {
+            "id": recipe.id,
+            "title": recipe.title,
+            "photo_url": _photo_url(recipe),
+            "tags": recipe.tags,
+            "servings": recipe.servings,
+            "servings_unit": recipe.servings_unit,
+            "total_minutes": _total_minutes(recipe),
+            "rating_avg": round(sum(r.stars for r in ratings) / len(ratings), 2) if ratings else None,
+            "rating_count": len(ratings),
+            "my_rating": next((r.stars for r in ratings if r.user_id == me.id), None),
+            "my_favorite": me.id in favorites,
+            "favorite_count": len(favorites),
+        }
+
+
+def recipe_out(db: Session, recipe: models.Recipe, me: models.User) -> schemas.RecipeOut:
+    votes = _Votes(db, [recipe.id])
+    ratings = sorted(votes.ratings[recipe.id], key=lambda r: r.user.name_key)
+    return schemas.RecipeOut(
+        **votes.summary(recipe, me),
+        prep_minutes=recipe.prep_minutes,
+        cook_minutes=recipe.cook_minutes,
+        steps=recipe.steps,
+        notes=recipe.notes,
+        source_kind=recipe.source_kind,
+        source_url=recipe.source_url,
+        language=recipe.language,
+        created_by_name=recipe.creator.name if recipe.creator else None,
+        deleted=recipe.deleted_at is not None,
+        ingredients=[
+            schemas.IngredientOut(
+                id=i.id, group=i.group, amount=i.amount, unit=i.unit, name=i.name, note=i.note, scaled_amount=i.amount
+            )
+            for i in recipe.ingredients
+        ],
+        ratings=[schemas.RatingOut(user_id=r.user_id, name=r.user.name, stars=r.stars) for r in ratings],
+        people=None,
+        factor=1,
+    )
+
+
+def get_recipe(db: Session, recipe_id: int, *, allow_deleted: bool = False) -> models.Recipe:
+    recipe = db.get(models.Recipe, recipe_id)
+    if recipe is None or (recipe.deleted_at is not None and not allow_deleted):
+        raise api_error(404, "recipe_not_found")
+    return recipe
+
+
+def _live_recipes(db: Session) -> list[models.Recipe]:
+    return (
+        db.query(models.Recipe)
+        .filter(models.Recipe.deleted_at.is_(None))
+        .options(selectinload(models.Recipe.ingredients))
+        .all()
+    )
+
+
+def normalize_tags(db: Session, tags: list[str], except_id: int | None = None) -> list[str]:
+    """Tags without blanks and duplicates; a tag the family already uses in another case keeps that spelling
+    ("vegi" becomes "Vegi"), so the tag filter lists it once."""
+    known: dict[str, str] = {}
+    for recipe in _live_recipes(db):
+        if recipe.id != except_id:
+            for tag in recipe.tags:
+                known.setdefault(tag.casefold(), tag)
+    result: list[str] = []
+    for tag in (t.strip() for t in tags):
+        key = tag.casefold()
+        if tag and key not in {t.casefold() for t in result}:
+            result.append(known.get(key, tag))
+    return result
+
+
+def _apply(db: Session, recipe: models.Recipe, body: schemas.RecipeIn) -> None:
+    data = body.model_dump(exclude={"ingredients", "tags"})
+    for key, value in data.items():
+        setattr(recipe, key, value)
+    recipe.tags = normalize_tags(db, body.tags, except_id=recipe.id)
+    recipe.ingredients = [
+        models.RecipeIngredient(position=n, **ingredient.model_dump()) for n, ingredient in enumerate(body.ingredients)
+    ]
+
+
+@router.get("/recipes", response_model=list[schemas.RecipeSummary])
+def list_recipes(
+    q: str = "",
+    tag: str = "",
+    favorites: str = Query("", pattern="^(|mine|any)$"),
+    me: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db),
+):
+    recipes = _live_recipes(db)
+    if q.strip():
+        needle = q.strip().casefold()
+        recipes = [
+            r
+            for r in recipes
+            if needle in r.title.casefold()
+            or any(needle in t.casefold() for t in r.tags)
+            or any(needle in i.name.casefold() for i in r.ingredients)
+        ]
+    if tag.strip():
+        wanted = tag.strip().casefold()
+        recipes = [r for r in recipes if any(t.casefold() == wanted for t in r.tags)]
+    votes = _Votes(db, [r.id for r in recipes])
+    if favorites == "mine":
+        recipes = [r for r in recipes if me.id in votes.favorites[r.id]]
+    elif favorites == "any":
+        recipes = [r for r in recipes if votes.favorites[r.id]]
+    recipes.sort(key=lambda r: sort_key(r.title))
+    return [votes.summary(r, me) for r in recipes]
+
+
+@router.post("/recipes", response_model=schemas.RecipeOut, status_code=201)
+def create_recipe(
+    body: schemas.RecipeIn, me: models.User = Depends(auth.get_current_user), db: Session = Depends(get_db)
+):
+    recipe = models.Recipe(created_by=me.id)
+    _apply(db, recipe, body)
+    db.add(recipe)
+    db.commit()
+    return recipe_out(db, recipe, me)
+
+
+@router.get("/recipes/{recipe_id}", response_model=schemas.RecipeOut)
+def read_recipe(recipe_id: int, me: models.User = Depends(auth.get_current_user), db: Session = Depends(get_db)):
+    return recipe_out(db, get_recipe(db, recipe_id, allow_deleted=True), me)
+
+
+@router.put("/recipes/{recipe_id}", response_model=schemas.RecipeOut)
+def update_recipe(
+    recipe_id: int,
+    body: schemas.RecipeIn,
+    me: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db),
+):
+    recipe = get_recipe(db, recipe_id)
+    _apply(db, recipe, body)
+    db.commit()
+    return recipe_out(db, recipe, me)
+
+
+@router.delete("/recipes/{recipe_id}", status_code=204)
+def delete_recipe(
+    recipe_id: int, _parent: models.User = Depends(auth.require_parent), db: Session = Depends(get_db)
+):
+    get_recipe(db, recipe_id).deleted_at = utcnow()
+    db.commit()
+
+
+@router.get("/tags", response_model=list[schemas.TagCount])
+def list_tags(_user: models.User = Depends(auth.get_current_user), db: Session = Depends(get_db)):
+    counts: dict[str, int] = {}
+    for recipe in _live_recipes(db):
+        for tag in recipe.tags:
+            counts[tag] = counts.get(tag, 0) + 1
+    return [{"name": name, "count": count} for name, count in sorted(counts.items(), key=lambda kv: sort_key(kv[0]))]
+
+
+@router.get("/units")
+def list_units(_user: models.User = Depends(auth.get_current_user)):
+    return list(UNITS)

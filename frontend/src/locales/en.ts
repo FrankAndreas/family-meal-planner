@@ -5,7 +5,6 @@ const en: typeof de = {
     common: {
         appName: 'Meal planner',
         loading: 'Loading…',
-        comingSoon: 'Coming soon.',
         save: 'Save',
         cancel: 'Cancel',
         delete: 'Delete',

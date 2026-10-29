@@ -3,7 +3,6 @@ const de = {
     common: {
         appName: 'Menüplaner',
         loading: 'Laden…',
-        comingSoon: 'Kommt bald.',
         save: 'Speichern',
         cancel: 'Abbrechen',
         delete: 'Löschen',

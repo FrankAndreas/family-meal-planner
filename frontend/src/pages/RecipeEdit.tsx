@@ -1,13 +1,14 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import api, { apiUrl, errorMessage } from '../api';
+import api, { errorMessage } from '../api';
 import i18next from '../i18n';
 import IngredientEditor from '../components/recipes/IngredientEditor';
+import PhotoPicker, { type PhotoChoice } from '../components/recipes/PhotoPicker';
 import type { Language } from '../i18n';
 import { fetchItem, type InboxItemDetail } from '../inbox';
 import { emptyRow, ingredientsFrom, rowInvalid, rowsFrom, type Row } from '../ingredientRows';
-import { fetchRecipe, type Recipe, type RecipeInput } from '../recipes';
+import { fetchRecipe, isWebLink, type Recipe, type RecipeInput } from '../recipes';
 import { BUTTON, BUTTON_SECONDARY, CARD, ERROR, FIELD, INPUT } from '../ui';
 
 interface Form {
@@ -37,7 +38,7 @@ export default function RecipeEdit() {
     const [original, setOriginal] = useState<Recipe | null>(null);
     const [units, setUnits] = useState<string[]>([]);
     const [knownTags, setKnownTags] = useState<string[]>([]);
-    const [photo, setPhoto] = useState<File | null>(null);
+    const [photo, setPhoto] = useState<PhotoChoice>({ kind: 'keep' });
     // A new recipe saved while its photo failed: saving again updates it instead of making a second one
     const [createdId, setCreatedId] = useState<number | null>(null);
     const [busy, setBusy] = useState(false);
@@ -107,7 +108,11 @@ export default function RecipeEdit() {
 
     const set = (key: keyof Form) => (e: { target: { value: string } }) => setForm({ ...form, [key]: e.target.value });
     const servings = Number(form.servings.replace(',', '.'));
-    const invalid = !form.title.trim() || !(servings > 0 && servings <= 100) || rows.some(rowInvalid);
+    const invalid =
+        !form.title.trim() ||
+        !(servings > 0 && servings <= 100) ||
+        rows.some(rowInvalid) ||
+        (photo.kind === 'link' && !isWebLink(photo.url));
 
     const save = async (e: FormEvent) => {
         e.preventDefault();
@@ -136,10 +141,14 @@ export default function RecipeEdit() {
                 ? (await api.put<Recipe>(`/api/recipes/${target}`, body)).data
                 : (await api.post<Recipe>('/api/recipes', body)).data;
             setCreatedId(saved.id);
-            if (photo) {
+            if (photo.kind === 'file') {
                 const data = new FormData();
-                data.append('file', photo);
+                data.append('file', photo.file);
                 await api.post(`/api/recipes/${saved.id}/photo`, data);
+            } else if (photo.kind === 'link') {
+                await api.post(`/api/recipes/${saved.id}/photo-url`, { url: photo.url.trim() });
+            } else if (photo.kind === 'remove' && saved.photo_url) {
+                await api.delete(`/api/recipes/${saved.id}/photo`);
             }
             navigate(`/rezepte/${saved.id}`, { replace: true });
         } catch (err) {
@@ -164,9 +173,6 @@ export default function RecipeEdit() {
                         ))}
                     </ul>
                 </section>
-            )}
-            {draftItem?.draft?.photo && (
-                <img src={apiUrl(`/api/photos/${draftItem.draft.photo}`)} alt="" className="h-40 rounded-xl object-cover" />
             )}
             <section className={`${CARD} grid gap-4 sm:grid-cols-2`}>
                 <div className="sm:col-span-2">
@@ -222,10 +228,11 @@ export default function RecipeEdit() {
                     </datalist>
                 </div>
                 <div className="sm:col-span-2">
-                    <label htmlFor="photo" className={label}>
-                        {t('recipes.photo')}
-                    </label>
-                    <input id="photo" type="file" accept="image/*" onChange={(e) => setPhoto(e.target.files?.[0] ?? null)} />
+                    <PhotoPicker
+                        current={original?.photo_url ?? (draftItem?.draft?.photo ? `/api/photos/${draftItem.draft.photo}` : null)}
+                        choice={photo}
+                        onChange={setPhoto}
+                    />
                 </div>
             </section>
             <section className={`${CARD} space-y-3`}>

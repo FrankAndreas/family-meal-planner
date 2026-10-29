@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session, selectinload
 
-from . import ai, auth, models, photos, scaling, schemas, stats
+from . import ai, auth, fetch, jsonld, models, photos, scaling, schemas, stats
 from .database import get_db
 from .errors import api_error
 from .settings_store import get_settings
@@ -322,6 +322,30 @@ async def upload_photo(
     if len(data) > photos.MAX_BYTES:
         raise api_error(413, "photo_too_large")
     old, recipe.photo = recipe.photo, photos.store_photo(data)
+    db.commit()
+    photos.delete_photo(old)
+    return recipe_out(db, recipe, me)
+
+
+@router.post("/recipes/{recipe_id}/photo-url", response_model=schemas.RecipeOut)
+def photo_from_link(
+    recipe_id: int,
+    body: schemas.UrlIn,
+    me: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db),
+):
+    """A picture's link, or a page's: then the picture it shows when shared. Only public web servers (see fetch)."""
+    recipe = get_recipe(db, recipe_id)
+    try:
+        found = fetch.fetch(body.url, accept=("image/", *fetch.PAGE_TYPES))
+        if not found.content_type.startswith("image/"):
+            image_url = jsonld.page_image(found.text, found.url)
+            if not image_url:
+                raise api_error(400, "photo_link_failed")
+            found = fetch.fetch(image_url, accept=("image/",))
+    except (fetch.FetchFailed, fetch.FetchRefused):
+        raise api_error(400, "photo_link_failed")
+    old, recipe.photo = recipe.photo, photos.store_photo(found.body)
     db.commit()
     photos.delete_photo(old)
     return recipe_out(db, recipe, me)

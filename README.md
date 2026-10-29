@@ -21,7 +21,7 @@ German by default, English per person.
 - On the phone: one day at a time, for adding something during the week.
 
 **Recipes**
-- Structured ingredients (amount, unit, name, note, groups like "Sauce"), steps, tags, photos (iPhone HEIC works).
+- Structured ingredients (amount, unit, name, note, groups like "Sauce"), steps, tags, a photo (picked, pasted or loaded from a link; iPhone HEIC works).
 - Scaled to any number of people, rounded the way people measure ("½ l", "1½ Eier", "350 g").
 - Ratings and favourites per person, so you see what everyone likes.
 

@@ -87,3 +87,6 @@ export async function fetchRecipe(id: number | string, people?: number | null): 
 // How many people a recipe is for when nobody said otherwise: its own yield, or the family for "1 Blech"
 export const defaultPeople = (recipe: RecipeSummary, familySize: number) =>
     recipe.servings_unit === null ? recipe.servings : familySize;
+
+// What the backend takes as a link (http/https); anything else is said at once instead of on saving
+export const isWebLink = (text: string) => /^https?:\/\/\S+$/i.test(text.trim());

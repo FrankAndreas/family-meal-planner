@@ -5,12 +5,18 @@ import en from './locales/en';
 
 export type Language = 'de' | 'en';
 
-// Before login (and after logout) the browser decides; after login the person's own setting
-export const browserLanguage = (): Language => (navigator.language.toLowerCase().startsWith('de') ? 'de' : 'en');
+// Before login (and after logout) the browser decides, if it speaks German or English (see guestLanguage in
+// language.ts for the others); after login the person's own setting
+export function browserLanguage(): Language | null {
+    const lang = navigator.language.toLowerCase();
+    if (lang.startsWith('de')) return 'de';
+    if (lang.startsWith('en')) return 'en';
+    return null;
+}
 
 i18n.use(initReactI18next).init({
     resources: { de: { translation: de }, en: { translation: en } },
-    lng: browserLanguage(),
+    lng: browserLanguage() ?? 'de',
     fallbackLng: 'de',
     interpolation: { escapeValue: false },
 });

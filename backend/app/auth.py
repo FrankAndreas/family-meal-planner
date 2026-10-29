@@ -21,9 +21,11 @@ if not config.env("SECRET_KEY"):
     logger.warning("SECRET_KEY is not set; using a random key, so logins won't survive a restart")
 ALGORITHM = "HS256"
 TOKEN_LIFETIME = timedelta(days=30)
-# A 4-digit PIN is guessable, so lock the user after a few wrong tries
+# A 4-digit PIN is guessable, so lock the user after a few wrong tries. Each lock in a row doubles the next one, up to
+# a day: then about 5 guesses a day are left, so a child can't find a parent's PIN (and with it the AI) by trying
 MAX_FAILED_LOGINS = 5
 LOCK_DURATION = timedelta(minutes=15)
+MAX_LOCK_DURATION = timedelta(days=1)
 
 _bearer = HTTPBearer(auto_error=False)
 
@@ -43,6 +45,11 @@ def verify_pin(pin: str, hashed: str) -> bool:
 def name_key(name: str) -> str:
     """What makes two names the same person's: case and surrounding spaces don't count."""
     return name.strip().casefold()
+
+
+def lock_duration(lockouts: int) -> timedelta:
+    """15, 30, 60, ... minutes for the first, second, third lock in a row; at most a day."""
+    return min(LOCK_DURATION * 2 ** min(max(lockouts - 1, 0), 10), MAX_LOCK_DURATION)
 
 
 def create_access_token(user: models.User) -> str:
@@ -65,10 +72,12 @@ def authenticate(db: Session, name: str, pin: str) -> models.User:
         user.failed_logins += 1
         if user.failed_logins >= MAX_FAILED_LOGINS:
             user.failed_logins = 0
-            user.locked_until = now + LOCK_DURATION
+            user.lockouts += 1
+            user.locked_until = now + lock_duration(user.lockouts)
         db.commit()
         raise wrong
     user.failed_logins = 0
+    user.lockouts = 0
     user.locked_until = None
     db.commit()
     return user

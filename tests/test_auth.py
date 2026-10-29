@@ -102,3 +102,48 @@ def test_unknown_default_language_falls_back_to_german(client, monkeypatch):
 def test_english_default_language(client, monkeypatch):
     monkeypatch.setenv("DEFAULT_LANGUAGE", "en")
     assert client.get("/api/me", headers=login(client)).json()["language"] == "en"
+
+
+def _fail(client, name=ADMIN, times=5):
+    for _ in range(times):
+        client.post("/api/token", json={"name": name, "pin": "0000"})
+
+
+def test_repeated_lockouts_grow(client, db):
+    from app import models
+
+    _fail(client)
+    user = db.query(models.User).filter_by(name="Admin").one()
+    user.locked_until = None  # the first lock ran out
+    db.commit()
+    _fail(client)
+    r = client.post("/api/token", json={"name": ADMIN, "pin": ADMIN_PIN})
+    assert r.json()["detail"] == {"code": "locked", "minutes": 30}
+
+
+def test_lock_never_longer_than_a_day(client, db):
+    from app import models
+
+    user = db.query(models.User).filter_by(name="Admin").one()
+    user.lockouts = 20
+    db.commit()
+    _fail(client)
+    r = client.post("/api/token", json={"name": ADMIN, "pin": ADMIN_PIN})
+    assert r.json()["detail"] == {"code": "locked", "minutes": 24 * 60}
+
+
+def test_correct_login_forgets_lockouts(client, db):
+    from app import models
+
+    user = db.query(models.User).filter_by(name="Admin").one()
+    user.lockouts = 3
+    db.commit()
+    login(client)
+    db.refresh(user)
+    assert user.lockouts == 0
+
+
+def test_public_config_has_default_language(client, monkeypatch):
+    assert client.get("/api/config").json() == {"default_language": "de"}
+    monkeypatch.setenv("DEFAULT_LANGUAGE", "en")
+    assert client.get("/api/config").json() == {"default_language": "en"}

@@ -28,13 +28,14 @@ export default function FamilyMembers() {
             .catch((err) => setError(errorMessage(err)));
     }, []);
 
-    // Every change reloads the list; a change to oneself (name, role) also reloads the logged-in person
+    // Every change reloads the logged-in person (their own name or role may have changed), then the list, which only
+    // parents may read: a parent who just made themself a child loses this section instead of getting an error
     const run = async (action: () => Promise<unknown>) => {
         setError('');
         try {
             await action();
-            await load();
-            await refreshUser();
+            const now = await refreshUser();
+            if (now.role === 'PARENT') await load();
             return true;
         } catch (err) {
             setError(errorMessage(err));
@@ -92,13 +93,16 @@ export default function FamilyMembers() {
                             >
                                 {t('settings.rename')}
                             </button>
-                            <button
-                                type="button"
-                                className={BUTTON_SECONDARY}
-                                onClick={() => setEditing({ id: u.id, kind: 'pin', value: '' })}
-                            >
-                                {t('settings.resetPin')}
-                            </button>
+                            {/* Their own PIN is changed under My settings, which keeps this device logged in */}
+                            {u.id !== me?.id && (
+                                <button
+                                    type="button"
+                                    className={BUTTON_SECONDARY}
+                                    onClick={() => setEditing({ id: u.id, kind: 'pin', value: '' })}
+                                >
+                                    {t('settings.resetPin')}
+                                </button>
+                            )}
                             {u.id !== me?.id && (
                                 <button
                                     type="button"

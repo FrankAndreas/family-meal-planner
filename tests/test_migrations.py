@@ -27,3 +27,11 @@ def test_migration_matches_models(tmp_path):
     inspector = inspect(_migrated(tmp_path))
     for table in models.Base.metadata.sorted_tables:
         assert {c["name"] for c in inspector.get_columns(table.name)} == set(table.columns.keys()), table.name
+
+
+def test_constraints_are_named(tmp_path):
+    """Named constraints, so later batch migrations on SQLite can drop or change them."""
+    inspector = inspect(_migrated(tmp_path))
+    for table in models.Base.metadata.sorted_tables:
+        for unique in inspector.get_unique_constraints(table.name):
+            assert unique["name"], table.name

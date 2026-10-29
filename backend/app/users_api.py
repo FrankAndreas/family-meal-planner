@@ -42,7 +42,14 @@ def _new_pin(user: models.User, pin: str) -> None:
     user.pin_hash = auth.get_pin_hash(pin)
     user.token_version += 1
     user.failed_logins = 0
+    user.lockouts = 0
     user.locked_until = None
+
+
+@router.get("/config")
+def public_config():
+    """What the login page needs before anyone is logged in: the language for browsers in neither German nor English."""
+    return {"default_language": config.default_language()}
 
 
 @router.get("/users/public", response_model=list[schemas.UserPublic])

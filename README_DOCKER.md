@@ -106,3 +106,25 @@ To deploy right away from your computer:
 cp .deploy.env.example .deploy.env   # once; then set NAS_HOST and NAS_DIR
 scripts/deploy-nas.sh
 ```
+
+### Rolling back an update
+
+If a new version misbehaves, go back to the previous one. First **disable the scheduled task**, otherwise the next
+night installs the same version again. Then, in the app folder:
+
+```bash
+cd /volume1/docker/meals
+# 1. Point latest at the previous images (frontend only if it was updated; see logs/update.log)
+sudo docker tag ghcr.io/frankandreas/meal-planer/backend:previous ghcr.io/frankandreas/meal-planer/backend:latest
+sudo docker tag ghcr.io/frankandreas/meal-planer/frontend:previous ghcr.io/frankandreas/meal-planer/frontend:latest
+
+# 2. Restore the database from the backup taken right before the update
+#    (the new version may have changed it). Changes made since the update are lost.
+sudo docker stop meals-backend
+sudo sh -c 'gunzip -c db-backups/meals-YYYYMMDD-HHMMSS.sqlite.gz > data/meals.db'
+
+# 3. Start the previous version
+sudo docker-compose up -d backend frontend
+```
+
+Re-enable the task once a fixed version is published.

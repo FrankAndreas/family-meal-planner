@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import api, { errorMessage } from '../api';
 import { useAuth } from '../AuthContext';
 import PinInput from '../components/PinInput';
@@ -9,7 +9,7 @@ import { BUTTON, CARD, ERROR } from '../ui';
 
 export default function Login() {
     const { t } = useTranslation();
-    const { login } = useAuth();
+    const { login, user } = useAuth();
     const navigate = useNavigate();
     const [users, setUsers] = useState<PublicUser[]>([]);
     const [name, setName] = useState('');
@@ -37,6 +37,9 @@ export default function Login() {
             setBusy(false);
         }
     };
+
+    // Still logged in (e.g. the login page was reached while the NAS was restarting): straight back to the app
+    if (user) return <Navigate to="/" replace />;
 
     return (
         <div className="flex min-h-screen items-center justify-center p-4">

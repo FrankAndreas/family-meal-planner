@@ -1,6 +1,8 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import api from './api';
-import { applyLanguage, browserLanguage } from './i18n';
+import axios from 'axios';
+import { applyLanguage } from './i18n';
+import { guestLanguage } from './language';
 import type { User } from './types';
 
 interface AuthContextType {
@@ -8,7 +10,7 @@ interface AuthContextType {
     isLoading: boolean;
     login: (name: string, pin: string) => Promise<void>;
     logout: () => void;
-    refreshUser: () => Promise<void>;
+    refreshUser: () => Promise<User>;
     setToken: (token: string) => void;
 }
 
@@ -23,17 +25,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const me = (await api.get<User>('/api/me')).data;
         applyLanguage(me.language);
         setUser(me);
+        return me;
     };
 
     useEffect(() => {
         const checkAuth = async () => {
+            let loggedIn = false;
             if (localStorage.getItem('token')) {
                 try {
                     await loadUser();
-                } catch {
-                    localStorage.removeItem('token');
+                    loggedIn = true;
+                } catch (error) {
+                    // Only a refused login ends it; a NAS that is restarting (502, no answer) keeps the token for later
+                    if (axios.isAxiosError(error) && error.response?.status === 401) localStorage.removeItem('token');
                 }
             }
+            if (!loggedIn) applyLanguage(await guestLanguage());
             setIsLoading(false);
         };
         checkAuth();
@@ -48,7 +55,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const logout = () => {
         localStorage.removeItem('token');
         setUser(null);
-        applyLanguage(browserLanguage());
+        guestLanguage().then(applyLanguage);
     };
 
     // A new PIN ends all logins; the backend hands this device a fresh token

@@ -19,14 +19,16 @@ def upgrade() -> None:
         "users",
         sa.Column("id", sa.Integer, primary_key=True),
         sa.Column("name", sa.String(50), nullable=False),
-        sa.Column("name_key", sa.String(50), nullable=False, unique=True),
+        sa.Column("name_key", sa.String(50), nullable=False),
         sa.Column("pin_hash", sa.String, nullable=False),
         sa.Column("role", sa.Enum("PARENT", "CHILD", name="userrole"), nullable=False),
         sa.Column("language", sa.String(2)),
         sa.Column("failed_logins", sa.Integer, nullable=False),
         sa.Column("locked_until", sa.DateTime),
+        sa.Column("lockouts", sa.Integer, nullable=False),
         sa.Column("token_version", sa.Integer, nullable=False),
         sa.Column("created_at", sa.DateTime, nullable=False),
+        sa.UniqueConstraint("name_key", name="uq_users_name_key"),
         sqlite_autoincrement=True,
     )
     op.create_table(

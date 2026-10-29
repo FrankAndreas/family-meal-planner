@@ -15,7 +15,7 @@
 #
 # Exit codes: 0 = up to date or updated successfully, 1 = failure (including a
 #             backend that isn't healthy).
-# See README_DOCKER.md ("Automatic Updates") for the Task Scheduler setup.
+# See README_DOCKER.md ("Automatic updates") for the Task Scheduler setup.
 
 set -uo pipefail
 
@@ -188,7 +188,7 @@ else
 fi
 
 # Keep the running images as :previous, so pruning can't remove them and a
-# rollback stays possible (see "Rolling back" in README_DOCKER.md)
+# rollback stays possible (see "Rolling back an update" in README_DOCKER.md)
 for service in $changed; do
     cid=$(container_of "$service")
     [ -z "$cid" ] && continue

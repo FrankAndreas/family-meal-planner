@@ -26,6 +26,8 @@ class User(Base):
     language = Column(String(2))
     failed_logins = Column(Integer, default=0, nullable=False)
     locked_until = Column(DateTime)
+    # Locks in a row: each one doubles the next (see auth.lock_duration); a correct login or a new PIN resets it
+    lockouts = Column(Integer, default=0, nullable=False)
     # Part of every login token; raising it ends all of the user's logins (new PIN)
     token_version = Column(Integer, default=0, nullable=False)
     created_at = Column(DateTime, default=utcnow, nullable=False)

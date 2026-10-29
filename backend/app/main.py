@@ -3,7 +3,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from . import config, database, database_setup, inbox_api, plan_api, recipes_api, settings_api, suggestions_api, users_api
+from . import ai, config, database, database_setup, inbox_api, plan_api, recipes_api, settings_api, suggestions_api, users_api
 from .seed import seed_admin
 from .settings_store import get_settings
 
@@ -27,6 +27,7 @@ app.include_router(recipes_api.router, prefix="/api")
 app.include_router(plan_api.router, prefix="/api")
 app.include_router(suggestions_api.router, prefix="/api")
 app.include_router(inbox_api.router, prefix="/api")
+app.include_router(ai.router, prefix="/api")
 
 # Only the browser tests need this (their frontend runs on a port of its own); in Docker, nginx serves both
 if config.env("CORS_ORIGINS"):

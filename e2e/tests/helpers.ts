@@ -69,3 +69,17 @@ export async function createRecipe(request: APIRequestContext, person: Person, f
     expect(response.ok(), await response.text()).toBeTruthy();
     return response.json();
 }
+
+// A week of the test's own, far in the future, so tests sharing the database never plan into the same week
+export function ownWeek(): string {
+    const day = new Date(Date.UTC(2031, 0, 1) + Math.floor(Math.random() * 3000) * 7 * 86_400_000);
+    return day.toISOString().slice(0, 10);
+}
+
+export async function call<T = any>(
+    request: APIRequestContext, person: Person, method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE', path: string, data?: unknown,
+): Promise<T> {
+    const response = await request.fetch(`${API}${path}`, { method, data, headers: { Authorization: `Bearer ${person.token}` } });
+    expect(response.ok(), `${method} ${path}: ${await response.text()}`).toBeTruthy();
+    return response.status() === 204 ? (undefined as T) : response.json();
+}

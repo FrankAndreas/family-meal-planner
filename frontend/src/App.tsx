@@ -4,7 +4,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider, useAuth } from './AuthContext';
 import Layout from './components/Layout';
 import Login from './pages/Login';
-import Placeholder from './pages/Placeholder';
+import PlanPage from './pages/PlanPage';
 import RecipeEdit from './pages/RecipeEdit';
 import Recipes from './pages/Recipes';
 import RecipeView from './pages/RecipeView';
@@ -30,7 +30,7 @@ export default function App() {
                             </RequireAuth>
                         }
                     >
-                        <Route index element={<Placeholder titleKey="nav.plan" />} />
+                        <Route index element={<PlanPage />} />
                         <Route path="rezepte" element={<Recipes />} />
                         <Route path="rezepte/neu" element={<RecipeEdit />} />
                         <Route path="rezepte/:id" element={<RecipeView />} />

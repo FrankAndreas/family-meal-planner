@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
+import { sinceText } from '../../lastEaten';
 import type { RecipeSummary } from '../../recipes';
 import Stars from './Stars';
 
@@ -8,6 +9,8 @@ interface RecipeCardProps {
     // Without onClick the card links to the recipe
     onClick?: () => void;
     compact?: boolean;
+    // A card that can be picked (planning): shown and announced as pressed
+    selected?: boolean;
 }
 
 export function RecipeThumb({ recipe, className }: { recipe: RecipeSummary; className: string }) {
@@ -22,7 +25,7 @@ export function RecipeThumb({ recipe, className }: { recipe: RecipeSummary; clas
     );
 }
 
-export default function RecipeCard({ recipe, onClick, compact = false }: RecipeCardProps) {
+export default function RecipeCard({ recipe, onClick, compact = false, selected }: RecipeCardProps) {
     const { t } = useTranslation();
     const body = compact ? (
         <div className="flex items-center gap-3 p-2">
@@ -32,6 +35,9 @@ export default function RecipeCard({ recipe, onClick, compact = false }: RecipeC
                 <div className="text-xs text-slate-400">
                     {recipe.rating_avg !== null && <Stars value={recipe.rating_avg} />}
                     {recipe.my_favorite && <span className="ml-1 text-fuchsia-300">♥</span>}
+                </div>
+                <div className="text-xs text-slate-500">
+                    {recipe.last_eaten ? t('recipes.lastEaten', { when: sinceText(recipe.last_eaten) }) : t('recipes.neverEaten')}
                 </div>
             </div>
         </div>
@@ -50,10 +56,12 @@ export default function RecipeCard({ recipe, onClick, compact = false }: RecipeC
             </div>
         </>
     );
-    const className = 'glass-card block overflow-hidden text-left transition hover:border-cyan-400/40 w-full';
+    const className = `glass-card block w-full overflow-hidden text-left transition hover:border-cyan-400/40 ${
+        selected ? 'ring-2 ring-cyan-400' : ''
+    }`;
     if (onClick) {
         return (
-            <button type="button" onClick={onClick} className={className}>
+            <button type="button" onClick={onClick} className={className} aria-pressed={selected}>
                 {body}
             </button>
         );

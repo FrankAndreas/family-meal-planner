@@ -14,6 +14,8 @@ export interface RecipeSummary {
     my_rating: number | null;
     my_favorite: boolean;
     favorite_count: number;
+    last_eaten: string | null;
+    times_eaten: number;
 }
 
 export interface Ingredient {

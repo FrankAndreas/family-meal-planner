@@ -34,7 +34,7 @@ German by default, English per person.
 **Getting recipes in**
 - **By mail:** share a Facebook post, a screenshot or a link to `rezepte@<your domain>` (Cloudflare Email Worker).
   Only registered family addresses are accepted.
-- **By link:** paste a recipe page (Swissmilk, Fooby, Betty Bossi, most blogs). Their built-in recipe data is read
+- **By link:** on the Rezepte page or in the Posteingang, paste a recipe page (Swissmilk, Fooby, Betty Bossi, most blogs). Their built-in recipe data is read
   without any AI.
 - **Nothing is read before a parent taps "Verarbeiten".** Then links are followed, and only if needed the AI
   (Infomaniak) reads the page or the screenshots. The result is a draft with unclear spots listed, checked before it

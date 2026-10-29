@@ -77,6 +77,7 @@ const en: typeof de = {
     },
     recipes: {
         new: '+ New recipe',
+        importFromLink: 'Import from link',
         newTitle: 'New recipe',
         editTitle: 'Edit recipe',
         search: 'Search recipes',

@@ -23,8 +23,8 @@ export default defineConfig({
     },
     projects: [
         // The Friday planning happens on an iPad-sized screen in landscape
-        { name: 'tablet', use: { ...devices['Desktop Chrome'], viewport: { width: 1180, height: 820 }, hasTouch: true } },
-        { name: 'phone', use: { ...devices['Pixel 7'] }, testMatch: /login\.spec\.ts/ },
+        { name: 'tablet', testIgnore: /plan-phone\.spec\.ts/, use: { ...devices['Desktop Chrome'], viewport: { width: 1180, height: 820 }, hasTouch: true } },
+        { name: 'phone', use: { ...devices['Pixel 7'] }, testMatch: /(login|plan-phone)\.spec\.ts/ },
     ],
     webServer: [
         {

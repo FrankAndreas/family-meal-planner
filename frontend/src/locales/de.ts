@@ -166,6 +166,7 @@ const de = {
         planOn: 'Planen am {{place}}',
         moveTo: 'Verschieben auf {{place}}',
         addTo: 'Hinzufügen am {{place}}',
+        add: '+ hinzufügen',
         planHere: '+ hier planen',
         moveHere: '→ hierhin',
         movingHint: '«{{title}}» verschieben: tippe auf das neue Feld.',

@@ -12,6 +12,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
 import api, { errorMessage } from '../api';
+import DayView from '../components/plan/DayView';
 import EntryMenu from '../components/plan/EntryMenu';
 import NoteDialog from '../components/plan/NoteDialog';
 import SuggestionPanel from '../components/plan/SuggestionPanel';
@@ -21,6 +22,7 @@ import { addEntry, fetchWeek, type PlanEntry, removeEntry, type Slot, updateEntr
 import type { RecipeSummary } from '../recipes';
 import type { FamilySettings } from '../types';
 import { ERROR } from '../ui';
+import { useWide } from '../useWide';
 
 export default function PlanPage() {
     const { t } = useTranslation();
@@ -42,6 +44,7 @@ export default function PlanPage() {
     );
     const [error, setError] = useState('');
     const requested = search.get('woche');
+    const wide = useWide();
 
     const reload = useCallback(async () => {
         const loaded = await fetchWeek(requested);
@@ -138,31 +141,42 @@ export default function PlanPage() {
                     </button>
                 </p>
             )}
-            <DndContext
-                sensors={sensors}
-                onDragStart={onDragStart}
-                onDragEnd={onDragEnd}
-                onDragCancel={() => setDragging(null)}
-            >
-                <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_17rem]">
-                    <WeekGrid week={week} mode={mode} familySize={familySize} onCell={onCell} onOpenEntry={setMenuEntry} />
-                    <SuggestionPanel
-                        selectedId={picked?.id ?? null}
-                        version={version}
-                        onPick={(recipe) => {
-                            setMoving(null);
-                            setPicked(picked?.id === recipe.id ? null : recipe);
-                        }}
-                    />
-                </div>
-                <DragOverlay dropAnimation={null}>
-                    {dragging && (
-                        <div className="rounded-md border border-fuchsia-300 bg-slate-900/90 px-2 py-1 text-xs shadow-lg">
-                            {dragTitle(dragging)}
-                        </div>
-                    )}
-                </DragOverlay>
-            </DndContext>
+            {wide ? (
+                <DndContext
+                    sensors={sensors}
+                    onDragStart={onDragStart}
+                    onDragEnd={onDragEnd}
+                    onDragCancel={() => setDragging(null)}
+                >
+                    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_17rem]">
+                        <WeekGrid week={week} mode={mode} familySize={familySize} onCell={onCell} onOpenEntry={setMenuEntry} />
+                        <SuggestionPanel
+                            selectedId={picked?.id ?? null}
+                            version={version}
+                            onPick={(recipe) => {
+                                setMoving(null);
+                                setPicked(picked?.id === recipe.id ? null : recipe);
+                            }}
+                        />
+                    </div>
+                    <DragOverlay dropAnimation={null}>
+                        {dragging && (
+                            <div className="rounded-md border border-fuchsia-300 bg-slate-900/90 px-2 py-1 text-xs shadow-lg">
+                                {dragTitle(dragging)}
+                            </div>
+                        )}
+                    </DragOverlay>
+                </DndContext>
+            ) : (
+                <DayView
+                    week={week}
+                    familySize={familySize}
+                    version={version}
+                    onOpenEntry={setMenuEntry}
+                    onNote={(day, slot) => setNoteCell({ day, slot })}
+                    onPlan={(day, slot, recipe) => run(() => addEntry({ date: day, slot, recipe_id: recipe.id }))}
+                />
+            )}
             {noteCell && (
                 <NoteDialog
                     place={place(noteCell.day, noteCell.slot)}

@@ -167,6 +167,7 @@ const en: typeof de = {
         planOn: 'Plan on {{place}}',
         moveTo: 'Move to {{place}}',
         addTo: 'Add to {{place}}',
+        add: '+ add',
         planHere: '+ plan here',
         moveHere: '→ here',
         movingHint: 'Moving “{{title}}”: tap its new place.',

@@ -133,6 +133,14 @@ def test_source_url_must_be_web(client, admin_headers):
     assert ok["source_url"] == "https://www.swissmilk.ch/de/rezepte/"
 
 
+def test_source_can_be_a_text(client, admin_headers):
+    for text in ("Betty Bossi Kochbuch, S. 42", "Risotto-Packung Migros", "Oma: Notizbuch"):
+        assert create_recipe(client, admin_headers, source_url=f" {text} ")["source_url"] == text
+    for address in ("javascript:alert(1)", "file:///etc/passwd", "data:text/html,x"):
+        r = client.post("/api/recipes", json=recipe_body(source_url=address), headers=admin_headers)
+        assert r.status_code == 422 and "not_a_web_link" in r.text, address
+
+
 def test_search_ignores_accents(client, admin_headers):
     create_recipe(client, admin_headers, "Älplermagronen", tags=["Käse"])
     for q in ("alplermagronen", "kase", "ÄLPLER"):

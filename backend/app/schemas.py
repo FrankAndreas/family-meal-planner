@@ -98,6 +98,8 @@ class IngredientIn(BaseModel):
 
 
 # A yield "unit" that just says people: such a recipe scales by its own servings, not by the family size
+# "scheme:rest" without spaces: an address, not a text
+OTHER_ADDRESS = re.compile(r"[a-z][a-z0-9+.-]*:\S*$", re.IGNORECASE)
 PEOPLE_WORDS = {"person", "personen", "pers", "portion", "portionen", "people", "persons", "serving", "servings"}
 
 
@@ -127,8 +129,9 @@ class RecipeIn(BaseModel):
     @field_validator("source_url")
     @classmethod
     def web_link(cls, url: str | None) -> str | None:
-        # Shown as a link: only web addresses, never javascript: or file: from an import
-        if url and not url.lower().startswith(("http://", "https://")):
+        # A web link (shown as a link) or a text like "Betty Bossi, S. 42" (shown as text);
+        # never an address like javascript: or file: from an import
+        if url and OTHER_ADDRESS.match(url) and not url.lower().startswith(("http://", "https://")):
             raise ValueError("not_a_web_link")
         return url or None
 

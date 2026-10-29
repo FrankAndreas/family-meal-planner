@@ -170,3 +170,11 @@ class RecipeOut(RecipeSummary):
 class TagCount(BaseModel):
     name: str
     count: int
+
+
+class RatingIn(BaseModel):
+    stars: Annotated[int, Field(ge=1, le=5)] | None
+
+
+class FavoriteIn(BaseModel):
+    favorite: bool

@@ -1,9 +1,10 @@
 import unicodedata
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, UploadFile
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session, selectinload
 
-from . import auth, models, scaling, schemas
+from . import auth, models, photos, scaling, schemas
 from .database import get_db
 from .errors import api_error
 from .settings_store import get_settings
@@ -227,3 +228,75 @@ def list_tags(_user: models.User = Depends(auth.get_current_user), db: Session =
 @router.get("/units")
 def list_units(_user: models.User = Depends(auth.get_current_user)):
     return list(UNITS)
+
+
+@router.put("/recipes/{recipe_id}/rating", response_model=schemas.RecipeOut)
+def rate_recipe(
+    recipe_id: int,
+    body: schemas.RatingIn,
+    me: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db),
+):
+    recipe = get_recipe(db, recipe_id)
+    rating = db.get(models.Rating, (recipe.id, me.id))
+    if body.stars is None:
+        if rating is not None:
+            db.delete(rating)
+    elif rating is None:
+        db.add(models.Rating(recipe_id=recipe.id, user_id=me.id, stars=body.stars))
+    else:
+        rating.stars = body.stars
+    db.commit()
+    return recipe_out(db, recipe, me)
+
+
+@router.put("/recipes/{recipe_id}/favorite", response_model=schemas.RecipeOut)
+def favorite_recipe(
+    recipe_id: int,
+    body: schemas.FavoriteIn,
+    me: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db),
+):
+    recipe = get_recipe(db, recipe_id)
+    favorite = db.get(models.Favorite, (recipe.id, me.id))
+    if body.favorite and favorite is None:
+        db.add(models.Favorite(recipe_id=recipe.id, user_id=me.id))
+    elif not body.favorite and favorite is not None:
+        db.delete(favorite)
+    db.commit()
+    return recipe_out(db, recipe, me)
+
+
+@router.post("/recipes/{recipe_id}/photo", response_model=schemas.RecipeOut)
+async def upload_photo(
+    recipe_id: int,
+    file: UploadFile,
+    me: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db),
+):
+    recipe = get_recipe(db, recipe_id)
+    data = await file.read(photos.MAX_BYTES + 1)
+    if len(data) > photos.MAX_BYTES:
+        raise api_error(413, "photo_too_large")
+    old, recipe.photo = recipe.photo, photos.store_photo(data)
+    db.commit()
+    photos.delete_photo(old)
+    return recipe_out(db, recipe, me)
+
+
+@router.delete("/recipes/{recipe_id}/photo", response_model=schemas.RecipeOut)
+def remove_photo(recipe_id: int, me: models.User = Depends(auth.get_current_user), db: Session = Depends(get_db)):
+    recipe = get_recipe(db, recipe_id)
+    old, recipe.photo = recipe.photo, None
+    db.commit()
+    photos.delete_photo(old)
+    return recipe_out(db, recipe, me)
+
+
+# Without login: <img> can't send the token. The names are random, and the app is only reachable at home
+@router.get("/photos/{name}")
+def read_photo(name: str):
+    path = photos.photo_path(name)
+    if path is None or not path.is_file():
+        raise api_error(404, "photo_not_found")
+    return FileResponse(path, media_type="image/jpeg", headers={"Cache-Control": "public, max-age=31536000, immutable"})

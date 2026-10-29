@@ -1,6 +1,7 @@
 import io
 
 import pillow_heif
+import pytest
 from PIL import Image
 
 from app import config, photos
@@ -99,3 +100,83 @@ def test_decompression_bomb_refused(client, admin_headers, monkeypatch):
     r = create_recipe(client, admin_headers)
     response = _upload(client, admin_headers, r["id"], _jpeg())
     assert response.status_code == 400 and response.json()["detail"] == "photo_unreadable"
+
+
+@pytest.fixture
+def web(monkeypatch):
+    """Fake DNS and HTTP for photo links: (host, path) to (status, headers, body)."""
+    from app import fetch
+
+    pages: dict = {}
+    opened = []
+    dns = {"public.example": ["93.184.216.34"], "nas.local": ["192.168.1.10"]}
+    monkeypatch.setattr(fetch, "_resolve", lambda host, port: dns.get(host, [host]))
+
+    def _open(scheme, host, port, target, ip, timeout):
+        opened.append((host, target))
+        return pages.get((host, target), (404, {}, b""))
+
+    monkeypatch.setattr(fetch, "_open", _open)
+    return pages, opened
+
+
+JPEG = {"content-type": "image/jpeg"}
+HTML = {"content-type": "text/html; charset=utf-8"}
+
+
+def _from_link(client, headers, recipe_id, url):
+    return client.post(f"/api/recipes/{recipe_id}/photo-url", json={"url": url}, headers=headers)
+
+
+def test_photo_from_image_link(client, admin_headers, web):
+    pages, _ = web
+    pages[("public.example", "/pic.jpg")] = (200, JPEG, _jpeg())
+    r = create_recipe(client, admin_headers)
+    out = _from_link(client, admin_headers, r["id"], "https://public.example/pic.jpg")
+    assert out.status_code == 200, out.text
+    img = Image.open(io.BytesIO(client.get(out.json()["photo_url"]).content))
+    assert max(img.size) == 1600 and not img.getexif()
+
+
+def test_photo_from_page_link_takes_the_page_picture(client, admin_headers, web):
+    pages, _ = web
+    page = b'<html><head><meta property="og:image" content="/img/dish.jpg"></head><body>Rezept</body></html>'
+    pages[("public.example", "/rezept")] = (200, HTML, page)
+    pages[("public.example", "/img/dish.jpg")] = (200, JPEG, _jpeg())
+    r = create_recipe(client, admin_headers)
+    out = _from_link(client, admin_headers, r["id"], "https://public.example/rezept")
+    assert out.status_code == 200, out.text
+    assert out.json()["photo_url"]
+
+
+def test_photo_from_link_replaces_old_file(client, admin_headers, web):
+    pages, _ = web
+    pages[("public.example", "/pic.jpg")] = (200, JPEG, _jpeg())
+    r = create_recipe(client, admin_headers)
+    first = _upload(client, admin_headers, r["id"], _jpeg()).json()["photo_url"].rsplit("/", 1)[1]
+    _from_link(client, admin_headers, r["id"], "https://public.example/pic.jpg")
+    assert not (config.data_dir() / "photos" / first).exists()
+
+
+def test_photo_link_into_home_network_refused(client, admin_headers, web):
+    _, opened = web
+    r = create_recipe(client, admin_headers)
+    for url in ("http://192.168.1.1/x.jpg", "http://nas.local/x.jpg"):
+        response = _from_link(client, admin_headers, r["id"], url)
+        assert response.status_code == 400 and response.json()["detail"] == "photo_link_failed"
+    assert opened == []
+
+
+def test_photo_link_without_a_picture(client, admin_headers, web):
+    pages, _ = web
+    pages[("public.example", "/text")] = (200, HTML, b"<html><body>Nur Text</body></html>")
+    r = create_recipe(client, admin_headers)
+    for url in ("https://public.example/text", "https://public.example/missing.jpg"):
+        response = _from_link(client, admin_headers, r["id"], url)
+        assert response.status_code == 400 and response.json()["detail"] == "photo_link_failed"
+    assert client.get(f"/api/recipes/{r['id']}", headers=admin_headers).json()["photo_url"] is None
+
+
+def test_photo_link_must_be_a_web_link(client, admin_headers):
+    r = create_recipe(client, admin_headers)
+    assert _from_link(client, admin_headers, r["id"], "file:///etc/passwd").status_code == 422

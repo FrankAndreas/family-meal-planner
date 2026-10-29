@@ -42,6 +42,7 @@ test('a parent processes a mail, checks the draft and saves it', async ({ page, 
     await page.getByLabel('Title').fill(subject);
     await page.getByRole('button', { name: 'Save recipe' }).click();
     await expect(page.getByRole('heading', { name: subject })).toBeVisible();
+    await expect(page.getByText(new RegExp(`by mail from ${parent.name}, \\d+\\.\\d+\\.\\d{4}`))).toBeVisible();
     await page.getByRole('link', { name: 'View original' }).click();
     await expect(page.getByText(subject)).toBeVisible();
     expect(errors).toEqual([]);

@@ -5,6 +5,7 @@ import html
 import json
 import re
 from html.parser import HTMLParser
+from urllib.parse import urljoin
 
 from .ingredient_parse import parse_line
 from .schemas import PEOPLE_WORDS
@@ -16,10 +17,14 @@ class _Scripts(HTMLParser):
     def __init__(self):
         super().__init__()
         self.blocks: list[str] = []
+        self.og_image: str | None = None
         self._inside = False
 
     def handle_starttag(self, tag, attrs):
-        self._inside = tag == "script" and dict(attrs).get("type", "").lower() == "application/ld+json"
+        values = dict(attrs)
+        if tag == "meta" and (values.get("property") or values.get("name") or "").lower() == "og:image":
+            self.og_image = self.og_image or (values.get("content") or "").strip() or None
+        self._inside = tag == "script" and (values.get("type") or "").lower() == "application/ld+json"
         if self._inside:
             self.blocks.append("")
 
@@ -152,3 +157,16 @@ def recipe_from_html(page: str, page_url: str) -> dict | None:
             "uncertain": [],
         }
     return None
+
+
+def page_image(page: str, page_url: str) -> str | None:
+    """The picture a page shows when it's shared (og:image), else its recipe's picture."""
+    parser = _Scripts()
+    try:
+        parser.feed(page)
+    except Exception:
+        return None
+    found = parser.og_image
+    if not found:
+        found = (recipe_from_html(page, page_url) or {}).get("image_url")
+    return _image(urljoin(page_url, html.unescape(found))) if found else None

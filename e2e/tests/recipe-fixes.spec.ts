@@ -8,7 +8,7 @@ test('a photo that cannot be read does not lead to a second copy of the recipe',
     await page.goto('/rezepte/neu');
     await page.getByLabel('Title').fill(title);
     await page.getByLabel('Ingredient 1').fill('Mehl');
-    await page.getByLabel('Photo').setInputFiles({ name: 'x.jpg', mimeType: 'image/jpeg', buffer: Buffer.from('nope') });
+    await page.getByLabel('Choose photo').setInputFiles({ name: 'x.jpg', mimeType: 'image/jpeg', buffer: Buffer.from('nope') });
     await page.getByRole('button', { name: 'Save recipe' }).click();
     await expect(page.getByText('The photo couldn’t be read.')).toBeVisible();
     // Saving again (as anyone would) must not make a second recipe

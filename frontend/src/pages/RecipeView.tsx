@@ -9,6 +9,7 @@ import PeopleStepper from '../components/recipes/PeopleStepper';
 import { RecipeThumb } from '../components/recipes/RecipeCard';
 import Stars from '../components/recipes/Stars';
 import type { Language } from '../i18n';
+import { siteName } from '../links';
 import { defaultPeople, fetchRecipe, type Ingredient, type Recipe } from '../recipes';
 import type { FamilySettings } from '../types';
 import { BUTTON_DANGER, BUTTON_SECONDARY, CARD, ERROR } from '../ui';
@@ -146,12 +147,24 @@ export default function RecipeView() {
                         {recipe.servings_unit && (
                             <span>{t('recipes.yields', { amount: recipe.servings, unit: recipe.servings_unit })}</span>
                         )}
-                        {recipe.source_url ? (
-                            <a href={recipe.source_url} target="_blank" rel="noreferrer" className="text-cyan-300 underline">
-                                {t('recipes.source')}
-                            </a>
-                        ) : null}
                     </div>
+                    {(recipe.source_url || recipe.source_mail) && (
+                        <p className="text-sm text-slate-300">
+                            {t('recipes.sourceLabel')}{' '}
+                            {recipe.source_url && (
+                                <a href={recipe.source_url} target="_blank" rel="noreferrer" className="text-cyan-300 underline">
+                                    {siteName(recipe.source_url)}
+                                    <span aria-hidden> ↗</span>
+                                </a>
+                            )}
+                            {recipe.source_url && recipe.source_mail && ' · '}
+                            {recipe.source_mail &&
+                                t(recipe.source_mail.kind === 'mail' ? 'recipes.sourceByMail' : 'recipes.sourceByLink', {
+                                    name: recipe.source_mail.user_name ?? '?',
+                                    date: format(parseISO(`${recipe.source_mail.received_at}Z`), 'd.M.yyyy'),
+                                })}
+                        </p>
+                    )}
                     {recipe.last_eaten ? (
                         <details className="text-sm text-slate-300">
                             <summary className="cursor-pointer">

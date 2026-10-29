@@ -43,6 +43,8 @@ export interface Recipe extends RecipeSummary {
     people: number | null;
     factor: number;
     inbox_item_id: number | null;
+    // The mail or pasted link it was saved from
+    source_mail: { id: number; kind: 'mail' | 'url'; user_name: string | null; received_at: string } | null;
     // The text before an AI translation
     original: {
         title: string;

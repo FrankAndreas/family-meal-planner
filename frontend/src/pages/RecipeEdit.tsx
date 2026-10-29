@@ -8,7 +8,8 @@ import PhotoPicker, { type PhotoChoice } from '../components/recipes/PhotoPicker
 import type { Language } from '../i18n';
 import { fetchItem, type InboxItemDetail } from '../inbox';
 import { emptyRow, ingredientsFrom, rowInvalid, rowsFrom, type Row } from '../ingredientRows';
-import { fetchRecipe, isWebLink, type Recipe, type RecipeInput } from '../recipes';
+import { isWebLink } from '../links';
+import { fetchRecipe, type Recipe, type RecipeInput } from '../recipes';
 import { BUTTON, BUTTON_SECONDARY, CARD, ERROR, FIELD, INPUT } from '../ui';
 
 interface Form {
@@ -20,9 +21,10 @@ interface Form {
     tags: string;
     steps: string;
     notes: string;
+    source: string;
 }
 
-const EMPTY: Form = { title: '', servings: '4', servingsUnit: '', prep: '', cook: '', tags: '', steps: '', notes: '' };
+const EMPTY: Form = { title: '', servings: '4', servingsUnit: '', prep: '', cook: '', tags: '', steps: '', notes: '', source: '' };
 const minutes = (text: string) => (text.trim() === '' ? null : Math.max(0, Math.round(Number(text))));
 
 export default function RecipeEdit() {
@@ -66,6 +68,7 @@ export default function RecipeEdit() {
                     tags: recipe.tags.join(', '),
                     steps: recipe.steps.join('\n'),
                     notes: recipe.notes,
+                    source: recipe.source_url ?? '',
                 });
                 setRows(rowsFrom(recipe.ingredients, i18next.language as Language));
             })
@@ -92,6 +95,7 @@ export default function RecipeEdit() {
                     tags: draft.tags.join(', '),
                     steps: draft.steps.join('\n'),
                     notes: draft.notes ?? '',
+                    source: draft.source_url ?? '',
                 });
                 setRows(
                     rowsFrom(
@@ -112,7 +116,8 @@ export default function RecipeEdit() {
         !form.title.trim() ||
         !(servings > 0 && servings <= 100) ||
         rows.some(rowInvalid) ||
-        (photo.kind === 'link' && !isWebLink(photo.url));
+        (photo.kind === 'link' && !isWebLink(photo.url)) ||
+        (form.source.trim() !== '' && !isWebLink(form.source));
 
     const save = async (e: FormEvent) => {
         e.preventDefault();
@@ -131,7 +136,7 @@ export default function RecipeEdit() {
             notes: form.notes,
             // Kept as they were: an imported recipe stays imported
             source_kind: original?.source_kind ?? 'manual',
-            source_url: original?.source_url ?? draftItem?.draft?.source_url ?? null,
+            source_url: form.source.trim() || null,
             language: original?.language ?? draftItem?.draft?.language ?? null,
             ...(draftItem && !createdId ? { inbox_item_id: draftItem.id } : {}),
         };
@@ -226,6 +231,21 @@ export default function RecipeEdit() {
                             <option key={tag} value={tag} />
                         ))}
                     </datalist>
+                </div>
+                <div className="sm:col-span-2">
+                    <label htmlFor="source" className={label}>
+                        {t('recipes.sourceUrl')}
+                    </label>
+                    <input
+                        id="source"
+                        className={INPUT}
+                        inputMode="url"
+                        placeholder={t('recipes.sourceUrlPlaceholder')}
+                        value={form.source}
+                        maxLength={1000}
+                        onChange={set('source')}
+                    />
+                    {form.source.trim() && !isWebLink(form.source) && <p className="mt-1 text-sm text-amber-200">{t('errors.not_a_web_link')}</p>}
                 </div>
                 <div className="sm:col-span-2">
                     <PhotoPicker

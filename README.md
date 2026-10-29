@@ -24,6 +24,7 @@ German by default, English per person.
 - Structured ingredients (amount, unit, name, note, groups like "Sauce"), steps, tags, a photo (picked, pasted or loaded from a link; iPhone HEIC works).
 - Scaled to any number of people, rounded the way people measure ("½ l", "1½ Eier", "350 g").
 - Ratings and favourites per person, so you see what everyone likes.
+- Where it comes from: a link to the original page (editable), and who sent it in by mail, and when.
 
 **Closing the week and history**
 - On Friday the planner offers to close the past week: untick what you didn't eat, note what you had instead, rate

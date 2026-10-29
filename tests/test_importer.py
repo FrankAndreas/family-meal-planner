@@ -6,7 +6,7 @@ import pytest
 
 from app import ai, config, fetch, importer, models
 from app.timeutil import utcnow
-from helpers import create_user, login
+from helpers import create_recipe, create_user, login
 from mails import build_mail, png
 
 PAGES = Path(__file__).parent / "pages"
@@ -164,6 +164,17 @@ def test_save_draft_as_recipe(client, admin_headers, world):
     assert client.get("/api/inbox", headers=admin_headers).json() == []
     again = client.post("/api/recipes", json={**body, "inbox_item_id": item}, headers=admin_headers)
     assert again.status_code == 400 and again.json()["detail"] == "draft_not_ready"
+
+
+def test_recipe_says_which_mail_it_came_from(client, admin_headers, world):
+    item = _mail(client, admin_headers, text="Rezept", images=[("1.png", png())])
+    client.post(f"/api/inbox/{item}/process", headers=admin_headers)
+    draft = _item(client, admin_headers, item)["draft"]
+    body = {k: draft[k] for k in ("title", "servings", "servings_unit", "ingredients", "steps", "tags")}
+    recipe = client.post("/api/recipes", json={**body, "inbox_item_id": item}, headers=admin_headers).json()
+    mail = client.get(f"/api/recipes/{recipe['id']}", headers=admin_headers).json()["source_mail"]
+    assert mail["id"] == item and mail["user_name"] == "Admin" and mail["kind"] == "mail" and mail["received_at"]
+    assert create_recipe(client, admin_headers)["source_mail"] is None
 
 
 def test_mail_footer_link_does_not_block_the_screenshots(client, admin_headers, world):

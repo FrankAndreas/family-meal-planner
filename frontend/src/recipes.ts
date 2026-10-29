@@ -43,6 +43,8 @@ export interface Recipe extends RecipeSummary {
     people: number | null;
     factor: number;
     inbox_item_id: number | null;
+    // The mail or pasted link it was saved from
+    source_mail: { id: number; kind: 'mail' | 'url'; user_name: string | null; received_at: string } | null;
     // The text before an AI translation
     original: {
         title: string;
@@ -87,6 +89,3 @@ export async function fetchRecipe(id: number | string, people?: number | null): 
 // How many people a recipe is for when nobody said otherwise: its own yield, or the family for "1 Blech"
 export const defaultPeople = (recipe: RecipeSummary, familySize: number) =>
     recipe.servings_unit === null ? recipe.servings : familySize;
-
-// What the backend takes as a link (http/https); anything else is said at once instead of on saving
-export const isWebLink = (text: string) => /^https?:\/\/\S+$/i.test(text.trim());

@@ -77,6 +77,7 @@ def recipe_out(
         else scaling.factor(recipe.servings, recipe.servings_unit, people, get_settings(db).family_size)
     )
     votes = Votes(db, [recipe.id])
+    item = db.query(models.InboxItem).filter(models.InboxItem.recipe_id == recipe.id).first()
     ratings = sorted(votes.ratings[recipe.id], key=lambda r: r.user.name_key)
     return schemas.RecipeOut(
         **votes.summary(recipe, me),
@@ -104,7 +105,12 @@ def recipe_out(
         ratings=[schemas.RatingOut(user_id=r.user_id, name=r.user.name, stars=r.stars) for r in ratings],
         people=people,
         factor=factor,
-        inbox_item_id=db.query(models.InboxItem.id).filter(models.InboxItem.recipe_id == recipe.id).scalar(),
+        inbox_item_id=item.id if item else None,
+        source_mail=schemas.SourceMail(
+            id=item.id, kind=item.kind, user_name=item.user.name if item.user else None, received_at=item.received_at
+        )
+        if item
+        else None,
         original=recipe.original,
     )
 

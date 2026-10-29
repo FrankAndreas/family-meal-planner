@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ClipboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { apiUrl } from '../../api';
-import { isWebLink } from '../../recipes';
+import { isWebLink } from '../../links';
 import { BUTTON_DANGER, BUTTON_SECONDARY, INPUT } from '../../ui';
 
 // What saving does with the photo: nothing, a picked or pasted picture, a link to load it from, or no photo

@@ -172,6 +172,15 @@ class RecipeSummary(BaseModel):
     times_eaten: int
 
 
+class SourceMail(BaseModel):
+    """The mail or pasted link a recipe was saved from: who sent it, and when."""
+
+    id: int
+    kind: str
+    user_name: str | None
+    received_at: dt.datetime
+
+
 class RecipeOut(RecipeSummary):
     prep_minutes: int | None
     cook_minutes: int | None
@@ -187,6 +196,7 @@ class RecipeOut(RecipeSummary):
     people: float | None
     factor: float
     inbox_item_id: int | None
+    source_mail: SourceMail | None
     original: dict | None
 
 

@@ -94,6 +94,10 @@ class IngredientIn(BaseModel):
         return group or None
 
 
+# A yield "unit" that just says people: such a recipe scales by its own servings, not by the family size
+PEOPLE_WORDS = {"person", "personen", "pers", "portion", "portionen", "people", "persons", "serving", "servings"}
+
+
 class RecipeIn(BaseModel):
     title: Title
     servings: Annotated[float, Field(gt=0, le=100)]
@@ -108,10 +112,20 @@ class RecipeIn(BaseModel):
     source_url: Annotated[str, StringConstraints(strip_whitespace=True, max_length=1000)] | None = None
     language: Literal["de", "en"] | None = None
 
-    @field_validator("servings_unit", "source_url")
+    @field_validator("servings_unit")
     @classmethod
-    def blank_is_none(cls, value: str | None) -> str | None:
-        return value or None
+    def people_unit_is_none(cls, unit: str | None) -> str | None:
+        if not unit or unit.casefold().rstrip(".") in PEOPLE_WORDS:
+            return None
+        return unit
+
+    @field_validator("source_url")
+    @classmethod
+    def web_link(cls, url: str | None) -> str | None:
+        # Shown as a link: only web addresses, never javascript: or file: from an import
+        if url and not url.lower().startswith(("http://", "https://")):
+            raise ValueError("not_a_web_link")
+        return url or None
 
     @field_validator("steps")
     @classmethod

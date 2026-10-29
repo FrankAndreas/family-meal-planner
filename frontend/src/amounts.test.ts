@@ -43,3 +43,14 @@ describe('formatAmount', () => {
         expect(formatAmount(amount, lang)).toBe(expected);
     });
 });
+
+describe('parseAmount and thousands', () => {
+    it.each(['1.000', '1.500', '12.250'])('refuses %s, which could mean a thousand or one', (text) => {
+        expect(parseAmount(text)).toBe('invalid');
+    });
+
+    it('still reads short decimals with a point', () => {
+        expect(parseAmount('1.5')).toBe(1.5);
+        expect(parseAmount('0.25')).toBe(0.25);
+    });
+});

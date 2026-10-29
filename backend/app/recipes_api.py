@@ -15,7 +15,8 @@ router = APIRouter(tags=["recipes"])
 
 
 def sort_key(text: str) -> str:
-    """Alphabetical the way people expect it: "Älplermagronen" next to "Apfelwähe", not after "Zopf"."""
+    """Text without case and accents: sorts "Älplermagronen" next to "Apfelwähe" (not after "Zopf"), and lets a
+    search for "alpler" find it."""
     decomposed = unicodedata.normalize("NFKD", text.casefold())
     return "".join(c for c in decomposed if not unicodedata.combining(c))
 
@@ -154,17 +155,17 @@ def list_recipes(
 ):
     recipes = _live_recipes(db)
     if q.strip():
-        needle = q.strip().casefold()
+        needle = sort_key(q.strip())
         recipes = [
             r
             for r in recipes
-            if needle in r.title.casefold()
-            or any(needle in t.casefold() for t in r.tags)
-            or any(needle in i.name.casefold() for i in r.ingredients)
+            if needle in sort_key(r.title)
+            or any(needle in sort_key(t) for t in r.tags)
+            or any(needle in sort_key(i.name) for i in r.ingredients)
         ]
     if tag.strip():
-        wanted = tag.strip().casefold()
-        recipes = [r for r in recipes if any(t.casefold() == wanted for t in r.tags)]
+        wanted = sort_key(tag.strip())
+        recipes = [r for r in recipes if any(sort_key(t) == wanted for t in r.tags)]
     votes = _Votes(db, [r.id for r in recipes])
     if favorites == "mine":
         recipes = [r for r in recipes if me.id in votes.favorites[r.id]]

@@ -65,7 +65,10 @@ export default function RecipeView() {
         setError('');
         try {
             const changed = (await action()).data;
-            setRecipe({ ...changed, ingredients: recipe!.ingredients, people: recipe!.people, factor: recipe!.factor });
+            // The answer is unscaled: keep the amounts of whatever people the view shows by now
+            setRecipe((shown) =>
+                shown ? { ...changed, ingredients: shown.ingredients, people: shown.people, factor: shown.factor } : changed,
+            );
         } catch (err) {
             setError(errorMessage(err));
         }

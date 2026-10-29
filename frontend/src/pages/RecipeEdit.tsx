@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
 import api, { errorMessage } from '../api';
+import i18next from '../i18n';
 import IngredientEditor from '../components/recipes/IngredientEditor';
 import type { Language } from '../i18n';
 import { emptyRow, ingredientsFrom, rowInvalid, rowsFrom, type Row } from '../ingredientRows';
@@ -23,7 +24,7 @@ const EMPTY: Form = { title: '', servings: '4', servingsUnit: '', prep: '', cook
 const minutes = (text: string) => (text.trim() === '' ? null : Math.max(0, Math.round(Number(text))));
 
 export default function RecipeEdit() {
-    const { t, i18n } = useTranslation();
+    const { t } = useTranslation();
     const { id } = useParams();
     const navigate = useNavigate();
     const [form, setForm] = useState<Form>(EMPTY);
@@ -32,6 +33,8 @@ export default function RecipeEdit() {
     const [units, setUnits] = useState<string[]>([]);
     const [knownTags, setKnownTags] = useState<string[]>([]);
     const [photo, setPhoto] = useState<File | null>(null);
+    // A new recipe saved while its photo failed: saving again updates it instead of making a second one
+    const [createdId, setCreatedId] = useState<number | null>(null);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
 
@@ -55,10 +58,10 @@ export default function RecipeEdit() {
                     steps: recipe.steps.join('\n'),
                     notes: recipe.notes,
                 });
-                setRows(rowsFrom(recipe.ingredients, i18n.language as Language));
+                setRows(rowsFrom(recipe.ingredients, i18next.language as Language));
             })
             .catch((err) => setError(errorMessage(err)));
-    }, [id, i18n.language]);
+    }, [id]);
 
     const set = (key: keyof Form) => (e: { target: { value: string } }) => setForm({ ...form, [key]: e.target.value });
     const servings = Number(form.servings.replace(',', '.'));
@@ -85,9 +88,11 @@ export default function RecipeEdit() {
             language: original?.language ?? null,
         };
         try {
-            const saved = id
-                ? (await api.put<Recipe>(`/api/recipes/${id}`, body)).data
+            const target = id ?? createdId;
+            const saved = target
+                ? (await api.put<Recipe>(`/api/recipes/${target}`, body)).data
                 : (await api.post<Recipe>('/api/recipes', body)).data;
+            setCreatedId(saved.id);
             if (photo) {
                 const data = new FormData();
                 data.append('file', photo);
@@ -99,6 +104,9 @@ export default function RecipeEdit() {
             setBusy(false);
         }
     };
+
+    // Editing a recipe that didn't load would save an empty one over it
+    if (id && !original) return error ? <p className={ERROR}>{error}</p> : <p className="text-slate-400">{t('common.loading')}</p>;
 
     const label = 'mb-1 block text-sm text-slate-300';
     return (

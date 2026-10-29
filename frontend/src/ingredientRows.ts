@@ -26,7 +26,8 @@ export function rowsFrom(ingredients: Ingredient[], lang: Language): Row[] {
     const rows: Row[] = [];
     let group: string | null = null;
     for (const i of ingredients) {
-        if (i.group !== group && i.group) rows.push({ ...emptyRow('group'), name: i.group });
+        // A heading without a name ends the group above, for ingredients that belong to none
+        if (i.group !== group) rows.push({ ...emptyRow('group'), name: i.group ?? '' });
         group = i.group;
         rows.push({
             ...emptyRow(),

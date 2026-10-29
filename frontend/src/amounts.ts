@@ -14,6 +14,8 @@ function parsePart(part: string): number | null {
     if (mixed) return Number(mixed[1]) + VULGAR[mixed[2]];
     const fraction = /^(\d+)\/(\d+)$/.exec(part);
     if (fraction) return Number(fraction[2]) === 0 ? null : Number(fraction[1]) / Number(fraction[2]);
+    // "1.000" or "1.500" might be a thousand (German) or one and a half: the person has to write it unmistakably
+    if (/^\d{1,3}(\.\d{3})+$/.test(part)) return null;
     if (/^\d+([.,]\d+)?$/.test(part)) return Number(part.replace(',', '.'));
     return null;
 }

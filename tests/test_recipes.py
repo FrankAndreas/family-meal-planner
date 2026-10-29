@@ -118,3 +118,25 @@ def test_recipe_survives_creator_deletion(client, admin_headers):
     r = create_recipe(client, login(client, "Lena", "5678"))
     client.delete(f"/api/users/{lena['id']}", headers=admin_headers)
     assert client.get(f"/api/recipes/{r['id']}", headers=admin_headers).json()["created_by_name"] is None
+
+
+def test_people_as_yield_unit_means_people(client, admin_headers):
+    for word in ("Personen", "personen ", "Pers.", "Portionen", "Portion", "people", "servings", "Person"):
+        r = create_recipe(client, admin_headers, servings=2, servings_unit=word)
+        assert r["servings_unit"] is None, word
+
+
+def test_source_url_must_be_web(client, admin_headers):
+    r = client.post("/api/recipes", json=recipe_body(source_url="javascript:alert(1)"), headers=admin_headers)
+    assert r.status_code == 422
+    ok = create_recipe(client, admin_headers, source_url="https://www.swissmilk.ch/de/rezepte/")
+    assert ok["source_url"] == "https://www.swissmilk.ch/de/rezepte/"
+
+
+def test_search_ignores_accents(client, admin_headers):
+    create_recipe(client, admin_headers, "Älplermagronen", tags=["Käse"])
+    for q in ("alplermagronen", "kase", "ÄLPLER"):
+        assert [r["title"] for r in client.get(f"/api/recipes?q={q}", headers=admin_headers).json()] == [
+            "Älplermagronen"
+        ], q
+    assert len(client.get("/api/recipes?tag=kase", headers=admin_headers).json()) == 1

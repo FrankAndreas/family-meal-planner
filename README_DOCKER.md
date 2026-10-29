@@ -2,8 +2,8 @@
 
 The app runs as two containers from images on GitHub Container Registry (GHCR):
 
-- **backend** (`ghcr.io/frankandreas/meal-planer/backend`): the API, with the SQLite database and files in `./data`
-- **frontend** (`ghcr.io/frankandreas/meal-planer/frontend`): nginx serving the app on port 8080 inside the
+- **backend** (`ghcr.io/frankandreas/family-meal-planner/backend`): the API, with the SQLite database and files in `./data`
+- **frontend** (`ghcr.io/frankandreas/family-meal-planner/frontend`): nginx serving the app on port 8080 inside the
   container, forwarding `/api` to the backend
 
 Same setup as family-budget-dashboard and family-job-tracking, so all of them run side by side on one NAS
@@ -185,8 +185,8 @@ night installs the same version again. Then, in the app folder:
 ```bash
 cd /volume1/docker/meals
 # 1. Point latest at the previous images (frontend only if it was updated; see logs/update.log)
-sudo docker tag ghcr.io/frankandreas/meal-planer/backend:previous ghcr.io/frankandreas/meal-planer/backend:latest
-sudo docker tag ghcr.io/frankandreas/meal-planer/frontend:previous ghcr.io/frankandreas/meal-planer/frontend:latest
+sudo docker tag ghcr.io/frankandreas/family-meal-planner/backend:previous ghcr.io/frankandreas/family-meal-planner/backend:latest
+sudo docker tag ghcr.io/frankandreas/family-meal-planner/frontend:previous ghcr.io/frankandreas/family-meal-planner/frontend:latest
 
 # 2. Restore the database from the backup taken right before the update
 #    (the new version may have changed it). Changes made since the update are lost.

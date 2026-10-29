@@ -10,7 +10,7 @@
 
 services:
   backend:
-    image: ghcr.io/frankandreas/meal-planer/backend:latest
+    image: ghcr.io/frankandreas/family-meal-planner/backend:latest
     build: ./backend
     container_name: meals-backend
     user: "${PUID:-999}:${PGID:-999}"
@@ -46,7 +46,7 @@ services:
       start_period: 10s
 
   frontend:
-    image: ghcr.io/frankandreas/meal-planer/frontend:latest
+    image: ghcr.io/frankandreas/family-meal-planner/frontend:latest
     build: ./frontend
     container_name: meals-frontend
     ports:

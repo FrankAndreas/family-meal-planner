@@ -38,6 +38,11 @@ export default defineConfig({
                 SECRET_KEY: 'e2e-only-key-not-used-anywhere-else',
                 CORS_ORIGINS: FRONTEND,
                 DEFAULT_LANGUAGE: 'en',
+                // Recipe mails as the Cloudflare Email Worker delivers them, and a fake AI (never the real service)
+                INBOUND_SECRET: 'e2e-inbound',
+                AI_FAKE: '1',
+                INFOMANIAK_AI_TOKEN: 'fake',
+                INFOMANIAK_AI_PRODUCT_ID: 'fake',
             },
             reuseExistingServer: false,
             timeout: 60_000,

@@ -83,3 +83,36 @@ export async function call<T = any>(
     expect(response.ok(), `${method} ${path}: ${await response.text()}`).toBeTruthy();
     return response.status() === 204 ? (undefined as T) : response.json();
 }
+
+const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+
+// A mail as the Cloudflare Email Worker posts it: text and one screenshot
+export async function sendMail(request: APIRequestContext, from: string, subject: string) {
+    const raw = [
+        `From: <${from}>`,
+        'To: rezepte@example.ch',
+        `Subject: ${subject}`,
+        `Message-ID: <${uniqueName('m')}@example.ch>`,
+        'MIME-Version: 1.0',
+        'Content-Type: multipart/mixed; boundary="b"',
+        '',
+        '--b',
+        'Content-Type: text/plain; charset=utf-8',
+        '',
+        'Gesehen auf Facebook',
+        '--b',
+        'Content-Type: image/png',
+        'Content-Disposition: attachment; filename="screenshot.png"',
+        'Content-Transfer-Encoding: base64',
+        '',
+        PNG,
+        '--b--',
+        '',
+    ].join('\r\n');
+    const response = await request.post(`${API}/inbound`, {
+        data: raw,
+        headers: { 'X-Inbound-Secret': 'e2e-inbound', 'Content-Type': 'message/rfc822' },
+    });
+    expect(response.ok(), await response.text()).toBeTruthy();
+    return response.json();
+}

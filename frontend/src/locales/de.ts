@@ -209,6 +209,11 @@ const de = {
         photo_unreadable: 'Das Foto konnte nicht gelesen werden.',
         photo_too_large: 'Das Foto ist zu gross (höchstens 25 MB).',
         photo_not_found: 'Das Foto gibt es nicht mehr.',
+        entry_not_found: 'Diese Mahlzeit ist nicht mehr im Plan.',
+        recipe_deleted: 'Dieses Rezept wurde gelöscht und kann nicht mehr geplant werden.',
+        week_not_over: 'Diese Woche ist noch nicht vorbei.',
+        recipe_or_note: 'Bitte ein Rezept oder eine Notiz angeben.',
+        not_a_web_link: 'Das ist keine Web-Adresse (http/https).',
         wrong_current_pin: 'Die aktuelle PIN ist falsch.',
     },
 };

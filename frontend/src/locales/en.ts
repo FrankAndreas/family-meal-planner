@@ -210,6 +210,11 @@ const en: typeof de = {
         photo_unreadable: 'The photo couldn’t be read.',
         photo_too_large: 'The photo is too large (at most 25 MB).',
         photo_not_found: 'The photo no longer exists.',
+        entry_not_found: 'This meal is no longer in the plan.',
+        recipe_deleted: 'This recipe was deleted and can’t be planned any more.',
+        week_not_over: 'This week isn’t over yet.',
+        recipe_or_note: 'Please give a recipe or a note.',
+        not_a_web_link: 'That isn’t a web address (http/https).',
         wrong_current_pin: 'The current PIN is wrong.',
     },
 };

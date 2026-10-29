@@ -35,12 +35,22 @@ def test_not_eaten_doesnt_count(client, admin_headers, today):
 def test_close_only_when_over(client, admin_headers, today):
     r = create_recipe(client, admin_headers)
     plan(client, admin_headers, "2026-10-25", recipe_id=r["id"])
+    today(date(2026, 10, 29))
     early = client.post("/api/plan/close", json={"start": "2026-10-24"}, headers=admin_headers)
     assert early.status_code == 400 and early.json()["detail"] == "week_not_over"
-    today(date(2026, 10, 31))
+    # On its last day (Friday, the planning session) the week can be closed
+    today(date(2026, 10, 30))
     closed = client.post("/api/plan/close", json={"start": "2026-10-27"}, headers=admin_headers)
     assert closed.status_code == 200 and closed.json()["closed"] is True and closed.json()["start"] == "2026-10-24"
     assert client.post("/api/plan/close", json={"start": "2026-10-24"}, headers=admin_headers).status_code == 200
+
+
+def test_friday_offers_closing_the_week_ending_today(client, admin_headers, today):
+    r = create_recipe(client, admin_headers)
+    plan(client, admin_headers, "2026-10-26", recipe_id=r["id"])
+    # Friday 30.10: the planner opens on 31.10, and the week ending today waits to be closed
+    week = client.get("/api/plan", headers=admin_headers).json()
+    assert week["start"] == "2026-10-31" and week["previous_needs_closing"] is True
 
 
 def test_previous_needs_closing(client, admin_headers, today):

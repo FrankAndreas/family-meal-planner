@@ -102,3 +102,53 @@ test('drag a suggestion into the week, and an entry to another day', async ({ pa
     await expect(page.getByRole('dialog')).toHaveCount(0);
     await expect(card).toHaveAttribute('aria-pressed', 'false');
 });
+
+test('on a touch screen: tap a card, then tap a cell', async ({ page, request }) => {
+    const parent = await newPerson(request);
+    const recipe = await createRecipe(request, parent);
+    await call(request, parent, 'PUT', `/recipes/${recipe.id}/favorite`, { favorite: true });
+    await login(page, parent.name);
+    await page.goto(`/?woche=${ownWeek()}`);
+    const card = page.getByRole('complementary').getByRole('button', { name: recipe.title });
+    await card.tap();
+    await expect(card).toHaveAttribute('aria-pressed', 'true');
+    await page.getByRole('button', { name: 'Plan on Thursday, Lunch' }).tap();
+    await expect(page.getByTestId('cell-thu-lunch')).toContainText(recipe.title);
+});
+
+test('two quick taps on + count twice', async ({ page, request }) => {
+    const parent = await newPerson(request);
+    const recipe = await createRecipe(request, parent);
+    const week = ownWeek();
+    const start = (await call(request, parent, 'GET', `/plan?start=${week}`)).start;
+    const entry = await call(request, parent, 'POST', '/plan/entries', { date: start, slot: 'dinner', recipe_id: recipe.id });
+    await login(page, parent.name);
+    await page.goto(`/?woche=${week}`);
+    await page.getByTestId('cell-sat-dinner').getByRole('button', { name: recipe.title }).click();
+    // A slow answer, as on a busy NAS: the second tap comes before the first is answered
+    await page.route('**/api/plan/entries/*', async (route) => {
+        if (route.request().method() === 'PATCH') await new Promise((resolve) => setTimeout(resolve, 800));
+        await route.continue();
+    });
+    const more = page.getByRole('dialog', { name: recipe.title }).getByRole('button', { name: 'More people' });
+    await more.click();
+    await more.click();
+    await expect(page.getByRole('dialog', { name: recipe.title }).getByText('6 people')).toBeVisible();
+    await expect.poll(async () => (await call(request, parent, 'GET', `/plan?start=${week}`)).entries[0].people).toBe(6);
+    expect(entry.people).toBe(4);
+});
+
+test('a meal another device removed: a clear message, and it disappears', async ({ page, request }) => {
+    const parent = await newPerson(request);
+    const week = ownWeek();
+    const start = (await call(request, parent, 'GET', `/plan?start=${week}`)).start;
+    const entry = await call(request, parent, 'POST', '/plan/entries', { date: start, slot: 'lunch', note: 'Weg' });
+    await login(page, parent.name);
+    await page.goto(`/?woche=${week}`);
+    await expect(page.getByTestId('cell-sat-lunch')).toContainText('Weg');
+    await call(request, parent, 'DELETE', `/plan/entries/${entry.id}`);
+    await page.getByTestId('cell-sat-lunch').getByRole('button', { name: 'Weg' }).click();
+    await page.getByRole('dialog', { name: 'Weg' }).getByRole('button', { name: 'Remove' }).click();
+    await expect(page.getByText('This meal is no longer in the plan.')).toBeVisible();
+    await expect(page.getByTestId('cell-sat-lunch')).not.toContainText('Weg');
+});

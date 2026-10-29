@@ -21,3 +21,21 @@ test('plan a dinner on the phone, day by day', async ({ page, request }) => {
     await expect(page.getByTestId('day-lunch')).toContainText('Leftovers');
     expect(errors).toEqual([]);
 });
+
+test('move a meal to another slot on the phone', async ({ page, request }) => {
+    const parent = await newPerson(request);
+    const week = ownWeek();
+    await login(page, parent.name);
+    await page.goto(`/?woche=${week}`);
+    await page.getByRole('tab', { name: 'Saturday' }).click();
+    await page.getByRole('button', { name: 'Add to Saturday, Lunch' }).click();
+    await page.getByRole('dialog', { name: 'Saturday, Lunch' }).getByRole('button', { name: 'Add a note' }).click();
+    await page.getByRole('dialog', { name: 'Add a note' }).getByRole('button', { name: 'Leftovers' }).click();
+    await page.getByTestId('day-lunch').getByRole('button', { name: 'Leftovers' }).click();
+    await page.getByRole('dialog', { name: 'Leftovers' }).getByRole('button', { name: 'Move', exact: true }).click();
+    await page.getByRole('tab', { name: 'Monday' }).click();
+    await page.getByRole('button', { name: 'Move to Monday, Dinner' }).click();
+    await expect(page.getByTestId('day-dinner')).toContainText('Leftovers');
+    await page.getByRole('tab', { name: 'Saturday' }).click();
+    await expect(page.getByTestId('day-lunch')).not.toContainText('Leftovers');
+});

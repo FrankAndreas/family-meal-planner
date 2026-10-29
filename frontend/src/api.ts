@@ -28,7 +28,9 @@ api.interceptors.response.use(
 // The backend sends a code (errors.<code> in the locales), alone or with the values the text needs
 export function errorMessage(error: unknown): string {
     if (axios.isAxiosError(error)) {
-        const detail = error.response?.data?.detail;
+        let detail = error.response?.data?.detail;
+        // Validation errors (422) come as a list; a check of ours names its code in the message ("Value error, x")
+        if (Array.isArray(detail)) detail = /Value error, (\w+)/.exec(detail.map((d) => d.msg).join(' '))?.[1];
         const { code, ...params } = typeof detail === 'string' ? { code: detail } : (detail ?? {});
         if (typeof code === 'string' && i18n.exists(`errors.${code}`)) return i18n.t(`errors.${code}`, params);
         if (!error.response) return i18n.t('errors.network');

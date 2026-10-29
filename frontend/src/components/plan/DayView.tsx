@@ -14,10 +14,13 @@ interface DayViewProps {
     onPlan: (day: string, slot: Slot, recipe: RecipeSummary) => void;
     onNote: (day: string, slot: Slot) => void;
     onOpenEntry: (entry: PlanEntry) => void;
+    // An entry is being moved: tapping a slot puts it there
+    moving: boolean;
+    onMoveTo: (day: string, slot: Slot) => void;
 }
 
 // Phones: one day at a time; "+" on a slot opens the suggestions as a sheet from the bottom
-export default function DayView({ week, familySize, version, onPlan, onNote, onOpenEntry }: DayViewProps) {
+export default function DayView({ week, familySize, version, onPlan, onNote, onOpenEntry, moving, onMoveTo }: DayViewProps) {
     const { t } = useTranslation();
     const [day, setDay] = useState(week.days.includes(week.today) ? week.today : week.days[0]);
     const [adding, setAdding] = useState<Slot | null>(null);
@@ -54,11 +57,13 @@ export default function DayView({ week, familySize, version, onPlan, onNote, onO
                         ))}
                     <button
                         type="button"
-                        aria-label={t('plan.addTo', { place: place(slot) })}
-                        onClick={() => setAdding(slot)}
-                        className="w-full rounded-md border border-dashed border-white/15 py-1.5 text-sm text-slate-400"
+                        aria-label={t(moving ? 'plan.moveTo' : 'plan.addTo', { place: place(slot) })}
+                        onClick={() => (moving ? onMoveTo(shown, slot) : setAdding(slot))}
+                        className={`w-full rounded-md border border-dashed py-1.5 text-sm ${
+                            moving ? 'border-cyan-400/60 text-cyan-300' : 'border-white/15 text-slate-400'
+                        }`}
                     >
-                        {t('plan.add')}
+                        {moving ? t('plan.moveHere') : t('plan.add')}
                     </button>
                 </section>
             ))}

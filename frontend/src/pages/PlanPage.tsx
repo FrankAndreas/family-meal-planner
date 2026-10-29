@@ -90,6 +90,9 @@ export default function PlanPage() {
             setMenuEntry((open) => (open ? (loaded.entries.find((e) => e.id === open.id) ?? null) : null));
         } catch (err) {
             setError(errorMessage(err));
+            // Another device may have changed the week: show it as it is now
+            const loaded = await reload().catch(() => null);
+            if (loaded) setMenuEntry((open) => (open ? (loaded.entries.find((e) => e.id === open.id) ?? null) : null));
         }
     };
 
@@ -169,7 +172,10 @@ export default function PlanPage() {
                 </DndContext>
             ) : (
                 <DayView
+                    key={week.start}
                     week={week}
+                    moving={moving !== null}
+                    onMoveTo={onCell}
                     familySize={familySize}
                     version={version}
                     onOpenEntry={setMenuEntry}
@@ -190,6 +196,7 @@ export default function PlanPage() {
             )}
             {menuEntry && (
                 <EntryMenu
+                    key={menuEntry.id}
                     entry={menuEntry}
                     past={menuEntry.date < week.today}
                     onClose={() => setMenuEntry(null)}

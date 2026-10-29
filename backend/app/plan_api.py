@@ -54,7 +54,8 @@ def _closed(db: Session, first: date, last: date) -> bool:
 
 def _needs_closing(db: Session, start: date) -> bool:
     first, last = start - timedelta(days=7), start - timedelta(days=1)
-    if last >= timeutil.today() or _closed(db, first, last):
+    # A week can be closed on its last day: Friday's planning session starts by closing the week ending today
+    if last > timeutil.today() or _closed(db, first, last):
         return False
     return (
         db.query(models.PlanEntry.id)
@@ -169,7 +170,7 @@ def delete_entry(entry_id: int, _user: models.User = Depends(auth.get_current_us
 def close_week(body: schemas.CloseIn, me: models.User = Depends(auth.get_current_user), db: Session = Depends(get_db)):
     start = week_start_of(body.start, get_settings(db).week_start)
     end = start + timedelta(days=6)
-    if end >= timeutil.today():
+    if end > timeutil.today():
         raise api_error(400, "week_not_over")
     if db.get(models.WeekClosure, start) is None:
         db.add(models.WeekClosure(start=start, end=end, closed_by=me.id))

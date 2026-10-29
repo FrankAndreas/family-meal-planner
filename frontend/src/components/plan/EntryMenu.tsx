@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import type { PlanEntry } from '../../plan';
@@ -18,6 +19,8 @@ interface EntryMenuProps {
 export default function EntryMenu({ entry, past, onPeople, onEaten, onMove, onRemove, onClose }: EntryMenuProps) {
     const { t } = useTranslation();
     const title = entry.recipe ? entry.recipe.title : entry.note!;
+    // Counted here, so quick taps add up before the server has answered the first one
+    const [people, setPeople] = useState(entry.people);
     return (
         <div className="fixed inset-0 z-30 flex items-end justify-center bg-black/50 p-4 sm:items-center" onClick={onClose}>
             <div
@@ -29,13 +32,21 @@ export default function EntryMenu({ entry, past, onPeople, onEaten, onMove, onRe
                 <h2 className="text-lg">{title}</h2>
                 {entry.recipe && !entry.recipe_deleted && (
                     <Link
-                        to={`/rezepte/${entry.recipe.id}?personen=${entry.people ?? ''}`}
+                        to={`/rezepte/${entry.recipe.id}?personen=${people ?? ''}`}
                         className={`${BUTTON_SECONDARY} block text-center`}
                     >
                         {t('plan.openRecipe')}
                     </Link>
                 )}
-                {entry.people !== null && <PeopleStepper value={entry.people} onChange={onPeople} />}
+                {people !== null && (
+                    <PeopleStepper
+                        value={people}
+                        onChange={(value) => {
+                            setPeople(value);
+                            onPeople(value);
+                        }}
+                    />
+                )}
                 {past && (
                     <label className="flex items-center gap-2 text-sm">
                         <input type="checkbox" checked={entry.eaten} onChange={(e) => onEaten(e.target.checked)} />

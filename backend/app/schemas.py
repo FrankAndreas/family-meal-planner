@@ -1,6 +1,6 @@
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 from .models import UserRole
 
@@ -55,3 +55,16 @@ class UserCreate(BaseModel):
 class UserPatch(BaseModel):
     name: Name | None = None
     role: UserRole | None = None
+
+
+class SettingsOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    family_size: int
+    week_start: int
+
+
+class SettingsPatch(BaseModel):
+    family_size: Annotated[int, Field(ge=1, le=20)] | None = None
+    # Python weekday: 0 = Monday ... 6 = Sunday
+    week_start: Annotated[int, Field(ge=0, le=6)] | None = None

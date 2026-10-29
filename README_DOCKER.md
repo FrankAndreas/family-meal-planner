@@ -65,8 +65,9 @@ If you lose the PIN before anyone uses the app, stop it, delete `data/meals.db` 
 
 ### Where the data is
 
-`data/` holds everything worth keeping: the database `meals.db` and, in later versions, recipe photos and imported
-mails. Back up the whole folder.
+`data/` holds everything worth keeping: the database `meals.db`, recipe photos (`data/photos/`) and the recipe mails
+with their originals (`data/inbox/`). Back up the whole folder: the update script's database backup does not include
+the files.
 
 ### HTTPS at home (recommended)
 
@@ -77,6 +78,75 @@ The DNS record and the `*.local.<domain>` wildcard certificate from family-budge
    port 443, **Enable HSTS**; destination HTTP, `localhost`, port 8085.
 2. **Control Panel → Security → Certificate → Settings**: pick the `*.local.<domain>` certificate for the new entry.
 3. Open `https://essen.local.<domain>` on the iPad and the phones and save it to the home screen.
+
+### Recipe mails (Cloudflare Email Worker, optional)
+
+Family members share a recipe (a Facebook post, a screenshot, a link) **by mail** to e.g. `rezepte@<domain>`. It waits
+**unopened** in the **Posteingang** until a parent taps **Verarbeiten**; only then is the mail read, are its links
+followed and may the AI see it. Mails are taken only
+
+- if Cloudflare found them authentic (`dmarc=pass`; the worker checks this), and
+- from an address registered for a family member in **Einstellungen → Mail-Adressen** (the app checks this).
+
+Everything else is rejected, and the sender gets a bounce. The app stays home-network only: the tunnel opens just the
+one path the worker posts to, behind Cloudflare Access. The setup is the same as family-budget-dashboard's "Receipt
+mails", with these names (Cloudflare renames dashboard menus from time to time):
+
+1. **Secret for the app.** Add it to `.env`, then restart and check the log:
+   ```bash
+   echo "INBOUND_SECRET=$(openssl rand -hex 32)" | sudo tee -a .env
+   sudo docker-compose up -d
+   sudo docker logs meals-backend 2>&1 | grep "Recipe mails"    # must say: configured
+   ```
+2. **Tunnel route for the worker only.** **Zero Trust → Networks → Connectors → Cloudflare Tunnels**, the NAS's tunnel
+   → **Published application routes → Add**: subdomain e.g. `rezepte-inbound`, your domain, **path `^/api/inbound$`**,
+   service `HTTP`, URL `<NAS_IP>:8085`.
+3. **Service token** `meals-inbound` (**Access controls → Service credentials → Service Tokens**, non-expiring); note
+   the Client ID and Secret.
+4. **Policy** `meals-inbound-token`: action **Service Auth**, include **Service Token** = `meals-inbound`.
+5. **Access application** (Public DNS): subdomain `rezepte-inbound`, path `api/inbound`, policy
+   `meals-inbound-token`. Check:
+   ```bash
+   curl -s -o /dev/null -w "%{http_code}\n" -X POST https://rezepte-inbound.<domain>/api/inbound   # 302 or 401
+   ```
+6. **Deploy the worker** from a checkout of this repository:
+   ```bash
+   cd cloudflare/email-worker
+   npm ci
+   npx wrangler login
+   npx wrangler deploy
+   # APP_URL=https://rezepte-inbound.<domain>, INBOUND_SECRET from step 1, the token from step 3
+   for name in APP_URL INBOUND_SECRET CF_ACCESS_CLIENT_ID CF_ACCESS_CLIENT_SECRET; do
+     printf %s "${!name}" | npx wrangler secret put "$name"
+   done
+   ```
+   Optional: `FALLBACK_ADDRESS` (a verified Email Routing destination outside the domain) gets a mail the app can't
+   take (NAS down) instead of a bounce.
+7. **Route the address** `rezepte` to the worker `meals-inbound` (**Email → Email Routing → Routing rules**).
+8. **Register the addresses** everyone shares from in **Einstellungen → Mail-Adressen**.
+9. **Test:** share a recipe from a registered mailbox to `rezepte@<domain>`; it shows in the Posteingang within
+   seconds. A mail from an unregistered address must bounce.
+
+Mails wait in `data/inbox/`; part of the `data/` backup.
+
+### AI (Infomaniak, optional)
+
+The AI reads recipes from screenshots and mail text, and translates recipes into German. **Only parents** start it
+(Verarbeiten, Übersetzen); recipe pages with built-in recipe data (Swissmilk, Fooby, Betty Bossi, most blogs) are
+read **without** it.
+
+What the AI service sees (Infomaniak processes it in Switzerland): the text of the mail or page and its pictures for a
+recipe import; the recipe's text for a translation. Nothing else from the app.
+
+1. In the Infomaniak Manager, create an API token with **only the `ai-tools` scope** and a lifetime, and note the AI
+   product's ID. **Set a spending limit** on the AI product: it is the outer cost control.
+2. Put both in `.env` (never in the repository) and restart:
+   `INFOMANIAK_AI_TOKEN=…`, `INFOMANIAK_AI_PRODUCT_ID=…`, then `sudo docker-compose up -d`; the log says `AI: configured`.
+3. Optional: `AI_MODEL` (default `google/gemma-4-31B-it`) and `AI_CALLS_PER_HOUR` (default 30 per person; `0` turns
+   the AI off while keeping the token).
+
+Parents see each person's AI calls this month in **Einstellungen → KI-Nutzung**. The NAS needs outgoing HTTPS to
+`api.infomaniak.com` and, for links, to the recipe sites.
 
 ## Automatic updates
 

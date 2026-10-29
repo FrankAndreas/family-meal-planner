@@ -28,6 +28,15 @@ services:
       # de or en: language of people who haven't picked one
       - DEFAULT_LANGUAGE=${DEFAULT_LANGUAGE:-de}
       - TZ=${TZ:-Europe/Zurich}
+      # Recipe mails through the Cloudflare Email Worker; empty = receiving is off.
+      # See README_DOCKER.md, "Recipe mails"
+      - INBOUND_SECRET=${INBOUND_SECRET:-}
+      # Reading recipes and translating with the Infomaniak AI; empty token or
+      # product ID = the AI is off (links to recipe pages still work). See README_DOCKER.md, "AI"
+      - INFOMANIAK_AI_TOKEN=${INFOMANIAK_AI_TOKEN:-}
+      - INFOMANIAK_AI_PRODUCT_ID=${INFOMANIAK_AI_PRODUCT_ID:-}
+      - AI_MODEL=${AI_MODEL:-}
+      - AI_CALLS_PER_HOUR=${AI_CALLS_PER_HOUR:-}
     restart: unless-stopped
     healthcheck:
       test: [ "CMD-SHELL", "python3 -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8000/health\")' || exit 1" ]

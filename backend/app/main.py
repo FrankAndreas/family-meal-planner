@@ -20,6 +20,10 @@ with database.SessionLocal() as _db:
 if _initial_pin:
     logger.warning("Created parent 'Admin' with INITIAL PIN %s. Log in and change it in Einstellungen.", _initial_pin)
 
+# Both integrations are optional; say which ones are on, but never refuse to start
+logger.info("Recipe mails: %s", "configured" if config.env("INBOUND_SECRET") else "not configured (INBOUND_SECRET empty)")
+logger.info("AI: %s", "configured" if ai.Settings.from_env().enabled else "not configured (no token, product ID or calls)")
+
 app = FastAPI(title="Meal Planner API", version="0.1.0")
 app.include_router(users_api.router, prefix="/api")
 app.include_router(settings_api.router, prefix="/api")

@@ -1,0 +1,19 @@
+{
+  "name": "meals-inbound",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "test": "vitest run",
+    "type-check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261024.1",
+    "typescript": "~5.9.3",
+    "vitest": "^4.1.10",
+    "wrangler": "^4.152.0"
+  },
+  "overrides": {
+    "undici": "^7.30.1"
+  }
+}

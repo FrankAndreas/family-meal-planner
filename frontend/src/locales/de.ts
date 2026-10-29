@@ -76,6 +76,7 @@ const de = {
     },
     recipes: {
         new: '+ Neues Rezept',
+        importFromLink: 'Aus Link importieren',
         newTitle: 'Neues Rezept',
         editTitle: 'Rezept bearbeiten',
         search: 'Rezepte suchen',

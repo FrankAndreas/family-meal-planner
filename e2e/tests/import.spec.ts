@@ -62,3 +62,15 @@ test('a parent translates an English recipe, and can show the original', async (
     await page.goto('/einstellungen');
     await expect(page.getByRole('region', { name: 'AI usage' })).toContainText(`${parent.name}: 1`);
 });
+
+test('a recipe link is pasted on the recipes page and lands in the inbox', async ({ page, request }) => {
+    const child = await newPerson(request, 'CHILD');
+    await login(page, child.name);
+    await page.goto('/rezepte');
+    await expect(page.getByLabel('Recipe link')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Import from link' }).click();
+    await page.getByLabel('Recipe link').fill('https://www.fooby.ch/de/rezepte/12345/risotto');
+    await page.getByRole('button', { name: 'Add link' }).click();
+    await expect(page).toHaveURL(/\/posteingang$/);
+    await expect(page.getByRole('article').filter({ hasText: 'www.fooby.ch' }).getByText('Waiting for a parent')).toBeVisible();
+});

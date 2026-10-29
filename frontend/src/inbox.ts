@@ -43,4 +43,10 @@ export const fetchInboxCount = async () => (await api.get<{ waiting: number }>('
 export const processItem = (id: number) => api.post(`/api/inbox/${id}/process`);
 export const discardItem = (id: number) => api.delete(`/api/inbox/${id}`);
 export const addUrl = (url: string) => api.post<InboxItem>('/api/inbox/urls', { url });
+// The photos of one recipe, as one inbox item
+export const addScan = (photos: Blob[]) => {
+    const body = new FormData();
+    photos.forEach((photo, n) => body.append('files', photo, `scan-${n + 1}.jpg`));
+    return api.post<InboxItem>('/api/inbox/scans', body);
+};
 export const isImage = (a: Attachment) => a.type.startsWith('image/');

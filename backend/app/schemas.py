@@ -111,7 +111,7 @@ class RecipeIn(BaseModel):
     steps: Annotated[list[str], Field(max_length=100)] = []
     tags: Annotated[list[Annotated[str, StringConstraints(max_length=40)]], Field(max_length=20)] = []
     notes: Annotated[str, StringConstraints(max_length=10_000)] = ""
-    source_kind: Literal["manual", "url", "mail"] = "manual"
+    source_kind: Literal["manual", "url", "mail", "scan"] = "manual"
     source_url: Annotated[str, StringConstraints(strip_whitespace=True, max_length=1000)] | None = None
     language: Literal["de", "en"] | None = None
     # Saving a draft from the inbox: the item it came from (its photo is taken over, the item is done)

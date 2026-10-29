@@ -47,7 +47,7 @@ export default function InboxItemPage() {
             <section className={`${CARD} space-y-2`}>
                 <h1 className="text-2xl">{item.subject}</h1>
                 <p className="text-sm text-slate-400">
-                    {item.user_name ?? item.from_addr} · {item.from_addr} · {format(parseISO(`${item.received_at}Z`), 'd.M.yyyy HH:mm')}
+                    {[item.user_name, item.from_addr].filter(Boolean).join(' · ')} · {format(parseISO(`${item.received_at}Z`), 'd.M.yyyy HH:mm')}
                 </p>
                 {item.url && (
                     <a href={item.url} target="_blank" rel="noreferrer" className="break-all text-cyan-300 underline">

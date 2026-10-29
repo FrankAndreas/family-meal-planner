@@ -298,3 +298,38 @@ def ai_usage(_parent: models.User = Depends(auth.require_parent), db: Session = 
         .all()
     )
     return {"month": [{"user_name": name, "calls": calls} for name, calls in rows], "total": db.query(models.AiCall).count()}
+
+
+TRANSLATE_PROMPT = """Übersetze dieses Kochrezept ins Deutsche (Schweizer Rechtschreibung: ss statt ß).
+Antworte NUR mit demselben JSON, in derselben Form: gleich viele Zutaten in derselben Reihenfolge, gleich viele
+Schritte. Übersetze title, name, note, steps und notes; erfinde nichts dazu.
+"""
+
+
+def translate(client: AiClient, text: dict) -> tuple[dict, int | None]:
+    """The recipe's text in German: {title, ingredients: [{name, note}], steps, notes}, the same shape as given."""
+    answer = client.complete([{"type": "text", "text": TRANSLATE_PROMPT + TRANSLATE_MARKER + json.dumps(text, ensure_ascii=False)}])
+    data = _json(answer.text)
+    if (
+        not isinstance(data, dict)
+        or not _str(data.get("title"), 200)
+        or not isinstance(data.get("ingredients"), list)
+        or len(data["ingredients"]) != len(text["ingredients"])
+        or not isinstance(data.get("steps"), list)
+        or len(data["steps"]) != len(text["steps"])
+    ):
+        raise AiFailed("translation doesn't fit the recipe")
+    return (
+        {
+            "title": _str(data["title"], 200),
+            "ingredients": [
+                {"name": _str(i.get("name"), 200) or old["name"], "note": _str(i.get("note"), 200)}
+                if isinstance(i, dict)
+                else old
+                for i, old in zip(data["ingredients"], text["ingredients"])
+            ],
+            "steps": [_str(step, 2000) or old for step, old in zip(data["steps"], text["steps"])],
+            "notes": str(data.get("notes") or "")[:10_000],
+        },
+        answer.tokens,
+    )

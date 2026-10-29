@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session, selectinload
 
-from . import auth, models, photos, scaling, schemas, stats
+from . import ai, auth, models, photos, scaling, schemas, stats
 from .database import get_db
 from .errors import api_error
 from .settings_store import get_settings
@@ -343,3 +343,31 @@ def read_photo(name: str):
     if path is None or not path.is_file():
         raise api_error(404, "photo_not_found")
     return FileResponse(path, media_type="image/jpeg", headers={"Cache-Control": "public, max-age=31536000, immutable"})
+
+
+@router.post("/recipes/{recipe_id}/translate", response_model=schemas.RecipeOut)
+def translate_recipe(recipe_id: int, parent: models.User = Depends(auth.require_parent), db: Session = Depends(get_db)):
+    """The recipe in German, by the AI; amounts and units stay, the text before is kept as the original."""
+    recipe = get_recipe(db, recipe_id)
+    if recipe.language == "de":
+        raise api_error(400, "already_german")
+    text = {
+        "title": recipe.title,
+        "ingredients": [{"name": i.name, "note": i.note} for i in recipe.ingredients],
+        "steps": list(recipe.steps),
+        "notes": recipe.notes,
+    }
+    call = ai.take_call(db, parent, "translate", recipe_id=recipe.id)
+    try:
+        german, tokens = ai.translate(ai.client_for(ai.Settings.from_env()), text)
+    except ai.AiFailed:
+        raise api_error(502, "ai_failed")
+    call.tokens = tokens
+    # A second translation (after edits) keeps the very first original
+    if recipe.original is None:
+        recipe.original = {**text, "language": recipe.language}
+    recipe.title, recipe.steps, recipe.notes, recipe.language = german["title"], german["steps"], german["notes"], "de"
+    for ingredient, new in zip(recipe.ingredients, german["ingredients"]):
+        ingredient.name, ingredient.note = new["name"], new["note"]
+    db.commit()
+    return recipe_out(db, recipe, parent)

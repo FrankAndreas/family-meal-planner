@@ -7,7 +7,7 @@ from pathlib import Path
 _tmp = tempfile.mkdtemp()
 os.environ["DATABASE_URL"] = f"sqlite:///{_tmp}/test.db"
 os.environ["DATA_DIR"] = _tmp
-os.environ["SECRET_KEY"] = "test-secret"
+os.environ["SECRET_KEY"] = "test-secret-key-only-for-the-test-suite"
 os.environ["INITIAL_ADMIN_PIN"] = "1234"
 os.environ["DEFAULT_LANGUAGE"] = "de"
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
@@ -24,14 +24,17 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 from app import database, models  # noqa: E402
 from app.main import app  # noqa: E402
+from app.seed import seed_admin  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
 def fresh_db(tmp_path, monkeypatch):
-    """Every test starts like a fresh install, with its own files folder."""
+    """Every test starts like a fresh install: parent "Admin" with PIN 1234, and its own files folder."""
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     models.Base.metadata.drop_all(bind=database.engine)
     models.Base.metadata.create_all(bind=database.engine)
+    with database.SessionLocal() as session:
+        seed_admin(session)
     yield
 
 

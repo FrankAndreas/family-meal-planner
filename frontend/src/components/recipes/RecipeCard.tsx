@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
+import { apiUrl } from '../../api';
 import { sinceText } from '../../lastEaten';
 import type { RecipeSummary } from '../../recipes';
 import Stars from './Stars';
@@ -14,7 +15,7 @@ interface RecipeCardProps {
 }
 
 export function RecipeThumb({ recipe, className }: { recipe: RecipeSummary; className: string }) {
-    if (recipe.photo_url) return <img src={recipe.photo_url} alt="" className={`${className} object-cover`} />;
+    if (recipe.photo_url) return <img src={apiUrl(recipe.photo_url)} alt="" className={`${className} object-cover`} />;
     // No photo: a gradient with the first letter, so cards still differ at a glance
     return (
         <div

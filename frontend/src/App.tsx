@@ -6,6 +6,8 @@ import Layout from './components/Layout';
 import Login from './pages/Login';
 import CloseWeek from './pages/CloseWeek';
 import History from './pages/History';
+import Inbox from './pages/Inbox';
+import InboxItemPage from './pages/InboxItemPage';
 import PlanPage from './pages/PlanPage';
 import RecipeEdit from './pages/RecipeEdit';
 import Recipes from './pages/Recipes';
@@ -39,6 +41,8 @@ export default function App() {
                         <Route path="rezepte/:id/bearbeiten" element={<RecipeEdit key="edit" />} />
                         <Route path="woche-abschliessen" element={<CloseWeek />} />
                         <Route path="verlauf" element={<History />} />
+                        <Route path="posteingang" element={<Inbox />} />
+                        <Route path="posteingang/:id" element={<InboxItemPage />} />
                         <Route path="einstellungen" element={<SettingsPage />} />
                     </Route>
                     <Route path="*" element={<Navigate to="/" replace />} />

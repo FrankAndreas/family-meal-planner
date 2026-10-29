@@ -1,10 +1,11 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate, useParams } from 'react-router-dom';
-import api, { errorMessage } from '../api';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import api, { apiUrl, errorMessage } from '../api';
 import i18next from '../i18n';
 import IngredientEditor from '../components/recipes/IngredientEditor';
 import type { Language } from '../i18n';
+import { fetchItem, type InboxItemDetail } from '../inbox';
 import { emptyRow, ingredientsFrom, rowInvalid, rowsFrom, type Row } from '../ingredientRows';
 import { fetchRecipe, type Recipe, type RecipeInput } from '../recipes';
 import { BUTTON, BUTTON_SECONDARY, CARD, ERROR, FIELD, INPUT } from '../ui';
@@ -26,6 +27,10 @@ const minutes = (text: string) => (text.trim() === '' ? null : Math.max(0, Math.
 export default function RecipeEdit() {
     const { t } = useTranslation();
     const { id } = useParams();
+    const [search] = useSearchParams();
+    // A draft from the inbox: prefilled, with what the AI wasn't sure about listed on top
+    const draftId = id ? null : search.get('entwurf');
+    const [draftItem, setDraftItem] = useState<InboxItemDetail | null>(null);
     const navigate = useNavigate();
     const [form, setForm] = useState<Form>(EMPTY);
     const [rows, setRows] = useState<Row[]>(() => [emptyRow()]);
@@ -45,8 +50,11 @@ export default function RecipeEdit() {
 
     useEffect(() => {
         if (!id) return;
+        // A late answer must not overwrite what someone already typed
+        let current = true;
         fetchRecipe(id)
             .then((recipe) => {
+                if (!current) return;
                 setOriginal(recipe);
                 setForm({
                     title: recipe.title,
@@ -60,8 +68,42 @@ export default function RecipeEdit() {
                 });
                 setRows(rowsFrom(recipe.ingredients, i18next.language as Language));
             })
-            .catch((err) => setError(errorMessage(err)));
+            .catch((err) => current && setError(errorMessage(err)));
+        return () => {
+            current = false;
+        };
     }, [id]);
+
+    useEffect(() => {
+        if (!draftId) return;
+        let current = true;
+        fetchItem(draftId)
+            .then((item) => {
+                const draft = item.draft;
+                if (!draft || !current) return;
+                setDraftItem(item);
+                setForm({
+                    title: draft.title,
+                    servings: String(draft.servings),
+                    servingsUnit: draft.servings_unit ?? '',
+                    prep: draft.prep_minutes == null ? '' : String(draft.prep_minutes),
+                    cook: draft.cook_minutes == null ? '' : String(draft.cook_minutes),
+                    tags: draft.tags.join(', '),
+                    steps: draft.steps.join('\n'),
+                    notes: draft.notes ?? '',
+                });
+                setRows(
+                    rowsFrom(
+                        draft.ingredients.map((i, n) => ({ ...i, id: n, group: null, scaled_amount: i.amount })),
+                        i18next.language as Language,
+                    ),
+                );
+            })
+            .catch((err) => current && setError(errorMessage(err)));
+        return () => {
+            current = false;
+        };
+    }, [draftId]);
 
     const set = (key: keyof Form) => (e: { target: { value: string } }) => setForm({ ...form, [key]: e.target.value });
     const servings = Number(form.servings.replace(',', '.'));
@@ -84,8 +126,9 @@ export default function RecipeEdit() {
             notes: form.notes,
             // Kept as they were: an imported recipe stays imported
             source_kind: original?.source_kind ?? 'manual',
-            source_url: original?.source_url ?? null,
-            language: original?.language ?? null,
+            source_url: original?.source_url ?? draftItem?.draft?.source_url ?? null,
+            language: original?.language ?? draftItem?.draft?.language ?? null,
+            ...(draftItem && !createdId ? { inbox_item_id: draftItem.id } : {}),
         };
         try {
             const target = id ?? createdId;
@@ -106,12 +149,25 @@ export default function RecipeEdit() {
     };
 
     // Editing a recipe that didn't load would save an empty one over it
-    if (id && !original) return error ? <p className={ERROR}>{error}</p> : <p className="text-slate-400">{t('common.loading')}</p>;
+    if ((id && !original) || (draftId && !draftItem)) return error ? <p className={ERROR}>{error}</p> : <p className="text-slate-400">{t('common.loading')}</p>;
 
     const label = 'mb-1 block text-sm text-slate-300';
     return (
         <form onSubmit={save} className="mx-auto max-w-4xl space-y-6">
-            <h1 className="text-2xl">{id ? t('recipes.editTitle') : t('recipes.newTitle')}</h1>
+            <h1 className="text-2xl">{id ? t('recipes.editTitle') : draftItem ? t('inbox.draftTitle') : t('recipes.newTitle')}</h1>
+            {draftItem && draftItem.draft!.uncertain.length > 0 && (
+                <section className="glass-card space-y-2 border-amber-300/40 p-4">
+                    <h2 className="text-base text-amber-100">{t('inbox.pleaseCheck')}</h2>
+                    <ul aria-label={t('inbox.pleaseCheck')} className="list-disc space-y-1 pl-5 text-sm text-amber-50">
+                        {draftItem.draft!.uncertain.map((text) => (
+                            <li key={text}>{text}</li>
+                        ))}
+                    </ul>
+                </section>
+            )}
+            {draftItem?.draft?.photo && (
+                <img src={apiUrl(`/api/photos/${draftItem.draft.photo}`)} alt="" className="h-40 rounded-xl object-cover" />
+            )}
             <section className={`${CARD} grid gap-4 sm:grid-cols-2`}>
                 <div className="sm:col-span-2">
                     <label htmlFor="title" className={label}>

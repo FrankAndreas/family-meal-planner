@@ -11,9 +11,14 @@ export default function FamilySettings() {
     const [error, setError] = useState('');
 
     useEffect(() => {
+        // A late answer must not overwrite what someone already typed
+        let current = true;
         api.get<Settings>('/api/settings')
-            .then((response) => setSettings(response.data))
-            .catch((err) => setError(errorMessage(err)));
+            .then((response) => current && setSettings(response.data))
+            .catch((err) => current && setError(errorMessage(err)));
+        return () => {
+            current = false;
+        };
     }, []);
 
     const save = async (e: FormEvent) => {

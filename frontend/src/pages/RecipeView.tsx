@@ -39,6 +39,8 @@ export default function RecipeView() {
     const [people, setPeople] = useState<number | null>(Number(search.get('personen')) || null);
     const [error, setError] = useState('');
     const [eatenOn, setEatenOn] = useState<string[]>([]);
+    const [showOriginal, setShowOriginal] = useState(false);
+    const [translating, setTranslating] = useState(false);
 
     useEffect(() => {
         api.get<string[]>(`/api/recipes/${id}/history`)
@@ -92,11 +94,40 @@ export default function RecipeView() {
         }
     };
 
+    const translate = async () => {
+        setTranslating(true);
+        setError('');
+        try {
+            await api.post(`/api/recipes/${recipe!.id}/translate`);
+            setRecipe(await fetchRecipe(recipe!.id, people));
+            setShowOriginal(false);
+        } catch (err) {
+            setError(errorMessage(err));
+        } finally {
+            setTranslating(false);
+        }
+    };
+
     if (!recipe) return error ? <p className={ERROR}>{error}</p> : <p className="text-slate-400">{t('common.loading')}</p>;
+
+    // The text before the translation, with today's amounts (they never change in a translation)
+    const shown: Recipe =
+        showOriginal && recipe.original
+            ? {
+                  ...recipe,
+                  title: recipe.original.title,
+                  steps: recipe.original.steps,
+                  notes: recipe.original.notes,
+                  ingredients: recipe.ingredients.map((i, n) => ({ ...i, ...(recipe.original!.ingredients[n] ?? {}) })),
+              }
+            : recipe;
+    // Imported in another language (or unknown, from outside): parents can have it translated
+    const canTranslate =
+        user?.role === 'PARENT' && !recipe.deleted && recipe.language !== 'de' && (recipe.language === 'en' || recipe.source_kind !== 'manual');
 
     // Ingredients under their headings, in order
     const groups: { name: string | null; items: Ingredient[] }[] = [];
-    for (const ingredient of recipe.ingredients) {
+    for (const ingredient of shown.ingredients) {
         const last = groups[groups.length - 1];
         if (last && last.name === ingredient.group) last.items.push(ingredient);
         else groups.push({ name: ingredient.group, items: [ingredient] });
@@ -108,7 +139,7 @@ export default function RecipeView() {
             <div className={`${CARD} grid gap-5 md:grid-cols-[16rem_1fr]`}>
                 <RecipeThumb recipe={recipe} className="h-56 w-full rounded-xl md:h-64" />
                 <div className="space-y-3">
-                    <h1 className="text-3xl">{recipe.title}</h1>
+                    <h1 className="text-3xl">{shown.title}</h1>
                     <div className="flex flex-wrap gap-2 text-sm text-slate-400">
                         {recipe.prep_minutes !== null && <span>{t('recipes.prep', { count: recipe.prep_minutes })}</span>}
                         {recipe.cook_minutes !== null && <span>{t('recipes.cook', { count: recipe.cook_minutes })}</span>}
@@ -183,6 +214,21 @@ export default function RecipeView() {
                             <Link to={`/rezepte/${recipe.id}/bearbeiten`} className={BUTTON_SECONDARY}>
                                 {t('common.edit')}
                             </Link>
+                            {recipe.inbox_item_id && (
+                                <Link to={`/posteingang/${recipe.inbox_item_id}`} className={BUTTON_SECONDARY}>
+                                    {t('recipes.viewOriginal')}
+                                </Link>
+                            )}
+                            {recipe.original && (
+                                <button type="button" className={BUTTON_SECONDARY} onClick={() => setShowOriginal(!showOriginal)}>
+                                    {showOriginal ? t('recipes.showTranslation') : t('recipes.showOriginal')}
+                                </button>
+                            )}
+                            {canTranslate && (
+                                <button type="button" className={BUTTON_SECONDARY} onClick={translate} disabled={translating}>
+                                    {translating ? t('recipes.translating') : t('recipes.translate')}
+                                </button>
+                            )}
                             {user?.role === 'PARENT' && (
                                 <button type="button" className={BUTTON_DANGER} onClick={remove}>
                                     {t('recipes.delete')}
@@ -211,13 +257,13 @@ export default function RecipeView() {
                 <section className={`${CARD} space-y-3`}>
                     <h2 className="text-lg">{t('recipes.steps')}</h2>
                     <ol aria-label={t('recipes.steps')} className="list-decimal space-y-3 pl-5">
-                        {recipe.steps.map((step, n) => (
+                        {shown.steps.map((step, n) => (
                             <li key={n} className="leading-relaxed">
                                 {step}
                             </li>
                         ))}
                     </ol>
-                    {recipe.notes && <p className="whitespace-pre-line text-slate-300">{recipe.notes}</p>}
+                    {shown.notes && <p className="whitespace-pre-line text-slate-300">{shown.notes}</p>}
                 </section>
             </div>
         </article>

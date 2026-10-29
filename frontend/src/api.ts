@@ -4,6 +4,9 @@ import i18n from './i18n';
 // Same origin: Vite (dev) or nginx (Docker) forwards /api to the backend; the browser tests set VITE_API_URL
 const api = axios.create({ baseURL: import.meta.env.VITE_API_URL || undefined });
 
+// A backend path for <img src> and links, which don't go through axios (photos are served without login)
+export const apiUrl = (path: string) => (import.meta.env.VITE_API_URL || '').replace(/\/+$/, '') + path;
+
 api.interceptors.request.use((config) => {
     const token = localStorage.getItem('token');
     if (token) {

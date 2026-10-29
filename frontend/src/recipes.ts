@@ -42,6 +42,15 @@ export interface Recipe extends RecipeSummary {
     ratings: { user_id: number; name: string; stars: number }[];
     people: number | null;
     factor: number;
+    inbox_item_id: number | null;
+    // The text before an AI translation
+    original: {
+        title: string;
+        ingredients: { name: string; note: string }[];
+        steps: string[];
+        notes: string;
+        language: Recipe['language'];
+    } | null;
 }
 
 export interface RecipeInput {
@@ -57,6 +66,7 @@ export interface RecipeInput {
     source_kind?: Recipe['source_kind'];
     source_url?: string | null;
     language?: Recipe['language'];
+    inbox_item_id?: number;
 }
 
 export interface RecipeFilter {

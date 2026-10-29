@@ -1,10 +1,10 @@
 from datetime import date, timedelta
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func
 from sqlalchemy.orm import Session, selectinload
 
-from . import auth, models, schemas, timeutil
+from . import auth, models, schemas, stats, timeutil
 from .database import get_db
 from .errors import api_error
 from .recipes_api import _Votes, get_recipe
@@ -45,6 +45,25 @@ def entries_out(db: Session, entries: list[models.PlanEntry], me: models.User) -
     ]
 
 
+def _closed(db: Session, first: date, last: date) -> bool:
+    """All days inside stored closures: after a change of the first day, a week only partly closed shows open."""
+    closures = db.query(models.WeekClosure).filter(models.WeekClosure.start <= last, models.WeekClosure.end >= first)
+    covered = {c.start + timedelta(days=n) for c in closures for n in range((c.end - c.start).days + 1)}
+    return all(day in covered for day in week_days(first))
+
+
+def _needs_closing(db: Session, start: date) -> bool:
+    first, last = start - timedelta(days=7), start - timedelta(days=1)
+    if last >= timeutil.today() or _closed(db, first, last):
+        return False
+    return (
+        db.query(models.PlanEntry.id)
+        .filter(models.PlanEntry.date >= first, models.PlanEntry.date <= last, models.PlanEntry.recipe_id.isnot(None))
+        .first()
+        is not None
+    )
+
+
 def week_out(db: Session, start: date, me: models.User) -> schemas.WeekOut:
     days = week_days(start)
     entries = _entries(db, days[0], days[-1])
@@ -54,7 +73,8 @@ def week_out(db: Session, start: date, me: models.User) -> schemas.WeekOut:
         days=days,
         today=timeutil.today(),
         entries=entries_out(db, entries, me),
-        closed=False,
+        closed=_closed(db, days[0], days[-1]),
+        previous_needs_closing=_needs_closing(db, days[0]),
         planned_slots=len({(e.date, e.slot) for e in entries}),
         total_slots=len(days) * len(SLOTS),
     )
@@ -143,3 +163,50 @@ def update_entry(
 def delete_entry(entry_id: int, _user: models.User = Depends(auth.get_current_user), db: Session = Depends(get_db)):
     db.delete(_get_entry(db, entry_id))
     db.commit()
+
+
+@router.post("/plan/close", response_model=schemas.WeekOut)
+def close_week(body: schemas.CloseIn, me: models.User = Depends(auth.get_current_user), db: Session = Depends(get_db)):
+    start = week_start_of(body.start, get_settings(db).week_start)
+    end = start + timedelta(days=6)
+    if end >= timeutil.today():
+        raise api_error(400, "week_not_over")
+    if db.get(models.WeekClosure, start) is None:
+        db.add(models.WeekClosure(start=start, end=end, closed_by=me.id))
+        db.commit()
+    return week_out(db, start, me)
+
+
+@router.get("/plan/history", response_model=list[schemas.WeekOut])
+def history(
+    before: date | None = None,
+    weeks: int = Query(8, ge=1, le=52),
+    me: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Past weeks with entries, newest first, all before the week of `before` (default: this week)."""
+    week_start = get_settings(db).week_start
+    limit = week_start_of(before or timeutil.today(), week_start)
+    starts: list[date] = []
+    for (day,) in (
+        db.query(models.PlanEntry.date).filter(models.PlanEntry.date < limit).distinct().order_by(models.PlanEntry.date.desc())
+    ):
+        start = week_start_of(day, week_start)
+        if start not in starts:
+            starts.append(start)
+            if len(starts) == weeks:
+                break
+    return [week_out(db, start, me) for start in starts]
+
+
+@router.get("/recipes/{recipe_id}/history", response_model=list[date])
+def recipe_history(
+    recipe_id: int, _user: models.User = Depends(auth.get_current_user), db: Session = Depends(get_db)
+):
+    get_recipe(db, recipe_id, allow_deleted=True)
+    rows = (
+        db.query(models.PlanEntry.date)
+        .filter(models.PlanEntry.recipe_id == recipe_id, *stats.eaten_filter())
+        .order_by(models.PlanEntry.date.desc())
+    )
+    return [day for (day,) in rows]

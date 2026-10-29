@@ -164,6 +164,8 @@ class RecipeSummary(BaseModel):
     my_rating: int | None
     my_favorite: bool
     favorite_count: int
+    last_eaten: dt.date | None
+    times_eaten: int
 
 
 class RecipeOut(RecipeSummary):
@@ -244,5 +246,11 @@ class WeekOut(BaseModel):
     today: dt.date
     entries: list[EntryOut]
     closed: bool
+    # The week before is over, not closed, and had recipes planned: the planner offers to close it first
+    previous_needs_closing: bool
     planned_slots: int
     total_slots: int
+
+
+class CloseIn(BaseModel):
+    start: dt.date

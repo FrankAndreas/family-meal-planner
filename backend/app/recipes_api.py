@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Query, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session, selectinload
 
-from . import auth, models, photos, scaling, schemas
+from . import auth, models, photos, scaling, schemas, stats
 from .database import get_db
 from .errors import api_error
 from .settings_store import get_settings
@@ -37,6 +37,7 @@ class _Votes:
     def __init__(self, db: Session, recipe_ids: list[int]):
         self.ratings: dict[int, list[models.Rating]] = {rid: [] for rid in recipe_ids}
         self.favorites: dict[int, set[int]] = {rid: set() for rid in recipe_ids}
+        self.eaten: dict[int, tuple] = {rid: (None, 0) for rid in recipe_ids}
         if not recipe_ids:
             return
         query = db.query(models.Rating).options(selectinload(models.Rating.user))
@@ -44,6 +45,7 @@ class _Votes:
             self.ratings[rating.recipe_id].append(rating)
         for fav in db.query(models.Favorite).filter(models.Favorite.recipe_id.in_(recipe_ids)):
             self.favorites[fav.recipe_id].add(fav.user_id)
+        self.eaten = stats.eaten_stats(db, recipe_ids)
 
     def summary(self, recipe: models.Recipe, me: models.User) -> dict:
         ratings = self.ratings[recipe.id]
@@ -61,6 +63,8 @@ class _Votes:
             "my_rating": next((r.stars for r in ratings if r.user_id == me.id), None),
             "my_favorite": me.id in favorites,
             "favorite_count": len(favorites),
+            "last_eaten": self.eaten[recipe.id][0],
+            "times_eaten": self.eaten[recipe.id][1],
         }
 
 

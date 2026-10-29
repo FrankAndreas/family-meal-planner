@@ -1,0 +1,110 @@
+import logging
+import math
+import secrets
+from datetime import datetime, timedelta, timezone
+
+import bcrypt
+import jwt
+from fastapi import Depends, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy.orm import Session
+
+from . import config, database, models
+from .errors import api_error
+from .timeutil import utcnow
+
+logger = logging.getLogger(__name__)
+
+# Signs the login tokens. Without SECRET_KEY a random key is used, which logs everyone out on every restart.
+SECRET_KEY = config.env("SECRET_KEY") or secrets.token_urlsafe(32)
+if not config.env("SECRET_KEY"):
+    logger.warning("SECRET_KEY is not set; using a random key, so logins won't survive a restart")
+ALGORITHM = "HS256"
+TOKEN_LIFETIME = timedelta(days=30)
+# A 4-digit PIN is guessable, so lock the user after a few wrong tries. Each lock in a row doubles the next one, up to
+# a day: then about 5 guesses a day are left, so a child can't find a parent's PIN (and with it the AI) by trying
+MAX_FAILED_LOGINS = 5
+LOCK_DURATION = timedelta(minutes=15)
+MAX_LOCK_DURATION = timedelta(days=1)
+
+_bearer = HTTPBearer(auto_error=False)
+
+
+def get_pin_hash(pin: str) -> str:
+    return bcrypt.hashpw(pin.encode(), bcrypt.gensalt()).decode()
+
+
+def verify_pin(pin: str, hashed: str) -> bool:
+    try:
+        return bcrypt.checkpw(pin.encode(), hashed.encode())
+    except ValueError:
+        # Not a valid bcrypt hash: treat it like a wrong PIN instead of a server error
+        return False
+
+
+def name_key(name: str) -> str:
+    """What makes two names the same person's: case and surrounding spaces don't count."""
+    return name.strip().casefold()
+
+
+def lock_duration(lockouts: int) -> timedelta:
+    """15, 30, 60, ... minutes for the first, second, third lock in a row; at most a day."""
+    return min(LOCK_DURATION * 2 ** min(max(lockouts - 1, 0), 10), MAX_LOCK_DURATION)
+
+
+def create_access_token(user: models.User) -> str:
+    expires = datetime.now(timezone.utc) + TOKEN_LIFETIME
+    claims = {"sub": str(user.id), "ver": user.token_version, "exp": expires}
+    return jwt.encode(claims, SECRET_KEY, algorithm=ALGORITHM)
+
+
+def authenticate(db: Session, name: str, pin: str) -> models.User:
+    """The user with this name and PIN; counts wrong PINs and locks the user after too many."""
+    wrong = api_error(status.HTTP_401_UNAUTHORIZED, "wrong_name_or_pin")
+    user = db.query(models.User).filter(models.User.name_key == name_key(name)).first()
+    if user is None:
+        raise wrong
+    now = utcnow()
+    if user.locked_until and user.locked_until > now:
+        minutes = math.ceil((user.locked_until - now).total_seconds() / 60)
+        raise api_error(status.HTTP_429_TOO_MANY_REQUESTS, "locked", minutes=minutes)
+    if not verify_pin(pin, user.pin_hash):
+        user.failed_logins += 1
+        if user.failed_logins >= MAX_FAILED_LOGINS:
+            user.failed_logins = 0
+            user.lockouts += 1
+            user.locked_until = now + lock_duration(user.lockouts)
+        db.commit()
+        raise wrong
+    user.failed_logins = 0
+    user.lockouts = 0
+    user.locked_until = None
+    db.commit()
+    return user
+
+
+def get_current_user(
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    db: Session = Depends(database.get_db),
+) -> models.User:
+    unauthorized = api_error(status.HTTP_401_UNAUTHORIZED, "not_logged_in")
+    unauthorized.headers = {"WWW-Authenticate": "Bearer"}
+    if credentials is None:
+        raise unauthorized
+    try:
+        payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id = int(payload["sub"])
+        version = int(payload["ver"])
+    except (jwt.PyJWTError, KeyError, ValueError, TypeError):
+        raise unauthorized
+    user = db.get(models.User, user_id)
+    # A new PIN raises token_version, which ends the logins made with the old one
+    if user is None or user.token_version != version:
+        raise unauthorized
+    return user
+
+
+def require_parent(user: models.User = Depends(get_current_user)) -> models.User:
+    if user.role != models.UserRole.PARENT:
+        raise api_error(status.HTTP_403_FORBIDDEN, "parents_only")
+    return user

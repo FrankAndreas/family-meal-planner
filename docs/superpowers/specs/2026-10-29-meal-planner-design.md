@@ -255,7 +255,7 @@ As family-budget-dashboard and family-job-tracking:
   for images. Files (mails, screenshots, recipe photos) under `data/`.
 - **Frontend:** React 19, Vite, TypeScript, Tailwind 4, i18next, react-router, axios, date-fns. Drag and drop must
   work with touch. The library is the builder's call.
-- **Docker:** two images on GHCR (`ghcr.io/frankandreas/meal-planer/backend` and `/frontend`, nginx serving the app
+- **Docker:** two images on GHCR (`ghcr.io/frankandreas/family-meal-planner/backend` and `/frontend`, nginx serving the app
   and proxying `/api`), `docker-compose.yml` copied to the NAS as `compose.yaml`, running as an unprivileged DSM user
   (`PUID`/`PGID`), healthcheck, `PORT` default **8085** (budget 8081, job tracking 8082). The nightly update script and
   deploy scripts are copied from the budget app.

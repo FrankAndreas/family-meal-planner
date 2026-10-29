@@ -288,3 +288,14 @@ class InboxItemOut(BaseModel):
     attachments: list[dict]
     error: str | None
     recipe_id: int | None
+
+
+class UrlIn(BaseModel):
+    url: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=1000)]
+
+    @field_validator("url")
+    @classmethod
+    def web_link(cls, url: str) -> str:
+        if not url.lower().startswith(("http://", "https://")):
+            raise ValueError("not_a_web_link")
+        return url

@@ -1,19 +1,25 @@
 """The recipe inbox: mails from the Cloudflare Email Worker and pasted links, waiting for a parent."""
 
 import hmac
+import io
 import logging
+from urllib.parse import urlsplit
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, Response
+from fastapi.responses import FileResponse
+from PIL import Image, ImageOps, UnidentifiedImageError
 from sqlalchemy.orm import Session
 
-from . import auth, config, mail, models, schemas
+from . import auth, config, importer, mail, models, photos, schemas  # noqa: F401  (photos: HEIC opener)
 from .database import get_db
 from .errors import api_error
+from .timeutil import utcnow
 
 router = APIRouter(tags=["inbox"])
 logger = logging.getLogger(__name__)
 
 MAX_BYTES = 25 * 1024 * 1024
+THUMB_SIDE = 320
 
 
 def inbox_dir():
@@ -114,6 +120,72 @@ def discard_item(item_id: int, parent: models.User = Depends(auth.require_parent
     db.delete(item)
     db.commit()
     path.unlink(missing_ok=True)
+    for thumb in (inbox_dir() / "thumbs").glob(f"{item_id}-*.jpg"):
+        thumb.unlink(missing_ok=True)
+
+
+@router.post("/inbox/urls", response_model=schemas.InboxItemOut, status_code=201)
+def add_url(body: schemas.UrlIn, user: models.User = Depends(auth.get_current_user), db: Session = Depends(get_db)):
+    """A link found while browsing. A parent's paste is the release: it is processed right away."""
+    parent = user.role == models.UserRole.PARENT
+    item = models.InboxItem(
+        kind="url",
+        status="processing" if parent else "waiting",
+        user_id=user.id,
+        subject=urlsplit(body.url).hostname or body.url,
+        url=body.url,
+    )
+    if parent:
+        item.processing_since = utcnow()
+    db.add(item)
+    db.commit()
+    if parent:
+        importer.start(item.id, user.id)
+    return item_out(item)
+
+
+def _image_attachment(item: models.InboxItem, index: int) -> tuple[str, bytes]:
+    found = mail.attachment(raw_path(item).read_bytes(), index) if item.kind == "mail" else None
+    if found is None or not found[0].startswith("image/"):
+        raise api_error(404, "attachment_not_found")
+    return found
+
+
+@router.get("/inbox/{item_id}/attachments/{index}")
+def read_attachment(
+    item_id: int, index: int, user: models.User = Depends(auth.get_current_user), db: Session = Depends(get_db)
+):
+    """One image of a mail, decoded because a person opened it (no AI, nothing leaves the NAS)."""
+    kind, data = _image_attachment(visible_item(db, item_id, user), index)
+    return Response(data, media_type=kind)
+
+
+@router.get("/inbox/{item_id}/attachments/{index}/thumb")
+def read_thumbnail(
+    item_id: int, index: int, user: models.User = Depends(auth.get_current_user), db: Session = Depends(get_db)
+):
+    item = visible_item(db, item_id, user)
+    cached = inbox_dir() / "thumbs" / f"{item.id}-{index}.jpg"
+    if not cached.is_file():
+        _, data = _image_attachment(item, index)
+        try:
+            with Image.open(io.BytesIO(data)) as source:
+                image = ImageOps.exif_transpose(source).convert("RGB")
+        except (UnidentifiedImageError, OSError, ValueError, Image.DecompressionBombError):
+            raise api_error(404, "attachment_not_found")
+        image.thumbnail((THUMB_SIDE, THUMB_SIDE))
+        cached.parent.mkdir(parents=True, exist_ok=True)
+        image.save(cached, "JPEG", quality=80)
+    return FileResponse(cached, media_type="image/jpeg")
+
+
+@router.get("/inbox/{item_id}/raw")
+def read_raw(item_id: int, parent: models.User = Depends(auth.require_parent), db: Session = Depends(get_db)):
+    """The mail as it arrived (part of the original of an imported recipe)."""
+    item = visible_item(db, item_id, parent)
+    if item.kind != "mail":
+        raise api_error(404, "attachment_not_found")
+    return FileResponse(raw_path(item), media_type="message/rfc822", filename=f"rezept-{item.id}.eml")
 
 
 def _email_out(entry: models.UserEmail) -> schemas.EmailOut:

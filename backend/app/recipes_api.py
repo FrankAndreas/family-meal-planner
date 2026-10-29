@@ -3,9 +3,10 @@ import unicodedata
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session, selectinload
 
-from . import auth, models, schemas
+from . import auth, models, scaling, schemas
 from .database import get_db
 from .errors import api_error
+from .settings_store import get_settings
 from .timeutil import utcnow
 from .units import UNITS
 
@@ -61,7 +62,14 @@ class _Votes:
         }
 
 
-def recipe_out(db: Session, recipe: models.Recipe, me: models.User) -> schemas.RecipeOut:
+def recipe_out(
+    db: Session, recipe: models.Recipe, me: models.User, people: float | None = None
+) -> schemas.RecipeOut:
+    factor = (
+        1
+        if people is None
+        else scaling.factor(recipe.servings, recipe.servings_unit, people, get_settings(db).family_size)
+    )
     votes = _Votes(db, [recipe.id])
     ratings = sorted(votes.ratings[recipe.id], key=lambda r: r.user.name_key)
     return schemas.RecipeOut(
@@ -77,13 +85,19 @@ def recipe_out(db: Session, recipe: models.Recipe, me: models.User) -> schemas.R
         deleted=recipe.deleted_at is not None,
         ingredients=[
             schemas.IngredientOut(
-                id=i.id, group=i.group, amount=i.amount, unit=i.unit, name=i.name, note=i.note, scaled_amount=i.amount
+                id=i.id,
+                group=i.group,
+                amount=i.amount,
+                unit=i.unit,
+                name=i.name,
+                note=i.note,
+                scaled_amount=scaling.scale(i.amount, i.unit, factor),
             )
             for i in recipe.ingredients
         ],
         ratings=[schemas.RatingOut(user_id=r.user_id, name=r.user.name, stars=r.stars) for r in ratings],
-        people=None,
-        factor=1,
+        people=people,
+        factor=factor,
     )
 
 
@@ -171,8 +185,13 @@ def create_recipe(
 
 
 @router.get("/recipes/{recipe_id}", response_model=schemas.RecipeOut)
-def read_recipe(recipe_id: int, me: models.User = Depends(auth.get_current_user), db: Session = Depends(get_db)):
-    return recipe_out(db, get_recipe(db, recipe_id, allow_deleted=True), me)
+def read_recipe(
+    recipe_id: int,
+    people: float | None = Query(None, gt=0, le=100),
+    me: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db),
+):
+    return recipe_out(db, get_recipe(db, recipe_id, allow_deleted=True), me, people)
 
 
 @router.put("/recipes/{recipe_id}", response_model=schemas.RecipeOut)

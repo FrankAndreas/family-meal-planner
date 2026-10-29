@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isWebLink, siteName } from './links';
+import { isOtherLink, isWebLink, siteName } from './links';
 
 describe('siteName', () => {
     it('is the host without www', () => {
@@ -17,5 +17,15 @@ describe('isWebLink', () => {
         expect(isWebLink(' https://fooby.ch/x ')).toBe(true);
         expect(isWebLink('javascript:alert(1)')).toBe(false);
         expect(isWebLink('Omas Kochbuch')).toBe(false);
+    });
+});
+
+describe('isOtherLink', () => {
+    it('is an address that is no web link', () => {
+        expect(isOtherLink('javascript:alert(1)')).toBe(true);
+        expect(isOtherLink(' file:///etc/passwd')).toBe(true);
+        expect(isOtherLink('https://fooby.ch/x')).toBe(false);
+        expect(isOtherLink('Betty Bossi Kochbuch, S. 42')).toBe(false);
+        expect(isOtherLink('Oma: Notizbuch')).toBe(false);
     });
 });

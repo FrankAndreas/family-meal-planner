@@ -77,6 +77,24 @@ The DNS record and the `*.local.<domain>` wildcard certificate from family-budge
 2. **Control Panel → Security → Certificate → Settings**: pick the `*.local.<domain>` certificate for the new entry.
 3. Open `https://essen.local.<domain>` on the iPad and the phones and save it to the home screen.
 
+### From outside: Cloudflare Tunnel and Access (optional)
+
+Away from home the family logs in with Cloudflare Access (an e-mail code); the planner passes that login on to the
+family hub, which knows each person by their **confirmed** e-mail address there. A hub cookie arriving through the
+tunnel counts for nothing.
+
+1. **Tunnel route.** **Zero Trust → Networks → Connectors → Cloudflare Tunnels** → the NAS's tunnel → **Published
+   application routes → Add**: subdomain e.g. `essen`, your domain, path empty, service `HTTP`, URL `<NAS_IP>:8085`.
+2. **Access application.** **Access controls → Applications → Create new application → Public DNS**: subdomain
+   `essen`, your domain, path empty, with a policy that allows the family's e-mail addresses. Note its **Application
+   Audience (AUD) Tag**.
+3. **The hub:** add that AUD tag to `CF_AUDIENCE` in the hub's `.env` (comma-separated, next to the hub's own) and
+   restart the hub; give the planner's tile the outside address `https://essen.<domain>`, so its tile shows outside.
+4. Everyone who uses it from outside needs a **confirmed** e-mail address in the hub (the one Cloudflare's code is sent
+   to). Unknown addresses see "No access".
+
+"Log out" from outside ends the Cloudflare login (`/cdn-cgi/access/logout`).
+
 ### Recipe mails (Cloudflare Email Worker, optional)
 
 Family members share a recipe (a Facebook post, a screenshot, a link) **by mail** to e.g. `rezepte@<domain>`. It waits
@@ -86,8 +104,8 @@ followed and may the AI see it. Mails are taken only
 - if Cloudflare found them authentic (`dmarc=pass`; the worker checks this), and
 - from an address registered for a family member in **Einstellungen → Mail-Adressen** (the app checks this).
 
-Everything else is rejected, and the sender gets a bounce. The app stays home-network only: the tunnel opens just the
-one path the worker posts to, behind Cloudflare Access. The setup is the same as family-budget-dashboard's "Receipt
+Everything else is rejected, and the sender gets a bounce. The worker posts to one path, behind its own Access
+application with a service token (separate from the people's access from outside, see below). The setup is the same as family-budget-dashboard's "Receipt
 mails", with these names (Cloudflare renames dashboard menus from time to time):
 
 1. **Secret for the app.** Add it to `.env`, then restart and check the log:

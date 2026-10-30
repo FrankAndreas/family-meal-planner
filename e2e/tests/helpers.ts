@@ -1,41 +1,90 @@
 import path from 'node:path';
-import { expect, type APIRequestContext, type Page } from '@playwright/test';
+import { expect, request as playwrightRequest, type APIRequestContext, type Page } from '@playwright/test';
 
 // The Python with the backend's packages; a path is made absolute (Python warns about relative ones with "..")
 const configured = process.env.E2E_PYTHON ?? 'python3';
 export const PYTHON = configured.includes('/') ? path.resolve(configured) : configured;
 
 export const API = 'http://localhost:8100/api';
+// The family hub the planner logs in through (a real one, from a family-hub checkout: playwright.config.ts)
+export const HUB = 'http://localhost:8130';
+export const FRONTEND = 'http://localhost:3100';
 export const ADMIN_PIN = '1111';
 export const PIN = '2468';
+// The hub takes changes only with its own header, and the manage cookie of the login
+const HUB_HEADERS = { 'X-Requested-With': 'hub' };
 
-export interface Person { name: string; token: string }
+// token: the hub login the planner gets (hub_session, also as Bearer); hubCookies: what the hub needs for a change
+export interface Person { name: string; token: string; hubCookies: string }
 
 export const uniqueName = (prefix: string) => `${prefix}${Date.now().toString(36).slice(-4)}${Math.random().toString(36).slice(2, 5)}`;
 
-export async function token(request: APIRequestContext, name: string, pin: string): Promise<string> {
-    const response = await request.post(`${API}/token`, { data: { name, pin } });
-    expect(response.ok(), await response.text()).toBeTruthy();
-    return (await response.json()).access_token;
+// A login at the hub, in a throwaway API context: logging out would end the login, so the cookies are only read
+async function hubCookies(name: string, pin: string): Promise<{ token: string; cookies: string }> {
+    const context = await playwrightRequest.newContext();
+    try {
+        const response = await context.post(`${HUB}/api/login`, { data: { name, pin }, headers: HUB_HEADERS });
+        expect(response.ok(), await response.text()).toBeTruthy();
+        const found = response.headersArray()
+            .filter(h => h.name.toLowerCase() === 'set-cookie' && /^hub_(session|manage)=/.test(h.value))
+            .map(h => h.value.split(';')[0]);
+        const session = found.find(c => c.startsWith('hub_session='));
+        expect(session, 'the hub sets hub_session').toBeTruthy();
+        return { token: session!.slice('hub_session='.length), cookies: found.join('; ') };
+    } finally {
+        await context.dispose();
+    }
 }
 
-// A person of the test's own, created by Admin through the API
+async function asHubAdmin<T = any>(request: APIRequestContext, method: string, path: string, data?: unknown): Promise<T> {
+    const { cookies } = await hubCookies('Admin', ADMIN_PIN);
+    const response = await request.fetch(`${HUB}${path}`, { method, data, headers: { ...HUB_HEADERS, Cookie: cookies } });
+    expect(response.ok(), `${method} ${path}: ${await response.text()}`).toBeTruthy();
+    return response.json();
+}
+
+// Who may use the planner: the hub tile with the key "meals" (made on first use, with Admin)
+export async function giveAccess(request: APIRequestContext, personId: number, access: boolean): Promise<void> {
+    const tiles = await asHubAdmin<{ id: number; app_key: string | null; people: number[] }[]>(request, 'GET', '/api/tiles/manage');
+    let tile = tiles.find(t => t.app_key === 'meals');
+    if (!tile) {
+        const admin = (await asHubAdmin<{ id: number; name: string }[]>(request, 'GET', '/api/people')).find(p => p.name === 'Admin')!;
+        tile = await asHubAdmin(request, 'POST', '/api/tiles', { name: 'Essen', local_url: FRONTEND, app_key: 'meals', people: [admin.id] });
+    }
+    const people = access ? [...new Set([...tile!.people, personId])] : tile!.people.filter(id => id !== personId);
+    await asHubAdmin(request, 'PATCH', `/api/tiles/${tile!.id}`, { people });
+}
+
+// A person added in the hub, with access to the planner unless access=false
+export async function addToHub(request: APIRequestContext, name: string, role: 'PARENT' | 'CHILD', access = true): Promise<number> {
+    const person = await asHubAdmin<{ id: number }>(request, 'POST', '/api/people', { name, pin: PIN, role });
+    if (access) await giveAccess(request, person.id, true);
+    return person.id;
+}
+
+export async function hubLogin(name: string, pin = name === 'Admin' ? ADMIN_PIN : PIN): Promise<Person> {
+    const { token, cookies } = await hubCookies(name, pin);
+    return { name, token, hubCookies: cookies };
+}
+
+// The token of a person's hub login (tests that call the planner's API with it as Bearer)
+export async function token(_request: APIRequestContext, name: string, pin?: string): Promise<string> {
+    return (await hubLogin(name, pin)).token;
+}
+
+// A person of the test's own, added in the hub with access to the planner, and logged in there
 export async function newPerson(request: APIRequestContext, role: 'PARENT' | 'CHILD' = 'PARENT'): Promise<Person> {
-    const admin = await token(request, 'Admin', ADMIN_PIN);
     const name = uniqueName(role === 'PARENT' ? 'P' : 'K');
-    const created = await request.post(`${API}/users`, {
-        data: { name, pin: PIN, role },
-        headers: { Authorization: `Bearer ${admin}` },
-    });
-    expect(created.ok(), await created.text()).toBeTruthy();
-    return { name, token: await token(request, name, PIN) };
+    await addToHub(request, name, role);
+    return hubLogin(name);
 }
 
 const pageErrors = new WeakMap<Page, string[]>();
 
-// Log in through the login page, and collect errors in the browser console (the test checks they are empty).
-// The listeners go on once per page: a test that logs in twice would otherwise accept each dialog twice.
-export async function login(page: Page, name: string, pin = PIN): Promise<string[]> {
+// Log in with the person's hub login (the cookie the hub sets at home), and collect errors in the browser console (the
+// test checks they are empty). The listeners go on once per page: a test that logs in twice would otherwise accept
+// each dialog twice.
+export async function login(page: Page, name: string, pin?: string): Promise<string[]> {
     let errors = pageErrors.get(page);
     if (!errors) {
         const collected: string[] = [];
@@ -45,10 +94,10 @@ export async function login(page: Page, name: string, pin = PIN): Promise<string
         page.on('console', m => { if (m.type() === 'error') collected.push(m.text()); });
         page.on('dialog', d => d.accept());
     }
-    await page.goto('/login');
-    await page.getByRole('button', { name, exact: true }).click();
-    await page.locator('#pin').fill(pin);
-    await page.locator('button[type=submit]').click();
+    const { token: session } = await hubLogin(name, pin);
+    await page.context().clearCookies();
+    await page.context().addCookies([{ name: 'hub_session', value: session, url: FRONTEND }]);
+    await page.goto('/');
     await expect(page.getByRole('button', { name: /log out|abmelden/i })).toBeVisible();
     return errors;
 }

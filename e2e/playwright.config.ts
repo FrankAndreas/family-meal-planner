@@ -2,11 +2,17 @@ import { defineConfig, devices } from '@playwright/test';
 import path from 'node:path';
 import { PYTHON as python } from './tests/helpers';
 
-// The tests start their own backend (fresh SQLite database, admin PIN 1111) and frontend on ports of their own,
-// so a dev server on 8000/5173 and its data are never touched. E2E_PYTHON: the Python with the backend's packages.
+// The tests start their own family hub (from a family-hub checkout: logins and people, Admin PIN 1111), backend
+// (fresh SQLite database) and frontend on ports of their own, so a dev server on 8000/5173 and its data are never
+// touched. E2E_PYTHON: the Python with the backend's packages. HUB_DIR: a family-hub checkout (default: next to this
+// repo); HUB_PYTHON: the Python with the hub's packages (default: E2E_PYTHON).
 export const BACKEND = 'http://localhost:8100';
 export const FRONTEND = 'http://localhost:3100';
+export const HUB = 'http://localhost:8130';
 const database = path.resolve(__dirname, '.tmp', 'e2e.db');
+const hubData = path.resolve(__dirname, '.tmp', 'hub');
+const hubDir = path.resolve(process.env.HUB_DIR ?? path.join(__dirname, '..', '..', 'family-hub'));
+const hubPython = process.env.HUB_PYTHON ? path.resolve(process.env.HUB_PYTHON) : python;
 
 export default defineConfig({
     testDir: './tests',
@@ -28,15 +34,29 @@ export default defineConfig({
     ],
     webServer: [
         {
+            command: `rm -rf "${hubData}" && mkdir -p "${hubData}" && "${hubPython}" -m uvicorn app.main:app --port 8130`,
+            cwd: path.join(hubDir, 'backend'),
+            url: `${HUB}/health`,
+            env: {
+                DATABASE_URL: `sqlite:///${hubData}/hub.db`,
+                DATA_DIR: hubData,
+                INITIAL_ADMIN_PIN: '1111',
+                DEFAULT_LANGUAGE: 'en',
+                // Plain http in the tests: a Secure cookie would never come back
+                COOKIE_INSECURE: '1',
+            },
+            reuseExistingServer: false,
+            timeout: 60_000,
+        },
+        {
             command: `mkdir -p "${path.dirname(database)}" && rm -f "${database}" && "${python}" -m uvicorn app.main:app --port 8100`,
             cwd: path.resolve(__dirname, '..', 'backend'),
             url: `${BACKEND}/health`,
             env: {
                 DATABASE_URL: `sqlite:///${database}`,
                 DATA_DIR: path.dirname(database),
-                INITIAL_ADMIN_PIN: '1111',
-                SECRET_KEY: 'e2e-only-key-not-used-anywhere-else',
-                CORS_ORIGINS: FRONTEND,
+                HUB_URL: HUB,
+                HUB_PUBLIC_URL: HUB,
                 DEFAULT_LANGUAGE: 'en',
                 // Recipe mails as the Cloudflare Email Worker delivers them, and a fake AI (never the real service)
                 INBOUND_SECRET: 'e2e-inbound',
@@ -51,7 +71,8 @@ export default defineConfig({
             command: 'npx vite --port 3100 --strictPort',
             cwd: path.resolve(__dirname, '..', 'frontend'),
             url: FRONTEND,
-            env: { VITE_API_URL: BACKEND },
+            // Vite forwards /api to the test backend, so the hub's cookie is the page's own (as with nginx)
+            env: { API_PROXY: BACKEND },
             reuseExistingServer: false,
             timeout: 60_000,
         },

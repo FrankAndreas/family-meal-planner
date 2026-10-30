@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { API, login, newPerson, PIN, uniqueName } from './helpers';
+import { API, addToHub, giveAccess, login, newPerson, uniqueName } from './helpers';
 
 test('a parent sets the first day of the week and the family size', async ({ page, request }) => {
     const parent = await newPerson(request);
@@ -20,46 +20,32 @@ test('a parent sets the first day of the week and the family size', async ({ pag
     expect(errors).toEqual([]);
 });
 
-test('a parent adds a child, who sees only their own settings', async ({ page, request }) => {
+// The family comes from the hub (spec 2026-10-30): a child added there appears here, and sees only their own settings
+test('a child added in the hub appears, and sees only their own settings', async ({ page, request }) => {
     const parent = await newPerson(request);
+    const child = await newPerson(request, 'CHILD');
     await login(page, parent.name);
     await page.goto('/einstellungen');
-    const child = uniqueName('K');
-    await page.getByLabel('Name of the new person').fill(child);
-    await page.getByLabel('PIN of the new person').fill(PIN);
-    await page.getByLabel('Role of the new person').selectOption('CHILD');
-    await page.getByRole('button', { name: 'Add person' }).click();
-    await expect(page.getByRole('listitem').filter({ hasText: child })).toContainText('Child');
+    await expect(page.getByRole('listitem').filter({ hasText: child.name })).toContainText('Child');
 
-    await page.getByRole('button', { name: 'Log out' }).click();
-    await login(page, child);
+    await login(page, child.name);
     await page.goto('/einstellungen');
     await expect(page.getByRole('heading', { name: 'My settings' })).toBeVisible();
+    await expect(page.getByText('Your language, your PIN and logging out on every device are in the family hub.')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Family members' })).toHaveCount(0);
     await expect(page.getByLabel('First day of the week')).toHaveCount(0);
 });
 
-test('renaming to a name that exists shows the error in words', async ({ page, request }) => {
+// Removed in the hub: hidden here with their stars, until a parent deletes their data
+test('someone removed in the hub is deleted here by a parent', async ({ page, request }) => {
     const parent = await newPerson(request);
-    const other = await newPerson(request, 'CHILD');
-    const child = await newPerson(request, 'CHILD');
+    const name = uniqueName('Gone');
+    const hubId = await addToHub(request, name, 'CHILD');
+    await login(page, name);
+    await giveAccess(request, hubId, false);
     await login(page, parent.name);
     await page.goto('/einstellungen');
-    const row = page.getByRole('listitem').filter({ hasText: child.name });
-    await row.getByRole('button', { name: 'Rename' }).click();
-    await row.getByLabel('New name').fill(other.name.toLowerCase());
-    await row.getByRole('button', { name: 'Save' }).click();
-    await expect(page.getByText('This name is already taken.')).toBeVisible();
-});
-
-test('changing your own PIN keeps you logged in on this device', async ({ page, request }) => {
-    const parent = await newPerson(request);
-    await login(page, parent.name);
-    await page.goto('/einstellungen');
-    await page.getByLabel('Current PIN').fill(PIN);
-    await page.getByLabel('New PIN').fill('1357');
-    await page.getByRole('button', { name: 'Change PIN' }).click();
-    await expect(page.getByText('PIN changed')).toBeVisible();
-    await page.reload();
-    await expect(page.getByRole('heading', { name: 'My settings' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Removed in the family hub' })).toBeVisible();
+    await page.getByRole('button', { name: `Delete data of ${name}` }).click();
+    await expect(page.getByRole('button', { name: `Delete data of ${name}` })).toHaveCount(0);
 });

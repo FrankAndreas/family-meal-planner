@@ -3,22 +3,25 @@ import { useTranslation } from 'react-i18next';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider, useAuth } from './AuthContext';
 import Layout from './components/Layout';
-import Login from './pages/Login';
 import CloseWeek from './pages/CloseWeek';
 import History from './pages/History';
 import Inbox from './pages/Inbox';
 import InboxItemPage from './pages/InboxItemPage';
+import NoAccess from './pages/NoAccess';
 import PlanPage from './pages/PlanPage';
 import RecipeEdit from './pages/RecipeEdit';
 import Recipes from './pages/Recipes';
 import RecipeView from './pages/RecipeView';
 import SettingsPage from './pages/SettingsPage';
 
+// Not logged in: the API's 401 has already sent the browser to the family hub's login
 function RequireAuth({ children }: { children: ReactElement }) {
     const { t } = useTranslation();
-    const { user, isLoading } = useAuth();
-    if (isLoading) return <p className="p-6 text-slate-400">{t('common.loading')}</p>;
-    return user ? children : <Navigate to="/login" replace />;
+    const { state } = useAuth();
+    if (state === 'no_access') return <NoAccess />;
+    if (state === 'hub_unavailable') return <NoAccess hubDown />;
+    if (state !== 'in') return <p className="p-6 text-slate-400">{t('common.loading')}</p>;
+    return children;
 }
 
 export default function App() {
@@ -26,7 +29,6 @@ export default function App() {
         <AuthProvider>
             <BrowserRouter>
                 <Routes>
-                    <Route path="/login" element={<Login />} />
                     <Route
                         element={
                             <RequireAuth>

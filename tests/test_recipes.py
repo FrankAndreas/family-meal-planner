@@ -1,4 +1,4 @@
-from helpers import create_recipe, create_user, login, recipe_body
+from helpers import create_recipe, create_user, login, recipe_body, remove_from_hub
 
 
 def test_create_and_read(client, admin_headers):
@@ -116,6 +116,8 @@ def test_units(client, admin_headers):
 def test_recipe_survives_creator_deletion(client, admin_headers):
     lena = create_user(client, admin_headers, "Lena")
     r = create_recipe(client, login(client, "Lena", "5678"))
+    remove_from_hub("Lena")
+    client.get("/api/users", headers=admin_headers)
     client.delete(f"/api/users/{lena['id']}", headers=admin_headers)
     assert client.get(f"/api/recipes/{r['id']}", headers=admin_headers).json()["created_by_name"] is None
 

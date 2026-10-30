@@ -1,4 +1,4 @@
-from helpers import create_recipe, create_user, login
+from helpers import create_recipe, create_user, login, remove_from_hub
 
 
 def _rate(client, headers, recipe_id, stars):
@@ -69,6 +69,9 @@ def test_deleting_user_removes_their_votes(client, admin_headers):
     kid = login(client, "Lena", "5678")
     _rate(client, kid, r["id"], 2)
     client.put(f"/api/recipes/{r['id']}/favorite", json={"favorite": True}, headers=kid)
+    # Only someone the family hub no longer lists is deleted here
+    remove_from_hub("Lena")
+    client.get("/api/users", headers=admin_headers)
     assert client.delete(f"/api/users/{lena['id']}", headers=admin_headers).status_code == 204
     got = client.get(f"/api/recipes/{r['id']}", headers=admin_headers).json()
     assert got["rating_count"] == 0 and got["favorite_count"] == 0

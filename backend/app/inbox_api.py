@@ -91,7 +91,11 @@ async def receive_mail(request: Request, db: Session = Depends(get_db)):
         raise api_error(413, "inbound_too_big")
     summary = mail.summarize(raw)
     sender = (
-        db.query(models.UserEmail).filter(models.UserEmail.address == summary.from_addr).first()
+        db.query(models.UserEmail)
+        .join(models.User)
+        # A person the family hub no longer lists sends nothing in (their address stays until their data is deleted)
+        .filter(models.UserEmail.address == summary.from_addr, models.User.is_active.is_(True))
+        .first()
         if summary.from_addr
         else None
     )

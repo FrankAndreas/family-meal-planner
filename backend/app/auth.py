@@ -1,107 +1,85 @@
-import logging
-import math
-import secrets
-from datetime import datetime, timedelta, timezone
+"""Who is logged in: the family hub's login (spec 2026-10-30), as in the budget app.
 
-import bcrypt
-import jwt
-from fastapi import Depends, status
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+At home the browser sends the hub's cookie `hub_session` (set for local.<domain>, so every family app gets it); tests
+and scripts may send the same token as `Authorization: Bearer`. The hub says whose login it is and whether they may
+use the planner; the planner's people come from the hub too (hub_people.py). No PINs here any more."""
+
+import logging
+
+from fastapi import Depends, Request, status
+from fastapi.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
 
-from . import config, database, models
+from . import database, hub, hub_people, models
 from .errors import api_error
-from .timeutil import utcnow
 
 logger = logging.getLogger(__name__)
 
-# Signs the login tokens. Without SECRET_KEY a random key is used, which logs everyone out on every restart.
-SECRET_KEY = config.env("SECRET_KEY") or secrets.token_urlsafe(32)
-if not config.env("SECRET_KEY"):
-    logger.warning("SECRET_KEY is not set; using a random key, so logins won't survive a restart")
-ALGORITHM = "HS256"
-TOKEN_LIFETIME = timedelta(days=30)
-# A 4-digit PIN is guessable, so lock the user after a few wrong tries. Each lock in a row doubles the next one, up to
-# a day: then about 5 guesses a day are left, so a child can't find a parent's PIN (and with it the AI) by trying
-MAX_FAILED_LOGINS = 5
-LOCK_DURATION = timedelta(minutes=15)
-MAX_LOCK_DURATION = timedelta(days=1)
-
-_bearer = HTTPBearer(auto_error=False)
+COOKIE = "hub_session"
+# With the cookie, a change must carry this header: another site can make the browser send the cookie (sibling apps
+# share the site), but not a custom header without this app allowing it
+CSRF_HEADER = "X-Requested-With"
+CSRF_VALUE = "meals"
+SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
+TUNNEL_HEADER = "Cf-Connecting-Ip"
 
 
-def get_pin_hash(pin: str) -> str:
-    return bcrypt.hashpw(pin.encode(), bcrypt.gensalt()).decode()
+def request_token(request: Request) -> tuple[str | None, bool]:
+    """The hub token of the request, and whether it came as the cookie."""
+    scheme, _, value = request.headers.get("Authorization", "").partition(" ")
+    if scheme.lower() == "bearer" and value.strip():
+        return value.strip(), False
+    cookie = request.cookies.get(COOKIE)
+    return (cookie, True) if cookie else (None, False)
 
 
-def verify_pin(pin: str, hashed: str) -> bool:
+def _not_logged_in():
+    error = api_error(status.HTTP_401_UNAUTHORIZED, "not_logged_in")
+    error.headers = {"WWW-Authenticate": "Bearer"}
+    return error
+
+
+def _active(db: Session, hub_id: int) -> models.User | None:
+    return db.query(models.User).filter(models.User.hub_id == hub_id, models.User.is_active.is_(True)).first()
+
+
+def _resolve(request: Request, db: Session) -> models.User:
+    """The person behind the request's login. Blocking (the hub, the database): runs in a worker thread."""
+    # Home only: Cloudflare sets this on everything through its tunnel (only the recipe mails come that way, with their
+    # own secret); a hub login arriving from outside can only be a stolen home cookie (family-hub README, "For apps")
+    if TUNNEL_HEADER in request.headers:
+        raise _not_logged_in()
+    token, from_cookie = request_token(request)
+    if not token:
+        raise _not_logged_in()
+    if from_cookie and request.method not in SAFE_METHODS and request.headers.get(CSRF_HEADER) != CSRF_VALUE:
+        raise api_error(status.HTTP_403_FORBIDDEN, "csrf")
     try:
-        return bcrypt.checkpw(pin.encode(), hashed.encode())
-    except ValueError:
-        # Not a valid bcrypt hash: treat it like a wrong PIN instead of a server error
-        return False
-
-
-def name_key(name: str) -> str:
-    """What makes two names the same person's: case and surrounding spaces don't count."""
-    return name.strip().casefold()
-
-
-def lock_duration(lockouts: int) -> timedelta:
-    """15, 30, 60, ... minutes for the first, second, third lock in a row; at most a day."""
-    return min(LOCK_DURATION * 2 ** min(max(lockouts - 1, 0), 10), MAX_LOCK_DURATION)
-
-
-def create_access_token(user: models.User) -> str:
-    expires = datetime.now(timezone.utc) + TOKEN_LIFETIME
-    claims = {"sub": str(user.id), "ver": user.token_version, "exp": expires}
-    return jwt.encode(claims, SECRET_KEY, algorithm=ALGORITHM)
-
-
-def authenticate(db: Session, name: str, pin: str) -> models.User:
-    """The user with this name and PIN; counts wrong PINs and locks the user after too many."""
-    wrong = api_error(status.HTTP_401_UNAUTHORIZED, "wrong_name_or_pin")
-    user = db.query(models.User).filter(models.User.name_key == name_key(name)).first()
+        person, access = hub.session(token)
+        if person is None:
+            raise _not_logged_in()
+        if not access:
+            raise api_error(status.HTTP_403_FORBIDDEN, "no_access")
+        hub_people.refresh(db, token)
+        user = _active(db, person.id)
+        if user is None:
+            # Given access a moment ago: the people kept here are older than that
+            hub_people.refresh(db, token, force=True)
+            user = _active(db, person.id)
+    except hub.HubUnavailable as error:
+        logger.warning("The family hub can't be reached (%s)", error)
+        raise api_error(status.HTTP_503_SERVICE_UNAVAILABLE, "hub_unavailable") from None
     if user is None:
-        raise wrong
-    now = utcnow()
-    if user.locked_until and user.locked_until > now:
-        minutes = math.ceil((user.locked_until - now).total_seconds() / 60)
-        raise api_error(status.HTTP_429_TOO_MANY_REQUESTS, "locked", minutes=minutes)
-    if not verify_pin(pin, user.pin_hash):
-        user.failed_logins += 1
-        if user.failed_logins >= MAX_FAILED_LOGINS:
-            user.failed_logins = 0
-            user.lockouts += 1
-            user.locked_until = now + lock_duration(user.lockouts)
-        db.commit()
-        raise wrong
-    user.failed_logins = 0
-    user.lockouts = 0
-    user.locked_until = None
-    db.commit()
+        raise api_error(status.HTTP_403_FORBIDDEN, "no_access")
+    # The hub's role and name may be newer than the row's (refreshed once a minute)
+    if user.role != models.UserRole(person.role):
+        hub_people.refresh(db, token, force=True)
+        db.refresh(user)
     return user
 
 
-def get_current_user(
-    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
-    db: Session = Depends(database.get_db),
-) -> models.User:
-    unauthorized = api_error(status.HTTP_401_UNAUTHORIZED, "not_logged_in")
-    unauthorized.headers = {"WWW-Authenticate": "Bearer"}
-    if credentials is None:
-        raise unauthorized
-    try:
-        payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id = int(payload["sub"])
-        version = int(payload["ver"])
-    except (jwt.PyJWTError, KeyError, ValueError, TypeError):
-        raise unauthorized
-    user = db.get(models.User, user_id)
-    # A new PIN raises token_version, which ends the logins made with the old one
-    if user is None or user.token_version != version:
-        raise unauthorized
-    return user
+async def get_current_user(request: Request, db: Session = Depends(database.get_db)) -> models.User:
+    return await run_in_threadpool(_resolve, request, db)
 
 
 def require_parent(user: models.User = Depends(get_current_user)) -> models.User:

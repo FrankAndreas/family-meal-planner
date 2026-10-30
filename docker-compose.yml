@@ -19,13 +19,13 @@ services:
     environment:
       - DATABASE_URL=sqlite:///./data/meals.db
       - DATA_DIR=./data
-      # Signs login tokens. If empty, a random key is used and everyone is
-      # logged out whenever the container restarts (e.g. on every update).
-      - SECRET_KEY=${SECRET_KEY:-}
-      # PIN for the first parent "Admin" on an empty database; empty means a
-      # random PIN, printed once in the backend log
-      - INITIAL_ADMIN_PIN=${INITIAL_ADMIN_PIN:-}
-      # de or en: language of people who haven't picked one
+      # The login is the family hub's (FrankAndreas/family-hub): how this
+      # backend reaches it (e.g. http://<NAS_IP>:8086), where browsers log in
+      # and out (https://home.local.<domain>), and this app's key in the hub
+      - HUB_URL=${HUB_URL:-}
+      - HUB_PUBLIC_URL=${HUB_PUBLIC_URL:-}
+      - HUB_APP_KEY=${HUB_APP_KEY:-meals}
+      # de or en: language of people the hub has no language for
       - DEFAULT_LANGUAGE=${DEFAULT_LANGUAGE:-de}
       - TZ=${TZ:-Europe/Zurich}
       # Recipe mails through the Cloudflare Email Worker; empty = receiving is off.

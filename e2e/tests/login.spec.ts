@@ -1,44 +1,56 @@
 import { expect, test } from '@playwright/test';
-import { ADMIN_PIN, login, newPerson } from './helpers';
+import { FRONTEND, HUB, addToHub, hubLogin, login, newPerson, uniqueName } from './helpers';
 
-test('Admin logs in and sees the app', async ({ page }) => {
-    const errors = await login(page, 'Admin', ADMIN_PIN);
+// Logging in goes through the family hub (spec 2026-10-30): without its login the planner sends the browser there
+test('not logged in → sent to the family hub', async ({ page }) => {
+    await page.goto('/');
+    await expect(page).toHaveURL(new RegExp(`^${HUB}/\\?next=`));
+});
+
+test('a parent logs in and sees the app', async ({ page, request }) => {
+    const parent = await newPerson(request);
+    const errors = await login(page, parent.name);
     await expect(page.getByText('Meal planner').first()).toBeVisible();
     await expect(page.getByRole('link', { name: 'Recipes' })).toBeVisible();
     expect(errors).toEqual([]);
 });
 
-test('a wrong PIN shows a message in words', async ({ page }) => {
-    await page.goto('/login');
-    await page.getByRole('button', { name: 'Admin', exact: true }).click();
-    await page.locator('#pin').fill('0000');
-    await page.locator('button[type=submit]').click();
-    await expect(page.getByText('Wrong name or PIN.')).toBeVisible();
+test('someone the hub doesn\'t give the planner sees "No access"', async ({ page, request }) => {
+    const name = uniqueName('N');
+    await addToHub(request, name, 'PARENT', false);
+    const { token } = await hubLogin(name);
+    await page.context().addCookies([{ name: 'hub_session', value: token, url: FRONTEND }]);
+    await page.goto('/');
+    await expect(page.getByRole('heading', { name: 'No access' })).toBeVisible();
+    await page.getByRole('button', { name: 'Log in as someone else' }).click();
+    await expect(page).toHaveURL(new RegExp(`^${HUB}/logout\\?next=${encodeURIComponent(FRONTEND)}`));
 });
 
-test('the chosen language follows the person, not the browser', async ({ page, request }) => {
+test('the language follows the person in the hub', async ({ page, request }) => {
+    const parent = await newPerson(request);
+    const changed = await request.fetch(`${HUB}/api/me`, {
+        method: 'PATCH', data: { language: 'de' }, headers: { 'X-Requested-With': 'hub', Cookie: parent.hubCookies },
+    });
+    expect(changed.ok(), await changed.text()).toBeTruthy();
+    await login(page, parent.name);
+    await expect(page.getByRole('link', { name: 'Wochenplan' })).toBeVisible();
+});
+
+test('"Log out" ends the login in the hub, which leads back here', async ({ page, request }) => {
     const parent = await newPerson(request);
     await login(page, parent.name);
-    await page.goto('/einstellungen');
-    await page.getByLabel('Language').selectOption('de');
-    await expect(page.getByRole('link', { name: 'Wochenplan' })).toBeVisible();
-    await page.reload();
-    await expect(page.getByRole('link', { name: 'Wochenplan' })).toBeVisible();
-    await page.getByRole('button', { name: 'Abmelden' }).click();
-    // Logged out, the browser's language (English here) is back
-    await expect(page.getByRole('button', { name: 'Log in' }).or(page.getByText('Pick your name'))).toBeVisible();
+    await page.getByRole('button', { name: 'Log out' }).click();
+    await expect(page).toHaveURL(new RegExp(`^${HUB}/logout\\?next=${encodeURIComponent(FRONTEND)}`));
 });
 
 test.describe('a browser in neither German nor English', () => {
     test.use({ locale: 'fr-FR' });
 
-    test('gets English, and the default language after login, never raw keys', async ({ page, request }) => {
-        await page.goto('/login');
-        await expect(page.getByText('Pick your name')).toBeVisible();
+    test('gets the default language after login, never raw keys', async ({ page, request }) => {
         const parent = await newPerson(request);
         await login(page, parent.name);
-        // DEFAULT_LANGUAGE=en in the test backend
+        // DEFAULT_LANGUAGE=en in the test hub and backend
         await expect(page.getByRole('link', { name: 'Week plan' })).toBeVisible();
-        await expect(page.locator('body')).not.toContainText(/\b(errors|login|nav|common|settings)\.[a-z]/);
+        await expect(page.locator('body')).not.toContainText(/\b(errors|access|nav|common|settings)\.[a-z]/);
     });
 });

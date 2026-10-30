@@ -28,40 +28,38 @@ Same setup as family-budget-dashboard and family-job-tracking, so all of them ru
    sudo mkdir -p data
    sudo chown -R 1031:100 data    # the IDs from step 1, or 999:999
    ```
-3. **Create `.env`** (see `.env.example` for all settings):
+3. **Create `.env`** (see `.env.example` for all settings; the family hub must already run, see below):
    ```bash
-   printf 'PUID=1031\nPGID=100\nPORT=8085\nSECRET_KEY=%s\n' "$(openssl rand -hex 32)" | sudo tee .env
+   printf 'PUID=1031\nPGID=100\nPORT=8085\nHUB_URL=http://<NAS_IP>:8086\nHUB_PUBLIC_URL=https://home.local.<domain>\n' | sudo tee .env
    sudo chmod 600 .env
    ```
-   > **Why `SECRET_KEY` matters:** it signs the logins. If it is empty, the backend picks a random one on every start,
-   > and everyone is logged out after each update.
 4. **Start** it:
    ```bash
    sudo docker-compose pull
    sudo docker-compose up -d
    ```
-5. **Open** `http://<NAS_IP>:8085`. For daily use, set up [HTTPS at home](#https-at-home-recommended): on plain HTTP
-   the PINs cross the Wi-Fi unencrypted.
+5. **Open** `https://essen.local.<domain>` once [HTTPS at home](#https-at-home-recommended) is set up: the family
+   hub's login cookie only reaches addresses under `local.<domain>`.
 
-### First login
+### Logging in: the family hub
 
-On an empty database the backend creates the parent **Admin** with a random 4-digit PIN, printed once in its log:
+The planner has no PINs of its own: the family logs in at the family hub (FrankAndreas/family-hub), which runs on the
+same NAS. In the hub's **Einstellungen → Apps**, give the planner's tile the app key `meals` and tick everyone who
+uses it; parents and children, names and languages all come from the hub. Parents can do everything; children can plan,
+add and rate recipes. "Abmelden" here logs out in the hub (and so in every family app).
 
-```bash
-sudo docker logs meals-backend 2>&1 | grep "INITIAL PIN"
-```
-
-Log in as `Admin`, change the PIN in **Einstellungen**, rename Admin, and add the other family members there (there is
-no sign-up page). Parents can do everything; children can plan and add recipes. There also:
+In the planner's **Einstellungen**:
 
 - **Personen am Tisch**: the family size, the default number of people for every planned meal
 - **Erster Tag der Woche**: default Saturday, so Friday's planning covers the coming week
+- **Im Familien-Hub entfernt**: people the hub no longer gives the planner. They're hidden, with their stars and
+  favourites, until a parent deletes their data here.
 
-To choose the first PIN yourself, set `INITIAL_ADMIN_PIN=1234` in `.env` before the first start. The app is German
-unless a person picks English in **Einstellungen**; `DEFAULT_LANGUAGE=en` makes English the default.
-
-If you lose the PIN before anyone uses the app, stop it, delete `data/meals.db` and start again.
-**This deletes all data.** Otherwise another parent can reset it.
+**Switching an existing installation** to the hub: add `HUB_URL`, `HUB_PUBLIC_URL` and `HUB_APP_KEY` to the backend's
+`environment:` in the NAS's `compose.yaml` (as in `docker-compose.yml`; a value only in `.env` doesn't reach the
+container), remove `SECRET_KEY` and `INITIAL_ADMIN_PIN`, set the values in `.env`, then update. Before the first login,
+make sure every planner person exists in the hub with the same name and role and is ticked: each is linked to that
+hub person at the first login, and only then, so their stars and favourites stay theirs.
 
 ### Where the data is
 

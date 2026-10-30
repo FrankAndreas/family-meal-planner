@@ -1,68 +1,69 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import api from './api';
 import axios from 'axios';
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
+import api, { errorCode, goToHubLogout } from './api';
 import { applyLanguage } from './i18n';
 import { guestLanguage } from './language';
 import type { User } from './types';
 
+// in: logged in; no_access: logged in at the hub, but not ticked for the planner; hub_unavailable: the hub doesn't
+// answer; away: on the way to the hub's login (the API's 401 sends the browser there)
+export type AuthState = 'loading' | 'in' | 'no_access' | 'hub_unavailable' | 'away';
+
 interface AuthContextType {
     user: User | null;
+    state: AuthState;
     isLoading: boolean;
-    login: (name: string, pin: string) => Promise<void>;
-    logout: () => void;
+    logout: () => Promise<void>;
     refreshUser: () => Promise<User>;
-    setToken: (token: string) => void;
+    retry: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
+// Who is logged in: the family hub's login (spec 2026-10-30); the backend asks the hub
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const [user, setUser] = useState<User | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
+    const [state, setState] = useState<AuthState>('loading');
 
-    // The person's language follows them: applied whenever their data is loaded
-    const loadUser = async () => {
+    // The person's language follows them (from the hub): applied whenever their data is loaded
+    const loadUser = useCallback(async () => {
         const me = (await api.get<User>('/api/me')).data;
         applyLanguage(me.language);
         setUser(me);
         return me;
-    };
-
-    useEffect(() => {
-        const checkAuth = async () => {
-            let loggedIn = false;
-            if (localStorage.getItem('token')) {
-                try {
-                    await loadUser();
-                    loggedIn = true;
-                } catch (error) {
-                    // Only a refused login ends it; a NAS that is restarting (502, no answer) keeps the token for later
-                    if (axios.isAxiosError(error) && error.response?.status === 401) localStorage.removeItem('token');
-                }
-            }
-            if (!loggedIn) applyLanguage(await guestLanguage());
-            setIsLoading(false);
-        };
-        checkAuth();
     }, []);
 
-    const login = async (name: string, pin: string) => {
-        const response = await api.post<{ access_token: string }>('/api/token', { name, pin });
-        localStorage.setItem('token', response.data.access_token);
-        await loadUser();
-    };
+    // Raised by "Try again" (hub_unavailable): asks the backend once more
+    const [attempt, setAttempt] = useState(0);
 
-    const logout = () => {
-        localStorage.removeItem('token');
-        setUser(null);
-        guestLanguage().then(applyLanguage);
-    };
+    useEffect(() => {
+        const check = async () => {
+            try {
+                await loadUser();
+                setState('in');
+            } catch (error) {
+                // 401: the API has sent the browser to the hub's login. Anything else but "no access" (the hub down, a
+                // NAS restarting) says so and offers to try again
+                const code = errorCode(error);
+                const away = axios.isAxiosError(error) && error.response?.status === 401;
+                setState(code === 'no_access' ? 'no_access' : away ? 'away' : 'hub_unavailable');
+                applyLanguage(await guestLanguage());
+            }
+        };
+        void check();
+    }, [loadUser, attempt]);
 
-    // A new PIN ends all logins; the backend hands this device a fresh token
-    const setToken = (token: string) => localStorage.setItem('token', token);
+    const logout = useCallback(async () => {
+        await goToHubLogout();
+    }, []);
+
+    const retry = useCallback(() => {
+        setState('loading');
+        setAttempt((n) => n + 1);
+    }, []);
 
     return (
-        <AuthContext.Provider value={{ user, isLoading, login, logout, refreshUser: loadUser, setToken }}>
+        <AuthContext.Provider value={{ user, state, isLoading: state === 'loading', logout, refreshUser: loadUser, retry }}>
             {children}
         </AuthContext.Provider>
     );

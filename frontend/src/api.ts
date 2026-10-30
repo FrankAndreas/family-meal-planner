@@ -1,32 +1,46 @@
 import axios from 'axios';
 import i18n from './i18n';
 
-// Same origin: Vite (dev) or nginx (Docker) forwards /api to the backend; the browser tests set VITE_API_URL
-const api = axios.create({ baseURL: import.meta.env.VITE_API_URL || undefined });
+// Same origin: Vite (dev, browser tests) or nginx (Docker) forwards /api to the backend, and the login is the family
+// hub's cookie, which the browser sends by itself. The backend takes changes made with the cookie only with this header
+// (another site can make a browser send the cookie, but not the header)
+const api = axios.create({ withCredentials: true, headers: { 'X-Requested-With': 'meals' } });
 
 // A backend path for <img src> and links, which don't go through axios (photos are served without login)
-export const apiUrl = (path: string) => (import.meta.env.VITE_API_URL || '').replace(/\/+$/, '') + path;
+export const apiUrl = (path: string) => path;
 
-api.interceptors.request.use((config) => {
-    const token = localStorage.getItem('token');
-    if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-});
-
-// Expired or invalid token: drop it and go back to the login page
+// The login ended (logged out in the hub, a new PIN): log in at the hub, which sends the browser back here
 api.interceptors.response.use(
     (response) => response,
     (error) => {
-        const isLogin = error.config?.url?.endsWith('/api/token');
-        if (error.response?.status === 401 && !isLogin && localStorage.getItem('token')) {
-            localStorage.removeItem('token');
-            window.location.href = '/login';
+        if (axios.isAxiosError(error) && error.response?.status === 401 && !error.config?.url?.endsWith('/api/hub')) {
+            void goToHub();
         }
         return Promise.reject(error);
     },
 );
+
+// Where the family hub is (HUB_PUBLIC_URL), from the backend
+async function hubUrl(): Promise<string> {
+    return (await api.get<{ login_url: string }>('/api/hub')).data.login_url;
+}
+
+// To the hub's login; with next=, the hub sends the browser back here afterwards
+export async function goToHub(next: string | null = window.location.href): Promise<void> {
+    const login = await hubUrl();
+    window.location.href = next ? `${login}/?next=${encodeURIComponent(next)}` : login;
+}
+
+// "Log out": the hub ends the login, for the planner and every other family app, then shows its login (back here after)
+export async function goToHubLogout(): Promise<void> {
+    window.location.href = `${await hubUrl()}/logout?next=${encodeURIComponent(window.location.origin)}`;
+}
+
+// The code of an error the app acts on (no_access, hub_unavailable)
+export function errorCode(error: unknown): string | undefined {
+    const detail = axios.isAxiosError(error) ? error.response?.data?.detail : undefined;
+    return typeof detail === 'string' ? detail : undefined;
+}
 
 // The backend sends a code (errors.<code> in the locales), alone or with the values the text needs
 export function errorMessage(error: unknown): string {

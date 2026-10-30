@@ -22,7 +22,7 @@ def _locale_errors(name: str) -> set[str]:
 
 
 def test_codes_found():
-    assert {"wrong_name_or_pin", "recipe_not_found", "entry_not_found"} <= _codes()
+    assert {"no_access", "recipe_not_found", "entry_not_found"} <= _codes()
 
 
 def test_every_code_has_a_text():

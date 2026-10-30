@@ -44,8 +44,8 @@ German by default, English per person.
 - AI translation of a recipe into German, with the original kept.
 
 **Family and costs**
-- PIN logins with parent and child roles. Children plan, add and rate recipes; only parents process imports, use the
-  AI, delete recipes and change settings.
+- One login for the family through the family hub (FrankAndreas/family-hub), with parent and child roles. Children
+  plan, add and rate recipes; only parents process imports, use the AI, delete recipes and change settings.
 - AI calls are limited per person and hour, at most 10 pictures per call, and parents see each person's calls per
   month. Set a spending limit at Infomaniak as the outer limit.
 
@@ -69,7 +69,7 @@ implementation plans in [`docs/superpowers/plans/`](docs/superpowers/plans/), an
 ```bash
 python3 -m venv venv
 venv/bin/pip install -r backend/requirements.txt -r tests/requirements.txt
-scripts/dev-backend.sh                      # API on :8000, Admin PIN 1111, database in backend/data
+scripts/dev-backend.sh                      # API on :8000, database in backend/data; logins from a family hub on :8086
 cd frontend && npm install && npm run dev   # app on :5173, /api forwarded to :8000
 ```
 

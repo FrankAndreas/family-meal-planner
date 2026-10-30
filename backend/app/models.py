@@ -19,18 +19,16 @@ class User(Base):
 
     id = Column(Integer, primary_key=True)
     name = Column(String(50), nullable=False)
-    # name.casefold(): names are unique and logins match regardless of case ("lena" is "Lena")
+    # name.casefold(): names are unique regardless of case ("lena" is "Lena")
     name_key = Column(String(50), unique=True, nullable=False)
-    pin_hash = Column(String, nullable=False)
     role = Column(Enum(UserRole), default=UserRole.CHILD, nullable=False)
-    # None: the default language (DEFAULT_LANGUAGE)
+    # The person's language in the family hub (None: the default language, DEFAULT_LANGUAGE)
     language = Column(String(2))
-    failed_logins = Column(Integer, default=0, nullable=False)
-    locked_until = Column(DateTime)
-    # Locks in a row: each one doubles the next (see auth.lock_duration); a correct login or a new PIN resets it
-    lockouts = Column(Integer, default=0, nullable=False)
-    # Part of every login token; raising it ends all of the user's logins (new PIN)
-    token_version = Column(Integer, default=0, nullable=False)
+    # The person in the family hub (spec 2026-10-30): login, name, role and language come from there. None: a row from
+    # before the hub, linked by name at the first sync
+    hub_id = Column(Integer, unique=True)
+    # False: the hub no longer lists the person for the planner; hidden with their data until a parent deletes it
+    is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime, default=utcnow, nullable=False)
 
 

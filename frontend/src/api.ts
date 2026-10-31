@@ -1,5 +1,6 @@
 import axios from 'axios';
 import i18n from './i18n';
+import { loginAddress, type HubLinks } from './hubAddress';
 
 // Same origin: Vite (dev, browser tests) or nginx (Docker) forwards /api to the backend, and the login is the family
 // hub's cookie, which the browser sends by itself. The backend takes changes made with the cookie only with this header
@@ -21,18 +22,15 @@ api.interceptors.response.use(
 );
 
 // Where the family hub is (HUB_PUBLIC_URL), and where "Log out" goes (at home the hub, outside Cloudflare Access)
-async function hubLinks(): Promise<{ login_url: string; logout_url: string }> {
-    return (await api.get<{ login_url: string; logout_url: string }>('/api/hub')).data;
+async function hubLinks(): Promise<HubLinks> {
+    return (await api.get<HubLinks>('/api/hub')).data;
 }
 
-async function hubUrl(): Promise<string> {
-    return (await hubLinks()).login_url;
-}
-
-// To the hub's login; with next=, the hub sends the browser back here afterwards
+// To the hub's login; with next=, the hub sends the browser back here afterwards. Outside the page stays and shows
+// the error
 export async function goToHub(next: string | null = window.location.href): Promise<void> {
-    const login = await hubUrl();
-    window.location.href = next ? `${login}/?next=${encodeURIComponent(next)}` : login;
+    const address = loginAddress(await hubLinks(), next);
+    if (address) window.location.href = address;
 }
 
 // "Log out": the hub ends the login, for the planner and every other family app, then shows its login (back here after)

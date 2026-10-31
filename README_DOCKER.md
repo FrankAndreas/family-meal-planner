@@ -93,7 +93,10 @@ tunnel counts for nothing.
 4. Everyone who uses it from outside needs a **confirmed** e-mail address in the hub (the one Cloudflare's code is sent
    to). Unknown addresses see "No access".
 
-"Log out" from outside ends the Cloudflare login (`/cdn-cgi/access/logout`).
+Never publish step 1 without step 2: the Access application is what keeps strangers out. Without it the API refuses
+everyone (no Cloudflare login), but recipe photos need no login (`<img>` can't send one).
+
+"Log out" from outside ends the Cloudflare login (`/cdn-cgi/access/logout`), for every family app at once.
 
 ### Recipe mails (Cloudflare Email Worker, optional)
 

@@ -44,10 +44,10 @@ def me(user: models.User = Depends(auth.get_current_user)):
 
 def _ask_the_hub(request: Request, db: Session) -> None:
     """The family list shows the hub's current state, not the one of up to a minute ago."""
-    token, _ = auth.request_token(request)
-    if token:
+    login, _ = auth.request_login(request)
+    if login:
         try:
-            hub_people.refresh(db, token, force=True)
+            hub_people.refresh(db, login, force=True)
         except hub.HubUnavailable:
             raise api_error(503, "hub_unavailable") from None
 

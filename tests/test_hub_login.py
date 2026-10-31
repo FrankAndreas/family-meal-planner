@@ -64,7 +64,10 @@ def test_no_login_through_the_tunnel(client):
 
 def test_hub_login_url(client, monkeypatch):
     monkeypatch.setenv("HUB_PUBLIC_URL", "https://home.local.example.ch")
-    assert client.get("/api/hub").json() == {"login_url": "https://home.local.example.ch"}
+    assert client.get("/api/hub").json() == {
+        "login_url": "https://home.local.example.ch",
+        "logout_url": "https://home.local.example.ch/logout",
+    }
 
 
 def test_removed_endpoints(client):

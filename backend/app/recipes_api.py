@@ -366,7 +366,8 @@ def remove_photo(recipe_id: int, me: models.User = Depends(auth.get_current_user
     return recipe_out(db, recipe, me)
 
 
-# Without login: <img> can't send the token. The names are random, and the app is only reachable at home
+# Without login: <img> can't send the token. The names are random (unguessable); from outside Cloudflare Access lets
+# only the family through
 @router.get("/photos/{name}")
 def read_photo(name: str):
     path = photos.photo_path(name)

@@ -29,9 +29,12 @@ def public_config():
 
 
 @router.get("/hub")
-def hub_link():
-    """Where browsers log in and out: the family hub's address at home."""
-    return {"login_url": hub.public_url()}
+def hub_link(request: Request):
+    """Where browsers log in (the family hub's address at home) and out: at home the hub's logout page, which ends the
+    login for every app; from outside Cloudflare Access's logout."""
+    outside = auth.TUNNEL_HEADER in request.headers
+    logout = "/cdn-cgi/access/logout" if outside else f"{hub.public_url()}/logout"
+    return {"login_url": hub.public_url(), "logout_url": logout}
 
 
 @router.get("/me", response_model=schemas.UserOut)
@@ -41,10 +44,10 @@ def me(user: models.User = Depends(auth.get_current_user)):
 
 def _ask_the_hub(request: Request, db: Session) -> None:
     """The family list shows the hub's current state, not the one of up to a minute ago."""
-    token, _ = auth.request_token(request)
-    if token:
+    login, _ = auth.request_login(request)
+    if login:
         try:
-            hub_people.refresh(db, token, force=True)
+            hub_people.refresh(db, login, force=True)
         except hub.HubUnavailable:
             raise api_error(503, "hub_unavailable") from None
 

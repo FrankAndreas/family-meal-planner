@@ -1,6 +1,6 @@
 import { format, parseISO } from 'date-fns';
 import { de, enUS } from 'date-fns/locale';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { errorMessage } from '../../api';
 import { addDays, addEntry, fetchWeek, type PlanEntry, SLOTS, type Slot, type Week, weekdayKey } from '../../plan';
@@ -41,21 +41,44 @@ export default function PlanRecipeDialog({ recipeId, title, people: initialPeopl
     const [people, setPeople] = useState(initialPeople);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
+    // A week is on its way: the one shown can't be picked from meanwhile
+    const [loading, setLoading] = useState(true);
+    const heading = useRef<HTMLHeadingElement>(null);
 
     useEffect(() => {
         let current = true;
         fetchWeek(start)
-            .then((loaded) => current && setWeek(loaded))
-            .catch((err) => current && setError(errorMessage(err)));
+            .then((loaded) => {
+                if (!current) return;
+                setWeek(loaded);
+                setError('');
+                setLoading(false);
+            })
+            .catch((err) => {
+                if (!current) return;
+                setError(errorMessage(err));
+                setLoading(false);
+            });
         return () => {
             current = false;
         };
     }, [start]);
 
+    // Focus into the dialog once, when it opens
+    useEffect(() => heading.current?.focus(), []);
+
+    useEffect(() => {
+        const close = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+        window.addEventListener('keydown', close);
+        return () => window.removeEventListener('keydown', close);
+    }, [onClose]);
+
     const toWeek = (days: number) => {
         if (!week) return;
         setDay(null);
-        setStart(addDays(week.start, days));
+        setLoading(true);
+        // From the week asked for last, so two quick taps move two weeks
+        setStart(addDays(start ?? week.start, days));
     };
     const dayName = (day: string) => `${t(`weekdays.${weekdayKey(day)}`)} ${format(parseISO(day), 'd.M.')}`;
     const place = ({ day, slot }: Place) => t('plan.place', { day: dayName(day), slot: t(`plan.slots.${slot}`) });
@@ -63,6 +86,8 @@ export default function PlanRecipeDialog({ recipeId, title, people: initialPeopl
     const label = (entry: PlanEntry) => entry.recipe?.title ?? entry.note ?? '';
     // Days already gone can't be picked; today still can
     const past = (day: string) => !!week && day < week.today;
+    const takenText = (entries: PlanEntry[]) =>
+        entries.length ? t('plan.slotTaken', { titles: entries.map(label).join(', ') }) : t('plan.slotFree');
 
     const save = async () => {
         if (!picked) return;
@@ -83,11 +108,12 @@ export default function PlanRecipeDialog({ recipeId, title, people: initialPeopl
         <div className="fixed inset-0 z-30 flex items-end justify-center bg-black/50 sm:items-center sm:p-4" onClick={onClose}>
             <div
                 role="dialog"
+                aria-modal="true"
                 aria-label={t('plan.planRecipeTitle', { title })}
                 onClick={(e) => e.stopPropagation()}
                 className="glass-card max-h-[90vh] w-full max-w-3xl space-y-4 overflow-y-auto rounded-b-none bg-slate-900/95 p-4 sm:rounded-b-2xl sm:p-5"
             >
-                <h2 className="text-lg">{t('plan.planRecipeTitle', { title })}</h2>
+                <h2 ref={heading} tabIndex={-1} className="text-lg focus:outline-none">{t('plan.planRecipeTitle', { title })}</h2>
                 {week && (
                     <div className="flex items-center justify-between gap-2">
                         <button type="button" className={ARROW} aria-label={t('plan.previousWeek')} onClick={() => toWeek(-7)}>
@@ -127,9 +153,9 @@ export default function PlanRecipeDialog({ recipeId, title, people: initialPeopl
                                             <td key={day} className="p-0">
                                                 <button
                                                     type="button"
-                                                    aria-label={place({ day, slot })}
+                                                    aria-label={`${place({ day, slot })}: ${takenText(here)}`}
                                                     aria-pressed={on}
-                                                    disabled={past(day)}
+                                                    disabled={past(day) || loading}
                                                     onClick={() => pick({ day, slot })}
                                                     className={`flex h-12 w-full flex-col items-center justify-center overflow-hidden rounded-md px-1 disabled:opacity-30 ${
                                                         on
@@ -169,7 +195,7 @@ export default function PlanRecipeDialog({ recipeId, title, people: initialPeopl
                                         type="button"
                                         aria-label={dayName(d)}
                                         aria-pressed={day === d}
-                                        disabled={past(d)}
+                                        disabled={past(d) || loading}
                                         onClick={() => setDay(d)}
                                         className={`rounded-lg border py-1.5 text-center disabled:opacity-30 ${chipColor(day === d)}`}
                                     >
@@ -195,17 +221,17 @@ export default function PlanRecipeDialog({ recipeId, title, people: initialPeopl
                                 ))}
                             </div>
                         </div>
-                        {picked && (
-                            <p className="text-sm text-slate-400" data-testid="plan-dialog-taken">
-                                {taken.length ? t('plan.slotTaken', { titles: taken.map(label).join(', ') }) : t('plan.slotFree')}
-                            </p>
-                        )}
                     </div>
+                )}
+                {picked && (
+                    <p className="text-sm text-slate-400" data-testid="plan-dialog-taken">
+                        {takenText(taken)}
+                    </p>
                 )}
                 <PeopleStepper value={people} onChange={setPeople} />
                 {error && <p className={ERROR}>{error}</p>}
                 <div className="flex flex-wrap gap-2">
-                    <button type="button" className={BUTTON} disabled={!picked || saving} onClick={save}>
+                    <button type="button" className={BUTTON} disabled={!picked || saving || loading} onClick={save}>
                         {picked ? t('plan.planOn', { place: place(picked) }) : t('plan.pickPlace')}
                     </button>
                     <button type="button" className={BUTTON_SECONDARY} onClick={onClose}>

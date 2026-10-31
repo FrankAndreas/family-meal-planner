@@ -217,10 +217,13 @@ def recipe_history(
 def recipe_planned(
     recipe_id: int, _user: models.User = Depends(auth.get_current_user), db: Session = Depends(get_db)
 ):
-    """Where the recipe is planned from today on, so the recipe view can warn before it's planned twice."""
+    """Where the recipe is planned from today on, shown on the recipe view so it isn't planned twice by accident."""
     get_recipe(db, recipe_id, allow_deleted=True)
-    rows = db.query(models.PlanEntry.date, models.PlanEntry.slot).filter(
-        models.PlanEntry.recipe_id == recipe_id, models.PlanEntry.date >= timeutil.today()
+    # Twice in the same meal is still one place
+    rows = (
+        db.query(models.PlanEntry.date, models.PlanEntry.slot)
+        .filter(models.PlanEntry.recipe_id == recipe_id, models.PlanEntry.date >= timeutil.today())
+        .distinct()
     )
     return [
         schemas.PlannedOut(date=day, slot=slot)

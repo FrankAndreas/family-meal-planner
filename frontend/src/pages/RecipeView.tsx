@@ -1,5 +1,5 @@
 import { format, parseISO } from "date-fns";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Link,
@@ -67,25 +67,37 @@ export default function RecipeView() {
   const [translating, setTranslating] = useState(false);
   const [planning, setPlanning] = useState(false);
   const [justPlanned, setJustPlanned] = useState<PlanEntry | null>(null);
-  // Where it's planned from today on, so nobody plans it twice by accident
+  // Where it's planned from today on, so nobody plans it twice by accident; asked again after planning
   const [planned, setPlanned] = useState<{ date: string; slot: Slot }[]>([]);
-
-  const loadPlanned = useCallback(
-    () =>
-      api
-        .get<{ date: string; slot: Slot }[]>(`/api/recipes/${id}/planned`)
-        .then((r) => setPlanned(r.data))
-        .catch(() => {}),
-    [id],
-  );
+  const [plannedVersion, setPlannedVersion] = useState(0);
+  const planButton = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
+    let current = true;
     api
       .get<string[]>(`/api/recipes/${id}/history`)
-      .then((r) => setEatenOn(r.data))
+      .then((r) => current && setEatenOn(r.data))
       .catch(() => {});
-    loadPlanned();
-  }, [id, loadPlanned]);
+    return () => {
+      current = false;
+    };
+  }, [id]);
+
+  useEffect(() => {
+    let current = true;
+    api
+      .get<{ date: string; slot: Slot }[]>(`/api/recipes/${id}/planned`)
+      .then((r) => current && setPlanned(r.data))
+      .catch(() => {});
+    return () => {
+      current = false;
+    };
+  }, [id, plannedVersion]);
+
+  const closePlanning = () => {
+    setPlanning(false);
+    planButton.current?.focus();
+  };
 
   // First load without people, to learn the recipe's own yield; then every change of people asks again
   useEffect(() => {
@@ -329,6 +341,7 @@ export default function RecipeView() {
           {!recipe.deleted && (
             <div className="flex flex-wrap gap-2 pt-2">
               <button
+                ref={planButton}
                 type="button"
                 className={BUTTON}
                 onClick={() => setPlanning(true)}
@@ -385,30 +398,30 @@ export default function RecipeView() {
           )}
         </div>
       </div>
-      {justPlanned?.recipe?.id === recipe.id && (
-        <p
-          role="status"
-          className="rounded-lg border border-emerald-400/30 bg-emerald-900/30 p-3 text-sm text-emerald-100"
-        >
-          {t("plan.plannedAt", {
-            place: place(justPlanned.date, justPlanned.slot),
-          })}{" "}
-          <Link to={`/?woche=${justPlanned.date}`} className="underline">
-            {t("plan.showWeek")}
-          </Link>
-        </p>
-      )}
+      {/* Always there, so screen readers announce the text when it comes */}
+      <div role="status">
+        {justPlanned?.recipe?.id === recipe.id && (
+          <p className="rounded-lg border border-emerald-400/30 bg-emerald-900/30 p-3 text-sm text-emerald-100">
+            {t("plan.plannedAt", {
+              place: place(justPlanned.date, justPlanned.slot),
+            })}{" "}
+            <Link to={`/?woche=${justPlanned.date}`} className="underline">
+              {t("plan.showWeek")}
+            </Link>
+          </p>
+        )}
+      </div>
       {error && <p className={ERROR}>{error}</p>}
       {planning && people !== null && (
         <PlanRecipeDialog
           recipeId={recipe.id}
           title={recipe.title}
           people={people}
-          onClose={() => setPlanning(false)}
+          onClose={closePlanning}
           onPlanned={(entry) => {
-            setPlanning(false);
+            closePlanning();
             setJustPlanned(entry);
-            loadPlanned();
+            setPlannedVersion((v) => v + 1);
           }}
         />
       )}

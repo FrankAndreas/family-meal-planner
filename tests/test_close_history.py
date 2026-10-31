@@ -101,3 +101,20 @@ def test_recipe_history(client, admin_headers, today):
     plan(client, admin_headers, "2026-10-26", recipe_id=r["id"])
     plan(client, admin_headers, "2026-11-02", recipe_id=r["id"])
     assert client.get(f"/api/recipes/{r['id']}/history", headers=admin_headers).json() == ["2026-10-26", "2026-10-12"]
+
+
+def test_recipe_planned_ahead(client, admin_headers, today):
+    r = create_recipe(client, admin_headers)
+    other = create_recipe(client, admin_headers, title="Anderes")
+    plan(client, admin_headers, "2026-10-26", recipe_id=r["id"])
+    plan(client, admin_headers, "2026-11-02", "dinner", recipe_id=r["id"])
+    plan(client, admin_headers, "2026-11-02", "breakfast", recipe_id=r["id"])
+    plan(client, admin_headers, "2026-10-30", "lunch", recipe_id=r["id"])
+    plan(client, admin_headers, "2026-11-03", recipe_id=other["id"])
+    # From today on, in the order of the days and their meals
+    assert client.get(f"/api/recipes/{r['id']}/planned", headers=admin_headers).json() == [
+        {"date": "2026-10-30", "slot": "lunch"},
+        {"date": "2026-11-02", "slot": "breakfast"},
+        {"date": "2026-11-02", "slot": "dinner"},
+    ]
+    assert client.get("/api/recipes/9999/planned", headers=admin_headers).status_code == 404

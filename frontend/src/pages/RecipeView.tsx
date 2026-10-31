@@ -1,5 +1,5 @@
 import { format, parseISO } from "date-fns";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Link,
@@ -11,10 +11,12 @@ import { formatAmount } from "../amounts";
 import api, { errorMessage } from "../api";
 import { useAuth } from "../AuthContext";
 import PeopleStepper from "../components/recipes/PeopleStepper";
+import PlanRecipeDialog from "../components/recipes/PlanRecipeDialog";
 import { RecipeThumb } from "../components/recipes/RecipeCard";
 import Stars from "../components/recipes/Stars";
 import type { Language } from "../i18n";
 import { isWebLink, siteName } from "../links";
+import { type PlanEntry, type Slot, weekdayKey } from "../plan";
 import {
   defaultPeople,
   fetchRecipe,
@@ -22,7 +24,7 @@ import {
   type Recipe,
 } from "../recipes";
 import type { FamilySettings } from "../types";
-import { BUTTON_DANGER, BUTTON_SECONDARY, CARD, ERROR } from "../ui";
+import { BUTTON, BUTTON_DANGER, BUTTON_SECONDARY, CARD, ERROR } from "../ui";
 
 function IngredientLine({ ingredient }: { ingredient: Ingredient }) {
   const { t, i18n } = useTranslation();
@@ -63,13 +65,27 @@ export default function RecipeView() {
   const [eatenOn, setEatenOn] = useState<string[]>([]);
   const [showOriginal, setShowOriginal] = useState(false);
   const [translating, setTranslating] = useState(false);
+  const [planning, setPlanning] = useState(false);
+  const [justPlanned, setJustPlanned] = useState<PlanEntry | null>(null);
+  // Where it's planned from today on, so nobody plans it twice by accident
+  const [planned, setPlanned] = useState<{ date: string; slot: Slot }[]>([]);
+
+  const loadPlanned = useCallback(
+    () =>
+      api
+        .get<{ date: string; slot: Slot }[]>(`/api/recipes/${id}/planned`)
+        .then((r) => setPlanned(r.data))
+        .catch(() => {}),
+    [id],
+  );
 
   useEffect(() => {
     api
       .get<string[]>(`/api/recipes/${id}/history`)
       .then((r) => setEatenOn(r.data))
       .catch(() => {});
-  }, [id]);
+    loadPlanned();
+  }, [id, loadPlanned]);
 
   // First load without people, to learn the recipe's own yield; then every change of people asks again
   useEffect(() => {
@@ -166,6 +182,12 @@ export default function RecipeView() {
     recipe.language !== "de" &&
     (recipe.language === "en" || recipe.source_kind !== "manual");
 
+  const place = (day: string, slot: Slot) =>
+    t("plan.place", {
+      day: `${t(`weekdays.${weekdayKey(day)}`)} ${format(parseISO(day), "d.M.")}`,
+      slot: t(`plan.slots.${slot}`),
+    });
+
   // Ingredients under their headings, in order
   const groups: { name: string | null; items: Ingredient[] }[] = [];
   for (const ingredient of shown.ingredients) {
@@ -245,6 +267,13 @@ export default function RecipeView() {
           ) : (
             <p className="text-sm text-slate-400">{t("recipes.neverEaten")}</p>
           )}
+          {planned.length > 0 && (
+            <p className="text-sm text-cyan-200" data-testid="planned-ahead">
+              {t("plan.plannedAhead", {
+                places: planned.map((p) => place(p.date, p.slot)).join(" · "),
+              })}
+            </p>
+          )}
           {recipe.tags.length > 0 && (
             <div className="flex flex-wrap gap-2">
               {recipe.tags.map((tag) => (
@@ -299,6 +328,13 @@ export default function RecipeView() {
           )}
           {!recipe.deleted && (
             <div className="flex flex-wrap gap-2 pt-2">
+              <button
+                type="button"
+                className={BUTTON}
+                onClick={() => setPlanning(true)}
+              >
+                {t("plan.planRecipe")}
+              </button>
               <Link
                 to={`/rezepte/${recipe.id}/bearbeiten`}
                 className={BUTTON_SECONDARY}
@@ -349,7 +385,33 @@ export default function RecipeView() {
           )}
         </div>
       </div>
+      {justPlanned?.recipe?.id === recipe.id && (
+        <p
+          role="status"
+          className="rounded-lg border border-emerald-400/30 bg-emerald-900/30 p-3 text-sm text-emerald-100"
+        >
+          {t("plan.plannedAt", {
+            place: place(justPlanned.date, justPlanned.slot),
+          })}{" "}
+          <Link to={`/?woche=${justPlanned.date}`} className="underline">
+            {t("plan.showWeek")}
+          </Link>
+        </p>
+      )}
       {error && <p className={ERROR}>{error}</p>}
+      {planning && people !== null && (
+        <PlanRecipeDialog
+          recipeId={recipe.id}
+          title={recipe.title}
+          people={people}
+          onClose={() => setPlanning(false)}
+          onPlanned={(entry) => {
+            setPlanning(false);
+            setJustPlanned(entry);
+            loadPlanned();
+          }}
+        />
+      )}
       <div className="grid gap-6 md:grid-cols-[minmax(16rem,1fr)_2fr]">
         <section className={`${CARD} space-y-3`}>
           <h2 className="text-lg">{t("recipes.ingredients")}</h2>

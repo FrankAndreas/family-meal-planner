@@ -234,6 +234,11 @@ class EntryOut(BaseModel):
     eaten: bool
 
 
+class PlannedOut(BaseModel):
+    date: dt.date
+    slot: Slot
+
+
 class WeekOut(BaseModel):
     start: dt.date
     end: dt.date

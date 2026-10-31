@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { createRecipe, login, newPerson, ownWeek } from './helpers';
+import { createRecipe, login, newPerson, nextWeek, ownWeek } from './helpers';
 
 test('plan a dinner on the phone, day by day', async ({ page, request }) => {
     const parent = await newPerson(request);
@@ -38,4 +38,31 @@ test('move a meal to another slot on the phone', async ({ page, request }) => {
     await expect(page.getByTestId('day-dinner')).toContainText('Leftovers');
     await page.getByRole('tab', { name: 'Saturday' }).click();
     await expect(page.getByTestId('day-lunch')).not.toContainText('Leftovers');
+});
+
+test('plan a recipe from its page on the phone, with day and meal buttons', async ({ page, request }) => {
+    const parent = await newPerson(request);
+    const recipe = await createRecipe(request, parent);
+    const errors = await login(page, parent.name);
+    await page.goto(`/rezepte/${recipe.id}`);
+    await page.getByRole('button', { name: '📅 Plan' }).click();
+    const dialog = page.getByRole('dialog', { name: `Plan “${recipe.title}”` });
+    await nextWeek(dialog);
+    await expect(dialog.getByRole('button', { name: 'Pick a day and a meal' })).toBeDisabled();
+    const day = dialog.getByRole('button', { name: /day \d+\.\d+\.$/ }).last();
+    const dayName = (await day.getAttribute('aria-label'))!;
+    await day.click();
+    await dialog.getByRole('button', { name: 'Lunch', exact: true }).click();
+    await expect(dialog.getByTestId('plan-dialog-taken')).toBeVisible();
+    await dialog.getByRole('button', { name: `Plan on ${dayName}, Lunch` }).click();
+    await expect(page.getByRole('status')).toContainText(`Planned: ${dayName}, Lunch`);
+
+    // The same place again: the dialog says what's there already
+    await page.getByRole('button', { name: '📅 Plan' }).click();
+    await nextWeek(dialog);
+    await dialog.getByRole('button', { name: dayName, exact: true }).click();
+    await dialog.getByRole('button', { name: 'Lunch', exact: true }).click();
+    await expect(dialog.getByTestId('plan-dialog-taken')).toContainText(`Already planned: `);
+    await expect(dialog.getByTestId('plan-dialog-taken')).toContainText(recipe.title);
+    expect(errors).toEqual([]);
 });

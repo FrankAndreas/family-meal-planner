@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { expect, request as playwrightRequest, type APIRequestContext, type Page } from '@playwright/test';
+import { expect, request as playwrightRequest, type APIRequestContext, type Locator, type Page } from '@playwright/test';
 
 // The Python with the backend's packages; a path is made absolute (Python warns about relative ones with "..")
 const configured = process.env.E2E_PYTHON ?? 'python3';
@@ -164,4 +164,12 @@ export async function sendMail(request: APIRequestContext, from: string, subject
     });
     expect(response.ok(), await response.text()).toBeTruthy();
     return response.json();
+}
+
+// In the dialog that plans a recipe from its page: on to the following week, once it's shown
+export async function nextWeek(dialog: Locator): Promise<void> {
+    const week = dialog.getByTestId('plan-dialog-week');
+    const before = await week.textContent();
+    await dialog.getByRole('button', { name: 'Next week' }).click();
+    await expect(week).not.toHaveText(before ?? '');
 }

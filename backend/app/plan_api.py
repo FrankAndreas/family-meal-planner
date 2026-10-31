@@ -211,3 +211,18 @@ def recipe_history(
         .order_by(models.PlanEntry.date.desc())
     )
     return [day for (day,) in rows]
+
+
+@router.get("/recipes/{recipe_id}/planned", response_model=list[schemas.PlannedOut])
+def recipe_planned(
+    recipe_id: int, _user: models.User = Depends(auth.get_current_user), db: Session = Depends(get_db)
+):
+    """Where the recipe is planned from today on, so the recipe view can warn before it's planned twice."""
+    get_recipe(db, recipe_id, allow_deleted=True)
+    rows = db.query(models.PlanEntry.date, models.PlanEntry.slot).filter(
+        models.PlanEntry.recipe_id == recipe_id, models.PlanEntry.date >= timeutil.today()
+    )
+    return [
+        schemas.PlannedOut(date=day, slot=slot)
+        for day, slot in sorted(rows, key=lambda row: (row[0], SLOTS.index(row[1])))
+    ]

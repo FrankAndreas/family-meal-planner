@@ -159,6 +159,18 @@ const de = {
         lastEatenOn_other: 'Zuletzt gegessen am {{date}} · {{count}}× gegessen',
         save: 'Rezept speichern',
     },
+    useUp: {
+        tabs: { search: 'Suchen', use_up: '🧺 Was habe ich?' },
+        modes: { use_up: 'Aufbrauchen', cook_now: 'Jetzt kochen' },
+        ingredient: 'Zutat',
+        placeholder: 'z. B. Kartoffeln',
+        hint: 'Gib ein, was du zu Hause hast, z. B. was bald weg muss.',
+        clear: 'Leeren',
+        used: '✓ {{names}}',
+        missing: 'fehlt: {{names}}',
+        none: 'Kein Rezept passt.',
+        remove: '{{name}} entfernen',
+    },
     units: {
         g: 'g',
         kg: 'kg',

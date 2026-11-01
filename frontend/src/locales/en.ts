@@ -160,6 +160,18 @@ const en: typeof de = {
         lastEatenOn_other: 'Last eaten on {{date}} · eaten {{count}} times',
         save: 'Save recipe',
     },
+    useUp: {
+        tabs: { search: 'Search', use_up: '🧺 What do I have?' },
+        modes: { use_up: 'Use up', cook_now: 'Cook now' },
+        ingredient: 'Ingredient',
+        placeholder: 'e.g. potatoes',
+        hint: 'Type what’s at home, e.g. what needs using soon.',
+        clear: 'Clear',
+        used: '✓ {{names}}',
+        missing: 'missing: {{names}}',
+        none: 'No recipe fits.',
+        remove: 'Remove {{name}}',
+    },
     units: {
         g: 'g',
         kg: 'kg',

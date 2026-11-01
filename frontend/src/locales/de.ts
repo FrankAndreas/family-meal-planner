@@ -174,6 +174,15 @@ const de = {
         full: 'Mehr geht nicht: {{max}} Zutaten.',
         remove: '{{name}} entfernen',
     },
+    swissmilk: {
+        search: 'Auch bei Swissmilk suchen',
+        searching: 'Suche bei Swissmilk…',
+        view: 'Ansehen ↗',
+        takeOver: 'Übernehmen',
+        already: 'schon in deinen Rezepten',
+        waiting: 'wartet im Posteingang',
+        none: 'Keine passenden Rezepte bei Swissmilk.',
+    },
     units: {
         g: 'g',
         kg: 'kg',

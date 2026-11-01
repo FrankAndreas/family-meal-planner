@@ -48,3 +48,21 @@ export function saveUseUp(state: UseUpState): void {
         // Private mode or blocked storage: it just forgets
     }
 }
+
+// Mirrors backend/app/schemas.py SwissmilkResult; `photo` is an address on this app's own backend
+export interface SwissmilkResult {
+    title: string;
+    url: string;
+    photo: string | null;
+    used: string[];
+    missing: string[];
+    recipe_id: number | null;
+    waiting: boolean;
+}
+
+export const fetchSwissmilk = async (have: string[], mode: UseUpMode) =>
+    (await api.get<SwissmilkResult[]>('/api/use-up/swissmilk', { params: { have, mode }, paramsSerializer: { indexes: null } }))
+        .data;
+
+// The backend takes one Swissmilk search per person in this time (backend/app/swissmilk_api.py)
+export const SWISSMILK_GAP_MS = 5000;

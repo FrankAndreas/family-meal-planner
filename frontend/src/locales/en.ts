@@ -175,6 +175,15 @@ const en: typeof de = {
         full: 'That’s the most: {{max}} ingredients.',
         remove: 'Remove {{name}}',
     },
+    swissmilk: {
+        search: 'Also search Swissmilk',
+        searching: 'Searching Swissmilk…',
+        view: 'View ↗',
+        takeOver: 'Take over',
+        already: 'already in your recipes',
+        waiting: 'waiting in the inbox',
+        none: 'No fitting recipes on Swissmilk.',
+    },
     units: {
         g: 'g',
         kg: 'kg',

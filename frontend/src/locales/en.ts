@@ -282,6 +282,7 @@ const en: typeof de = {
         recipe_not_found: 'This recipe doesn’t exist.',
         too_many_searches: 'Please wait a moment before searching Swissmilk again.',
         swissmilk_unreachable: 'Swissmilk can’t be reached right now.',
+        swissmilk_unreadable: 'This Swissmilk page has no recipe that can be read.',
         not_found: 'Not found.',
         unknown_unit: 'The app doesn’t know this unit.',
         scan_not_image: 'Only photos work (JPEG, PNG, HEIC …).',

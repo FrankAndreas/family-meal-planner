@@ -281,6 +281,7 @@ const de = {
         recipe_not_found: 'Dieses Rezept gibt es nicht.',
         too_many_searches: 'Bitte warte einen Moment, bevor du wieder bei Swissmilk suchst.',
         swissmilk_unreachable: 'Swissmilk ist gerade nicht erreichbar.',
+        swissmilk_unreadable: 'Auf dieser Swissmilk-Seite ist kein lesbares Rezept.',
         not_found: 'Nicht gefunden.',
         unknown_unit: 'Diese Einheit kennt die App nicht.',
         scan_not_image: 'Es gehen nur Fotos (JPEG, PNG, HEIC …).',

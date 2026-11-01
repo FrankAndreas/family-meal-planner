@@ -58,3 +58,19 @@ test('days already gone cannot be picked', async ({ page, request }) => {
     await expect(cells).toHaveCount(7);
     for (const cell of await cells.all()) await expect(cell).toBeDisabled();
 });
+
+// The page behind an open dialog must not shine through its text
+test('the planning dialog has a solid background', async ({ page, request }) => {
+    const parent = await newPerson(request);
+    const recipe = await createRecipe(request, parent);
+    await login(page, parent.name);
+    await page.goto(`/rezepte/${recipe.id}`);
+    await page.getByRole('button', { name: '📅 Plan' }).click();
+    const dialog = page.getByRole('dialog', { name: `Plan “${recipe.title}”` });
+    const alpha = await dialog.evaluate((el) => {
+        const match = getComputedStyle(el).backgroundColor.match(/rgba?\(([^)]+)\)/);
+        const parts = match ? match[1].split(/[ ,/]+/).filter(Boolean) : [];
+        return parts.length === 4 ? Number(parts[3]) : 1;
+    });
+    expect(alpha).toBeGreaterThanOrEqual(0.9);
+});

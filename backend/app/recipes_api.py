@@ -1,5 +1,3 @@
-import unicodedata
-
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session, selectinload
@@ -8,17 +6,11 @@ from . import ai, auth, fetch, jsonld, models, photos, scaling, schemas, stats
 from .database import get_db
 from .errors import api_error
 from .settings_store import get_settings
+from .text import sort_key
 from .timeutil import utcnow
 from .units import UNITS
 
 router = APIRouter(tags=["recipes"])
-
-
-def sort_key(text: str) -> str:
-    """Text without case and accents: sorts "Älplermagronen" next to "Apfelwähe" (not after "Zopf"), and lets a
-    search for "alpler" find it."""
-    decomposed = unicodedata.normalize("NFKD", text.casefold())
-    return "".join(c for c in decomposed if not unicodedata.combining(c))
 
 
 def _photo_url(recipe: models.Recipe) -> str | None:

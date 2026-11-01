@@ -5,8 +5,10 @@ import api, { errorMessage } from '../api';
 import ScanRecipe from '../components/inbox/ScanRecipe';
 import UrlPaste from '../components/inbox/UrlPaste';
 import RecipeCard from '../components/recipes/RecipeCard';
+import UseUp from '../components/recipes/UseUp';
 import { fetchRecipes, type RecipeSummary } from '../recipes';
 import { BUTTON, BUTTON_SECONDARY, ERROR, INPUT } from '../ui';
+import { loadUseUp, saveUseUp, type UseUpState } from '../useUp';
 
 export default function Recipes() {
     const { t } = useTranslation();
@@ -20,6 +22,12 @@ export default function Recipes() {
     const [tag, setTag] = useState('');
     const [onlyMine, setOnlyMine] = useState(false);
     const [error, setError] = useState('');
+    // Search, or "Was habe ich?"; kept on this device with what was typed there
+    const [useUp, setUseUp] = useState<UseUpState>(loadUseUp);
+    const changeUseUp = (next: UseUpState) => {
+        setUseUp(next);
+        saveUseUp(next);
+    };
 
     useEffect(() => {
         api.get<{ name: string; count: number }[]>('/api/tags')
@@ -63,42 +71,64 @@ export default function Recipes() {
             {/* Same as in the inbox: the draft shows up there (a parent's link is read at once) */}
             {panel === 'link' && <UrlPaste onAdded={() => navigate('/posteingang')} />}
             {panel === 'scan' && <ScanRecipe onDone={() => navigate('/posteingang')} />}
-            <div className="flex flex-wrap items-center gap-3">
-                <input
-                    className={`${INPUT} max-w-sm`}
-                    type="search"
-                    aria-label={t('recipes.search')}
-                    placeholder={t('recipes.searchPlaceholder')}
-                    value={q}
-                    onChange={(e) => setQ(e.target.value)}
-                />
-                <label className="flex items-center gap-2 text-sm text-slate-300">
-                    <input type="checkbox" checked={onlyMine} onChange={(e) => setOnlyMine(e.target.checked)} />
-                    {t('recipes.onlyMyFavorites')}
-                </label>
-            </div>
-            {tags.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                    <button type="button" className={chip(tag === '')} onClick={() => setTag('')}>
-                        {t('recipes.allTags')}
+            <div role="tablist" className="flex gap-2">
+                {(['search', 'use_up'] as const).map((key) => (
+                    <button
+                        key={key}
+                        type="button"
+                        role="tab"
+                        aria-selected={useUp.tab === key}
+                        onClick={() => changeUseUp({ ...useUp, tab: key })}
+                        className={`rounded-lg px-3 py-1.5 text-sm ${
+                            useUp.tab === key ? 'bg-fuchsia-400/20 text-fuchsia-100' : 'text-slate-400 hover:bg-white/5'
+                        }`}
+                    >
+                        {t(`useUp.tabs.${key}`)}
                     </button>
-                    {tags.map((item) => (
-                        <button
-                            key={item.name}
-                            type="button"
-                            className={chip(tag === item.name)}
-                            onClick={() => setTag(tag === item.name ? '' : item.name)}
-                        >
-                            {item.name} <span className="text-slate-500">{item.count}</span>
-                        </button>
-                    ))}
-                </div>
-            )}
-            {error && <p className={ERROR}>{error}</p>}
-            {recipes && recipes.length === 0 && <p className="text-slate-400">{t('recipes.none')}</p>}
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-                {recipes?.map((recipe) => <RecipeCard key={recipe.id} recipe={recipe} />)}
+                ))}
             </div>
+            {useUp.tab === 'use_up' ? (
+                <UseUp have={useUp.have} mode={useUp.mode} onChange={(have, mode) => changeUseUp({ ...useUp, have, mode })} />
+            ) : (
+                <>
+                    <div className="flex flex-wrap items-center gap-3">
+                        <input
+                            className={`${INPUT} max-w-sm`}
+                            type="search"
+                            aria-label={t('recipes.search')}
+                            placeholder={t('recipes.searchPlaceholder')}
+                            value={q}
+                            onChange={(e) => setQ(e.target.value)}
+                        />
+                        <label className="flex items-center gap-2 text-sm text-slate-300">
+                            <input type="checkbox" checked={onlyMine} onChange={(e) => setOnlyMine(e.target.checked)} />
+                            {t('recipes.onlyMyFavorites')}
+                        </label>
+                    </div>
+                    {tags.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                            <button type="button" className={chip(tag === '')} onClick={() => setTag('')}>
+                                {t('recipes.allTags')}
+                            </button>
+                            {tags.map((item) => (
+                                <button
+                                    key={item.name}
+                                    type="button"
+                                    className={chip(tag === item.name)}
+                                    onClick={() => setTag(tag === item.name ? '' : item.name)}
+                                >
+                                    {item.name} <span className="text-slate-500">{item.count}</span>
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                    {error && <p className={ERROR}>{error}</p>}
+                    {recipes && recipes.length === 0 && <p className="text-slate-400">{t('recipes.none')}</p>}
+                    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+                        {recipes?.map((recipe) => <RecipeCard key={recipe.id} recipe={recipe} />)}
+                    </div>
+                </>
+            )}
         </div>
     );
 }

@@ -20,6 +20,8 @@ export interface FamilySettings {
     family_size: number;
     // Python weekday: 0 = Monday ... 6 = Sunday
     week_start: number;
+    // Always at home: never shown as missing in "Was habe ich?"
+    staples: string[];
 }
 
 // Python weekday number (0 = Monday) → locale key under weekdays.*

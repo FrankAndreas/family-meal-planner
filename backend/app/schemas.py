@@ -42,12 +42,28 @@ class SettingsOut(BaseModel):
 
     family_size: int
     week_start: int
+    staples: list[str]
 
 
 class SettingsPatch(BaseModel):
     family_size: Annotated[int, Field(ge=1, le=20)] | None = None
     # Python weekday: 0 = Monday ... 6 = Sunday
     week_start: Annotated[int, Field(ge=0, le=6)] | None = None
+    # What's always at home; blanks trimmed, the same word twice (any case) kept once
+    staples: Annotated[list[Annotated[str, Field(max_length=40)]], Field(max_length=50)] | None = None
+
+    @field_validator("staples")
+    @classmethod
+    def clean_staples(cls, staples: list[str] | None) -> list[str] | None:
+        if staples is None:
+            return None
+        result: list[str] = []
+        for word in (s.strip() for s in staples):
+            if not word:
+                raise ValueError("staple_empty")
+            if word.casefold() not in {r.casefold() for r in result}:
+                result.append(word)
+        return result
 
 
 Title = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
@@ -149,6 +165,13 @@ class RecipeSummary(BaseModel):
     favorite_count: int
     last_eaten: dt.date | None
     times_eaten: int
+
+
+class UseUpOut(RecipeSummary):
+    """A recipe for what's at home: which typed ingredients it uses, and what's missing (neither typed nor a basic)."""
+
+    used: list[str]
+    missing: list[str]
 
 
 class SourceMail(BaseModel):

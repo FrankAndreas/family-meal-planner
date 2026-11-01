@@ -82,33 +82,37 @@ def _fresh(key: str):
     return hit if hit and time.monotonic() - hit[0] < CACHE_SECONDS else None
 
 
-def _cached(key: str, make):
-    with _lock:
-        hit = _fresh(key)
-        if hit:
-            return hit[1]
-        waiting = _inflight.get(key)
-        if waiting is None:
-            _inflight[key] = done = threading.Event()
-    if waiting is not None:
-        waiting.wait()
+def _cached(key: str, make, deadline: float | None = None, keep=lambda value: True):
+    """The cached value, else `make()`. Only one fetch per key at a time: others wait for it (until their deadline),
+    and if it fails, one of them tries again. `keep` decides whether a value is worth keeping."""
+    while True:
         with _lock:
             hit = _fresh(key)
-        if hit:
-            return hit[1]
-        # The other fetch failed: try once more ourselves
-        return make()
+            if hit:
+                return hit[1]
+            waiting = _inflight.get(key)
+            if waiting is None:
+                _inflight[key] = done = threading.Event()
+        if waiting is None:
+            break
+        left = None if deadline is None else deadline - time.monotonic()
+        if (left is not None and left <= 0) or not waiting.wait(timeout=left):
+            raise fetch.FetchFailed("deadline")
+        # Done: its value is in the cache now, or it failed and the loop makes one of us the next to try
     try:
         value = make()
-        with _lock:
-            _cache[key] = (time.monotonic(), value)
-            _cache.move_to_end(key)
-            while len(_cache) > CACHE_ENTRIES:
-                _cache.popitem(last=False)
+        if keep(value):
+            with _lock:
+                _cache[key] = (time.monotonic(), value)
+                _cache.move_to_end(key)
+                while len(_cache) > CACHE_ENTRIES:
+                    _cache.popitem(last=False)
         return value
     finally:
         with _lock:
-            _inflight.pop(key, None)
+            # Only our own: after clear_cache() a newer fetch of this key may be under way
+            if _inflight.get(key) is done:
+                del _inflight[key]
         done.set()
 
 
@@ -178,13 +182,14 @@ def candidates(page: str) -> list[str]:
 def search(words: list[str], deadline: float | None = None) -> list[str]:
     """Swissmilk's recipe links for these words; the same search within a day asks Swissmilk once."""
     url = search_url(words)
-    return _cached(f"search:{url}", lambda: candidates(_get(url, deadline=deadline).text))
+    # Nothing found is not kept: it may be a maintenance page rather than an answer
+    return _cached(f"search:{url}", lambda: candidates(_get(url, deadline=deadline).text), deadline, keep=bool)
 
 
 def recipe(url: str, deadline: float | None = None) -> dict | None:
     if not is_recipe_url(url):
         raise fetch.FetchRefused(url)
-    return _cached(f"recipe:{url}", lambda: read_recipe(_get(url, deadline=deadline).text, url))
+    return _cached(f"recipe:{url}", lambda: read_recipe(_get(url, deadline=deadline).text, url), deadline)
 
 
 def _check_photo(url: str) -> None:
@@ -192,10 +197,14 @@ def _check_photo(url: str) -> None:
         raise fetch.FetchRefused(url)
 
 
-def photo(url: str) -> bytes:
+def photo(url: str, deadline: float | None = None) -> bytes:
     """A search result's photo, small."""
     _check_photo(url)
-    return _cached(f"photo:{url}", lambda: photos.downscale(_get(url, accept=IMAGE_TYPES).body, THUMB_SIDE))
+    return _cached(
+        f"photo:{url}",
+        lambda: photos.downscale(_get(url, accept=IMAGE_TYPES, deadline=deadline).body, THUMB_SIDE),
+        deadline,
+    )
 
 
 def original_photo(url: str) -> bytes:

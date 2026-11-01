@@ -182,6 +182,8 @@ def test_photo_link_must_be_a_web_link(client, admin_headers):
     assert _from_link(client, admin_headers, r["id"], "file:///etc/passwd").status_code == 422
 
 
+# Pillow warns when it reads the header; the picture is refused before it's decoded
+@pytest.mark.filterwarnings("ignore::PIL.Image.DecompressionBombWarning")
 def test_huge_picture_refused():
     """A small file that decodes into a giant picture (a decompression bomb) is refused, not decoded."""
     import io

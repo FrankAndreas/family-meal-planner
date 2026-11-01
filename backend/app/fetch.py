@@ -7,6 +7,7 @@ import http.client
 import ipaddress
 import socket
 import ssl
+import threading
 import time
 from dataclasses import dataclass
 from urllib.parse import urljoin, urlsplit
@@ -60,6 +61,8 @@ class _PinnedHTTPS(http.client.HTTPSConnection):
 
     def connect(self):
         sock = socket.create_connection((self._ip, self.port), self.timeout)
+        # Kept, so a deadline can cut the connection in any phase (handshake, headers, body)
+        self.raw_sock = sock
         self.sock = ssl.create_default_context().wrap_socket(sock, server_hostname=self.host)
 
 
@@ -69,7 +72,7 @@ class _PinnedHTTP(http.client.HTTPConnection):
         self._ip = ip
 
     def connect(self):
-        self.sock = socket.create_connection((self._ip, self.port), self.timeout)
+        self.sock = self.raw_sock = socket.create_connection((self._ip, self.port), self.timeout)
 
 
 def _open(
@@ -77,29 +80,41 @@ def _open(
 ) -> tuple[int, dict, bytes]:
     kind = _PinnedHTTPS if scheme == "https" else _PinnedHTTP
     connection = kind(host, ip, port=port, timeout=timeout)
+    watchdog = None
+    if deadline is not None:
+        # At the deadline the connection is cut, whatever it's waiting for: a server trickling its handshake,
+        # headers or body can't hold the fetch
+        watchdog = threading.Timer(max(0.0, deadline - time.monotonic()), _cut, (connection,))
+        watchdog.daemon = True
+        watchdog.start()
     try:
         connection.request("GET", target, headers={"User-Agent": USER_AGENT, "Accept": "text/html,*/*;q=0.5"})
         response = connection.getresponse()
         headers = {k.lower(): v for k, v in response.getheaders()}
-        if deadline is None:
-            return response.status, headers, response.read(MAX_BYTES + 1)
-        # Read in pieces, each waiting no longer than what's left: a trickling server can't hold the fetch
-        body = b""
+        body = bytearray()
         while len(body) <= MAX_BYTES:
-            left = deadline - time.monotonic()
-            if left <= 0:
-                raise FetchFailed("deadline")
-            if connection.sock is not None:
-                connection.sock.settimeout(min(timeout, left))
             piece = response.read1(CHUNK)
             if not piece:
                 break
             body += piece
-        return response.status, headers, body
+        if deadline is not None and time.monotonic() >= deadline:
+            raise FetchFailed("deadline")
+        return response.status, headers, bytes(body)
     except (OSError, http.client.HTTPException) as error:
-        raise FetchFailed("connection") from error
+        raise FetchFailed("deadline" if deadline is not None and time.monotonic() >= deadline else "connection") from error
     finally:
+        if watchdog is not None:
+            watchdog.cancel()
         connection.close()
+
+
+def _cut(connection) -> None:
+    sock = getattr(connection, "raw_sock", None)
+    if sock is not None:
+        try:
+            sock.shutdown(socket.SHUT_RDWR)
+        except OSError:
+            pass
 
 
 def _checked(url: str) -> tuple[str, str, int, str, str]:

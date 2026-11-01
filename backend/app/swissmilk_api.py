@@ -20,6 +20,8 @@ router = APIRouter(tags=["swissmilk"])
 
 # The whole search, all recipe pages included; what isn't there by then is left out
 BUDGET_SECONDS = 15
+# A photo through the backend, at most
+PHOTO_SECONDS = 10
 # Recipe pages fetched at once
 PARALLEL = 4
 # One Swissmilk search per person in this time
@@ -136,7 +138,7 @@ def photo(key: str, _user: models.User = Depends(auth.get_current_user)):
     if url is None:
         raise api_error(404, "not_found")
     try:
-        data = swissmilk.photo(url)
+        data = swissmilk.photo(url, time.monotonic() + PHOTO_SECONDS)
     except Exception:
         raise api_error(404, "not_found")
     return Response(data, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=86400"})

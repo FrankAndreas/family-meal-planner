@@ -177,3 +177,88 @@ def test_search_page_is_cached(monkeypatch):
     monkeypatch.setattr(swissmilk, "_get", get)
     assert swissmilk.search(["Kartoffeln"]) == swissmilk.search(["Kartoffeln"])
     assert calls == [swissmilk.search_url(["Kartoffeln"])]
+
+
+def test_waiting_for_another_fetch_ends_by_the_deadline(monkeypatch):
+    import threading
+    import time
+
+    def stuck(url, accept=None, deadline=None):
+        time.sleep(3)
+        return fetch.Page(url, "text/html", PAGE.encode())
+
+    monkeypatch.setattr(swissmilk, "_get", stuck)
+    threading.Thread(target=swissmilk.recipe, args=(FIRST,), daemon=True).start()
+    time.sleep(0.1)
+    started = time.monotonic()
+    with pytest.raises(fetch.FetchFailed):
+        swissmilk.recipe(FIRST, time.monotonic() + 0.5)
+    assert time.monotonic() - started < 1.5
+
+
+def test_after_a_failed_fetch_one_new_try(monkeypatch):
+    import threading
+    import time
+
+    calls = []
+
+    def flaky(url, accept=None, deadline=None):
+        calls.append(url)
+        time.sleep(0.3)
+        if len(calls) == 1:
+            raise fetch.FetchFailed("http 503")
+        return fetch.Page(url, "text/html", PAGE.encode())
+
+    monkeypatch.setattr(swissmilk, "_get", flaky)
+    results = []
+
+    def ask():
+        try:
+            results.append(swissmilk.recipe(FIRST)["title"])
+        except fetch.FetchFailed:
+            results.append("failed")
+
+    threads = [threading.Thread(target=ask) for _ in range(5)]
+    for t in threads:
+        t.start()
+        time.sleep(0.02)
+    for t in threads:
+        t.join()
+    assert len(calls) == 2 and results.count("Kartoffelgratin") == 4
+
+
+def test_empty_search_not_kept(monkeypatch):
+    calls = []
+
+    def get(url, accept=None, deadline=None):
+        calls.append(url)
+        return fetch.Page(url, "text/html", b"<html>Wartungsarbeiten</html>")
+
+    monkeypatch.setattr(swissmilk, "_get", get)
+    assert swissmilk.search(["Kartoffeln"]) == [] and swissmilk.search(["Kartoffeln"]) == []
+    assert len(calls) == 2
+
+
+def test_clear_during_a_fetch_keeps_the_newer_one(monkeypatch):
+    import threading
+    import time
+
+    calls = []
+
+    def slow(url, accept=None, deadline=None):
+        calls.append(url)
+        time.sleep(0.4 if len(calls) == 1 else 0.8)
+        return fetch.Page(url, "text/html", PAGE.encode())
+
+    monkeypatch.setattr(swissmilk, "_get", slow)
+    first = threading.Thread(target=swissmilk.recipe, args=(FIRST,))
+    first.start()
+    time.sleep(0.1)
+    swissmilk.clear_cache()
+    second = threading.Thread(target=swissmilk.recipe, args=(FIRST,))
+    second.start()
+    first.join()
+    # The first fetch is over; the second is still on its way and a third asker waits for it
+    swissmilk.recipe(FIRST)
+    second.join()
+    assert len(calls) == 2

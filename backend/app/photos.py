@@ -3,7 +3,6 @@
 import io
 import re
 import uuid
-import warnings
 from pathlib import Path
 
 import pillow_heif
@@ -36,13 +35,12 @@ def photo_path(name: str) -> Path | None:
 def downscale(data: bytes, side: int = MAX_SIDE) -> bytes:
     """Any picture as a JPEG of at most `side` pixels, without the original's metadata."""
     try:
-        with warnings.catch_warnings():
-            warnings.simplefilter("error", Image.DecompressionBombWarning)
-            with Image.open(io.BytesIO(data)) as source:
-                if source.width * source.height > MAX_PIXELS:
-                    raise ValueError("too many pixels")
-                image = ImageOps.exif_transpose(source).convert("RGB")
-    except (UnidentifiedImageError, OSError, ValueError, Image.DecompressionBombError, Image.DecompressionBombWarning):
+        with Image.open(io.BytesIO(data)) as source:
+            # Checked before decoding: the header tells the size
+            if source.width * source.height > MAX_PIXELS:
+                raise ValueError("too many pixels")
+            image = ImageOps.exif_transpose(source).convert("RGB")
+    except (UnidentifiedImageError, OSError, ValueError, Image.DecompressionBombError):
         raise api_error(400, "photo_unreadable")
     image.thumbnail((side, side))
     out = io.BytesIO()

@@ -176,6 +176,7 @@ const en: typeof de = {
         remove: 'Remove {{name}}',
     },
     swissmilk: {
+        title: 'Swissmilk',
         search: 'Also search Swissmilk',
         searching: 'Searching Swissmilk…',
         view: 'View ↗',

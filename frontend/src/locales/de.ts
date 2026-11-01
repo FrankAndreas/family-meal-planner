@@ -175,6 +175,7 @@ const de = {
         remove: '{{name}} entfernen',
     },
     swissmilk: {
+        title: 'Swissmilk',
         search: 'Auch bei Swissmilk suchen',
         searching: 'Suche bei Swissmilk…',
         view: 'Ansehen ↗',

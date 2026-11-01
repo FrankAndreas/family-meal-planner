@@ -74,8 +74,8 @@ export default function SwissmilkResults({ have, mode }: SwissmilkResultsProps) 
 
     const results = answer?.key === key ? answer.results : null;
     return (
-        <section aria-label="Swissmilk" className="space-y-3">
-            <h2 className="text-lg">Swissmilk</h2>
+        <section aria-label={t('swissmilk.title')} className="space-y-3">
+            <h2 className="text-lg">{t('swissmilk.title')}</h2>
             {error && <p className={ERROR}>{error}</p>}
             {!results && !error && <p className="text-slate-400">{t('swissmilk.searching')}</p>}
             {results && results.length === 0 && <p className="text-slate-400">{t('swissmilk.none')}</p>}

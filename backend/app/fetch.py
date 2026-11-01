@@ -7,11 +7,14 @@ import http.client
 import ipaddress
 import socket
 import ssl
+import threading
+import time
 from dataclasses import dataclass
 from urllib.parse import urljoin, urlsplit
 
 MAX_BYTES = 3 * 1024 * 1024
 MAX_REDIRECTS = 5
+CHUNK = 64 * 1024
 TIMEOUT = 10
 USER_AGENT = "Mozilla/5.0 (Menüplaner; family use)"
 PAGE_TYPES = ("text/html", "application/ld+json", "application/xhtml+xml")
@@ -58,6 +61,8 @@ class _PinnedHTTPS(http.client.HTTPSConnection):
 
     def connect(self):
         sock = socket.create_connection((self._ip, self.port), self.timeout)
+        # Kept, so a deadline can cut the connection in any phase (handshake, headers, body)
+        self.raw_sock = sock
         self.sock = ssl.create_default_context().wrap_socket(sock, server_hostname=self.host)
 
 
@@ -67,21 +72,49 @@ class _PinnedHTTP(http.client.HTTPConnection):
         self._ip = ip
 
     def connect(self):
-        self.sock = socket.create_connection((self._ip, self.port), self.timeout)
+        self.sock = self.raw_sock = socket.create_connection((self._ip, self.port), self.timeout)
 
 
-def _open(scheme: str, host: str, port: int, target: str, ip: str, timeout: float) -> tuple[int, dict, bytes]:
+def _open(
+    scheme: str, host: str, port: int, target: str, ip: str, timeout: float, deadline: float | None = None
+) -> tuple[int, dict, bytes]:
     kind = _PinnedHTTPS if scheme == "https" else _PinnedHTTP
     connection = kind(host, ip, port=port, timeout=timeout)
+    watchdog = None
+    if deadline is not None:
+        # At the deadline the connection is cut, whatever it's waiting for: a server trickling its handshake,
+        # headers or body can't hold the fetch
+        watchdog = threading.Timer(max(0.0, deadline - time.monotonic()), _cut, (connection,))
+        watchdog.daemon = True
+        watchdog.start()
     try:
         connection.request("GET", target, headers={"User-Agent": USER_AGENT, "Accept": "text/html,*/*;q=0.5"})
         response = connection.getresponse()
         headers = {k.lower(): v for k, v in response.getheaders()}
-        return response.status, headers, response.read(MAX_BYTES + 1)
+        body = bytearray()
+        while len(body) <= MAX_BYTES:
+            piece = response.read1(CHUNK)
+            if not piece:
+                break
+            body += piece
+        if deadline is not None and time.monotonic() >= deadline:
+            raise FetchFailed("deadline")
+        return response.status, headers, bytes(body)
     except (OSError, http.client.HTTPException) as error:
-        raise FetchFailed("connection") from error
+        raise FetchFailed("deadline" if deadline is not None and time.monotonic() >= deadline else "connection") from error
     finally:
+        if watchdog is not None:
+            watchdog.cancel()
         connection.close()
+
+
+def _cut(connection) -> None:
+    sock = getattr(connection, "raw_sock", None)
+    if sock is not None:
+        try:
+            sock.shutdown(socket.SHUT_RDWR)
+        except OSError:
+            pass
 
 
 def _checked(url: str) -> tuple[str, str, int, str, str]:
@@ -120,12 +153,25 @@ def _allowed(url: str, allowed_hosts: frozenset[str]) -> None:
         raise FetchRefused(url)
 
 
-def fetch(url: str, accept: tuple[str, ...] = PAGE_TYPES, *, allowed_hosts: frozenset[str] | None = None) -> Page:
+def fetch(
+    url: str,
+    accept: tuple[str, ...] = PAGE_TYPES,
+    *,
+    allowed_hosts: frozenset[str] | None = None,
+    deadline: float | None = None,
+) -> Page:
+    """`deadline` (time.monotonic()): the whole fetch, redirects and reading included, ends by then."""
     for _ in range(MAX_REDIRECTS + 1):
         if allowed_hosts is not None:
             _allowed(url, allowed_hosts)
+        if deadline is not None and deadline <= time.monotonic():
+            raise FetchFailed("deadline")
         scheme, host, port, target, ip = _checked(url)
-        status, headers, body = _open(scheme, host, port, target, ip, TIMEOUT)
+        if deadline is None:
+            status, headers, body = _open(scheme, host, port, target, ip, TIMEOUT)
+        else:
+            timeout = max(0.1, min(TIMEOUT, deadline - time.monotonic()))
+            status, headers, body = _open(scheme, host, port, target, ip, timeout, deadline=deadline)
         if status in (301, 302, 303, 307, 308) and headers.get("location"):
             url = urljoin(url, headers["location"])
             continue

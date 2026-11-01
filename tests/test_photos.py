@@ -180,3 +180,29 @@ def test_photo_link_without_a_picture(client, admin_headers, web):
 def test_photo_link_must_be_a_web_link(client, admin_headers):
     r = create_recipe(client, admin_headers)
     assert _from_link(client, admin_headers, r["id"], "file:///etc/passwd").status_code == 422
+
+
+# Pillow warns when it reads the header; the picture is refused before it's decoded
+@pytest.mark.filterwarnings("ignore::PIL.Image.DecompressionBombWarning")
+def test_huge_picture_refused():
+    """A small file that decodes into a giant picture (a decompression bomb) is refused, not decoded."""
+    import io
+
+    import pytest
+    from fastapi import HTTPException
+    from PIL import Image
+
+    from app import photos
+
+    out = io.BytesIO()
+    Image.new("1", (12000, 12000)).save(out, "PNG")
+    assert len(out.getvalue()) < 1_000_000
+    with pytest.raises(HTTPException):
+        photos.downscale(out.getvalue())
+
+
+def test_big_phone_photos_still_fit():
+    """A 48 MP iPhone photo (8064 x 6048) is a normal upload, not a bomb."""
+    from app import photos
+
+    assert photos.MAX_PIXELS >= 8064 * 6048

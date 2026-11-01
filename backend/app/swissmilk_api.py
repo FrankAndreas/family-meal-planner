@@ -20,6 +20,8 @@ router = APIRouter(tags=["swissmilk"])
 
 # The whole search, all recipe pages included; what isn't there by then is left out
 BUDGET_SECONDS = 15
+# A photo through the backend, at most
+PHOTO_SECONDS = 10
 # Recipe pages fetched at once
 PARALLEL = 4
 # One Swissmilk search per person in this time
@@ -44,9 +46,9 @@ def _take_turn(user_id: int) -> None:
         _last_search[user_id] = now
 
 
-def _read(url: str) -> dict | None:
+def _read(url: str, deadline: float) -> dict | None:
     try:
-        return swissmilk.recipe(url)
+        return swissmilk.recipe(url, deadline)
     except Exception:
         # A page that can't be loaded or read is left out, never an error for the whole search
         return None
@@ -84,17 +86,19 @@ def search(
     if not typed:
         return []
     _take_turn(me.id)
-    started = time.monotonic()
-    try:
-        page = swissmilk._get(swissmilk.search_url(typed))
-    except (fetch.FetchFailed, fetch.FetchRefused):
-        raise api_error(502, "swissmilk_unreachable")
-    urls = swissmilk.candidates(page.text)
-
+    # One budget for everything: the search page, then the recipe pages; fetches end by it too
+    deadline = time.monotonic() + BUDGET_SECONDS
     executor = ThreadPoolExecutor(max_workers=PARALLEL)
-    futures = {executor.submit(_read, url): url for url in urls}
-    done, _ = wait(futures, timeout=max(0.0, BUDGET_SECONDS - (time.monotonic() - started)))
-    executor.shutdown(wait=False, cancel_futures=True)
+    try:
+        listing = executor.submit(swissmilk.search, typed, deadline)
+        try:
+            urls = listing.result(timeout=max(0.0, deadline - time.monotonic()))
+        except Exception:
+            raise api_error(502, "swissmilk_unreachable")
+        futures = {executor.submit(_read, url, deadline): url for url in urls}
+        done, _ = wait(futures, timeout=max(0.0, deadline - time.monotonic()))
+    finally:
+        executor.shutdown(wait=False, cancel_futures=True)
 
     staples = get_settings(db).staples
     recipes, waiting = _already(db)
@@ -134,7 +138,7 @@ def photo(key: str, _user: models.User = Depends(auth.get_current_user)):
     if url is None:
         raise api_error(404, "not_found")
     try:
-        data = swissmilk.photo(url)
+        data = swissmilk.photo(url, time.monotonic() + PHOTO_SECONDS)
     except Exception:
         raise api_error(404, "not_found")
     return Response(data, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=86400"})

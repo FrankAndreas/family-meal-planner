@@ -122,3 +122,89 @@ def test_allowlist_refuses_other_hosts_and_redirects(net):
     # Without an allowlist the redirect is followed as before
     pages[("evil.example", "/x")] = (200, HTML, b"<html></html>")
     assert fetch.fetch("https://www.swissmilk.ch/a/").url == "https://evil.example/x"
+
+
+def test_deadline_ends_a_slow_trickle():
+    """A server that sends one byte at a time can't hold a fetch past its deadline."""
+    import socket
+    import threading
+    import time
+
+    server = socket.socket()
+    server.bind(("127.0.0.1", 0))
+    server.listen(1)
+
+    def drip():
+        conn, _ = server.accept()
+        conn.recv(1024)
+        conn.sendall(b"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: 100000\r\n\r\n")
+        try:
+            for _ in range(50):
+                conn.sendall(b"x")
+                time.sleep(0.2)
+        except OSError:
+            pass
+        conn.close()
+
+    threading.Thread(target=drip, daemon=True).start()
+    started = time.monotonic()
+    with pytest.raises(fetch.FetchFailed):
+        fetch._open("http", "127.0.0.1", server.getsockname()[1], "/", "127.0.0.1", 10, deadline=started + 0.6)
+    assert time.monotonic() - started < 1.5
+    server.close()
+
+
+def test_deadline_passed_opens_nothing(net):
+    import time
+
+    _, pages, opened = net
+    pages[("public.example", "/")] = (200, HTML, b"<html></html>")
+    with pytest.raises(fetch.FetchFailed):
+        fetch.fetch("https://public.example/", deadline=time.monotonic() - 1)
+    assert opened == []
+
+
+def _trickle_server(prefix: bytes, slow: bytes):
+    """A local server that sends `prefix` at once, then `slow` one byte every 0.3 s."""
+    import socket
+    import threading
+    import time
+
+    server = socket.socket()
+    server.bind(("127.0.0.1", 0))
+    server.listen(1)
+
+    def serve():
+        conn, _ = server.accept()
+        conn.recv(1024)
+        try:
+            conn.sendall(prefix)
+            for byte in slow:
+                conn.sendall(bytes([byte]))
+                time.sleep(0.3)
+        except OSError:
+            pass
+        conn.close()
+        server.close()
+
+    threading.Thread(target=serve, daemon=True).start()
+    return server.getsockname()[1]
+
+
+@pytest.mark.parametrize(
+    "prefix, slow",
+    [
+        # Headers trickling in
+        (b"HTTP/1.1 200 OK\r\n", b"X-Slow: " + b"a" * 100 + b"\r\n\r\n"),
+        # A body without length on a closing connection
+        (b"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: close\r\n\r\n", b"x" * 100),
+    ],
+)
+def test_deadline_is_hard_in_every_phase(prefix, slow):
+    import time
+
+    port = _trickle_server(prefix, slow)
+    started = time.monotonic()
+    with pytest.raises(fetch.FetchFailed):
+        fetch._open("http", "127.0.0.1", port, "/", "127.0.0.1", 10, deadline=started + 1.0)
+    assert time.monotonic() - started < 2.0

@@ -27,7 +27,7 @@ def site(monkeypatch):
     swissmilk.clear_cache()
     swissmilk_api.reset_limits()
 
-    def get(url, accept=fetch.PAGE_TYPES):
+    def get(url, accept=fetch.PAGE_TYPES, deadline=None):
         if url in pages:
             result = pages[url](url) if callable(pages[url]) else pages[url]
             if isinstance(result, Exception):
@@ -131,3 +131,17 @@ def test_no_ai_called(client, admin_headers, site, monkeypatch):
 def test_nothing_typed_asks_nobody(client, admin_headers, site, monkeypatch):
     monkeypatch.setattr(swissmilk, "_get", lambda *a, **k: (_ for _ in ()).throw(AssertionError("no call")))
     assert _search(client, admin_headers, " ").json() == []
+
+
+def test_slow_search_page_within_budget(client, admin_headers, site, monkeypatch):
+    monkeypatch.setattr(swissmilk_api, "BUDGET_SECONDS", 1.0)
+
+    def slow(url):
+        time.sleep(3)
+        return SEARCH
+
+    site[swissmilk.search_url(["Kartoffeln"])] = slow
+    started = time.monotonic()
+    response = _search(client, admin_headers, "Kartoffeln")
+    assert time.monotonic() - started < 2.0
+    assert response.status_code == 502 and response.json()["detail"] == "swissmilk_unreachable"

@@ -15,6 +15,9 @@ pillow_heif.register_heif_opener()  # HEIC photos from iPhones
 
 MAX_BYTES = 25 * 1024 * 1024
 MAX_SIDE = 1600
+# A picture is decoded only up to this size (48 MP phone photos fit): a small file can unpack into a giant one
+# (a decompression bomb)
+MAX_PIXELS = 64_000_000
 NAME = re.compile(r"^[0-9a-f]{32}\.jpg$")
 
 
@@ -33,6 +36,9 @@ def downscale(data: bytes, side: int = MAX_SIDE) -> bytes:
     """Any picture as a JPEG of at most `side` pixels, without the original's metadata."""
     try:
         with Image.open(io.BytesIO(data)) as source:
+            # Checked before decoding: the header tells the size
+            if source.width * source.height > MAX_PIXELS:
+                raise ValueError("too many pixels")
             image = ImageOps.exif_transpose(source).convert("RGB")
     except (UnidentifiedImageError, OSError, ValueError, Image.DecompressionBombError):
         raise api_error(400, "photo_unreadable")

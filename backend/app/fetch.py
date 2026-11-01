@@ -109,8 +109,21 @@ def _checked(url: str) -> tuple[str, str, int, str, str]:
     return scheme, host, port, target, addresses[0]
 
 
-def fetch(url: str, accept: tuple[str, ...] = PAGE_TYPES) -> Page:
+def _allowed(url: str, allowed_hosts: frozenset[str]) -> None:
+    """With an allowlist: HTTPS to one of these hosts only, for the first address and every redirect."""
+    try:
+        parts = urlsplit(url)
+        host = (parts.hostname or "").lower()
+    except ValueError as error:
+        raise FetchRefused(url) from error
+    if parts.scheme.lower() != "https" or host not in allowed_hosts:
+        raise FetchRefused(url)
+
+
+def fetch(url: str, accept: tuple[str, ...] = PAGE_TYPES, *, allowed_hosts: frozenset[str] | None = None) -> Page:
     for _ in range(MAX_REDIRECTS + 1):
+        if allowed_hosts is not None:
+            _allowed(url, allowed_hosts)
         scheme, host, port, target, ip = _checked(url)
         status, headers, body = _open(scheme, host, port, target, ip, TIMEOUT)
         if status in (301, 302, 303, 307, 308) and headers.get("location"):

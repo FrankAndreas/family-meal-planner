@@ -29,17 +29,25 @@ def photo_path(name: str) -> Path | None:
     return folder() / name
 
 
-def store_photo(data: bytes) -> str:
+def downscale(data: bytes) -> bytes:
+    """Any picture as a JPEG of at most MAX_SIDE pixels, without the original's metadata."""
     try:
         with Image.open(io.BytesIO(data)) as source:
             image = ImageOps.exif_transpose(source).convert("RGB")
     except (UnidentifiedImageError, OSError, ValueError, Image.DecompressionBombError):
         raise api_error(400, "photo_unreadable")
     image.thumbnail((MAX_SIDE, MAX_SIDE))
+    out = io.BytesIO()
+    # Saved without exif=..., so nothing of the original's metadata is kept
+    image.save(out, "JPEG", quality=85)
+    return out.getvalue()
+
+
+def store_photo(data: bytes) -> str:
+    jpeg = downscale(data)
     name = f"{uuid.uuid4().hex}.jpg"
     folder().mkdir(parents=True, exist_ok=True)
-    # Saved without exif=..., so nothing of the original's metadata is kept
-    image.save(folder() / name, "JPEG", quality=85)
+    (folder() / name).write_bytes(jpeg)
     return name
 
 

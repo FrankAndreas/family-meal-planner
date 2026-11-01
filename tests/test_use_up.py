@@ -94,3 +94,14 @@ def test_ingredient_names(client, admin_headers):
     names = lambda q: client.get("/api/ingredient-names", params={"q": q}, headers=admin_headers).json()  # noqa: E731
     assert names("kart") == ["Kartoffeln", "Süsskartoffeln"]
     assert names("") == []
+
+
+def test_missing_named_once(client, admin_headers, today):
+    _recipe(client, admin_headers, "A", "Kartoffeln", "Butter", "butter")
+    found = _search(client, admin_headers, "Kartoffeln", mode="cook_now")
+    assert found[0]["missing"] == ["Butter"]
+
+
+def test_a_basic_with_something_else_is_missing(client, admin_headers, today):
+    _recipe(client, admin_headers, "A", "Kartoffeln", "Zitronensaft und Salz")
+    assert _search(client, admin_headers, "Kartoffeln")[0]["missing"] == ["Zitronensaft und Salz"]

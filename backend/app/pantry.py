@@ -30,6 +30,7 @@ EXCEPTIONS: dict[str, tuple[str, ...]] = {
     "ei": ("br", "salb", "kl"),
     "nuss": ("muskat",),
     "apfel": ("granat", "erd"),
+    "ol": ("karfi",),
 }
 
 _ENDINGS = ("en", "er", "n", "e", "s")
@@ -54,6 +55,8 @@ def _base(word: str) -> str:
 
 # Words that start with a typed word but are a different food: "Butter" isn't "Buttermilch"
 NOT_STARTS = {_base(w) for w in ("buttermilch", "zitronengras", "kohlrabi")}
+# What makes a describing word of a food word: "mehl|ig", "mehl|igkochend"
+_DESCRIBING = ("ig", "lich", "isch")
 
 
 def _words(name: str, nouns_only: bool = True) -> list[str]:
@@ -80,7 +83,13 @@ def _matches_word(typed: str, word: str, strict: bool) -> bool:
     front = word[: -len(typed)] if word.endswith(typed) else None
     if front is not None and len(front) >= _MIN_FRONT:
         return not front.endswith(EXCEPTIONS.get(typed, ()))
-    return not strict and len(typed) >= _MIN_START and word.startswith(typed) and word not in NOT_STARTS
+    return (
+        not strict
+        and len(typed) >= _MIN_START
+        and word.startswith(typed)
+        and word not in NOT_STARTS
+        and not word[len(typed) :].startswith(_DESCRIBING)
+    )
 
 
 def matches(typed: str, ingredient: str, *, strict: bool = False) -> bool:
@@ -94,3 +103,17 @@ def matches(typed: str, ingredient: str, *, strict: bool = False) -> bool:
         any(_matches_word(form, word, strict) for form in _GROUP.get(base, (base,)) for word in words)
         for base in typed_words
     )
+
+
+def covered(ingredient: str, staples: list[str]) -> bool:
+    """Is the ingredient a basic? Each of its food words must be one ("Salz und Pfeffer" yes, "Zitronensaft und Salz"
+    no: the lemon juice is still to buy)."""
+    words = _words(ingredient)
+
+    def covers(staple: str, word: str) -> bool:
+        bases = _typed_words(staple)
+        if len(bases) > 1 and not matches(staple, ingredient, strict=True):
+            return False
+        return any(_matches_word(form, word, True) for base in bases for form in _GROUP.get(base, (base,)))
+
+    return bool(words) and all(any(covers(staple, word) for staple in staples) for word in words)

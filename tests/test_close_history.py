@@ -1,6 +1,6 @@
 from datetime import date
 
-from helpers import create_recipe, plan
+from helpers import create_recipe, create_user, login, plan
 
 
 def _summary(client, headers, recipe_id):
@@ -101,3 +101,33 @@ def test_recipe_history(client, admin_headers, today):
     plan(client, admin_headers, "2026-10-26", recipe_id=r["id"])
     plan(client, admin_headers, "2026-11-02", recipe_id=r["id"])
     assert client.get(f"/api/recipes/{r['id']}/history", headers=admin_headers).json() == ["2026-10-26", "2026-10-12"]
+
+
+def test_recipe_planned_ahead(client, admin_headers, today):
+    r = create_recipe(client, admin_headers)
+    other = create_recipe(client, admin_headers, title="Anderes")
+    plan(client, admin_headers, "2026-10-26", recipe_id=r["id"])
+    plan(client, admin_headers, "2026-11-02", "dinner", recipe_id=r["id"])
+    plan(client, admin_headers, "2026-11-02", "breakfast", recipe_id=r["id"])
+    plan(client, admin_headers, "2026-10-30", "lunch", recipe_id=r["id"])
+    plan(client, admin_headers, "2026-11-03", recipe_id=other["id"])
+    # From today on, in the order of the days and their meals
+    assert client.get(f"/api/recipes/{r['id']}/planned", headers=admin_headers).json() == [
+        {"date": "2026-10-30", "slot": "lunch"},
+        {"date": "2026-11-02", "slot": "breakfast"},
+        {"date": "2026-11-02", "slot": "dinner"},
+    ]
+    assert client.get("/api/recipes/9999/planned", headers=admin_headers).status_code == 404
+
+
+def test_recipe_planned_once_per_place_for_kids_and_deleted(client, admin_headers, today):
+    r = create_recipe(client, admin_headers)
+    planned = lambda headers: client.get(f"/api/recipes/{r['id']}/planned", headers=headers).json()  # noqa: E731
+    assert planned(admin_headers) == []
+    plan(client, admin_headers, "2026-11-02", recipe_id=r["id"])
+    plan(client, admin_headers, "2026-11-02", recipe_id=r["id"])
+    create_user(client, admin_headers, "Lena")
+    assert planned(login(client, "Lena", "5678")) == [{"date": "2026-11-02", "slot": "dinner"}]
+    # A deleted recipe still shows where it's planned
+    client.delete(f"/api/recipes/{r['id']}", headers=admin_headers)
+    assert planned(admin_headers) == [{"date": "2026-11-02", "slot": "dinner"}]

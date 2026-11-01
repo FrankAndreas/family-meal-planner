@@ -111,6 +111,53 @@ _ALTERNATIVES = re.compile(r"\s+oder\s+", re.IGNORECASE)
 _TOGETHER = re.compile(r"\s+und\s+|\s*[&/+]\s*", re.IGNORECASE)
 
 
+# The default basics' everyday kinds: another compound ("Trüffelöl", "Paniermehl", "Rosenwasser") is a specialty
+# that's still to buy. A basic not listed here (one added in Settings) keeps the plain rule: the word itself or the
+# end of a compound. A specialty that is at home anyway is added in Settings as its own basic.
+EVERYDAY_KINDS: dict[str, tuple[str, ...]] = {
+    "Öl": ("Speiseöl", "Olivenöl", "Rapsöl", "Sonnenblumenöl", "Bratöl", "Pflanzenöl", "Frittieröl"),
+    "Salz": ("Meersalz", "Kochsalz", "Speisesalz", "Jodsalz", "Kräutersalz", "Steinsalz"),
+    "Pfeffer": (),
+    "Zucker": (
+        "Kristallzucker", "Feinkristallzucker", "Griesszucker", "Haushaltzucker", "Rohzucker", "Rohrzucker",
+        "Puderzucker", "Vanillezucker",
+    ),
+    "Mehl": ("Weissmehl", "Halbweissmehl", "Ruchmehl", "Weizenmehl", "Zopfmehl"),
+    "Wasser": ("Leitungswasser", "Salzwasser", "Mineralwasser", "Sprudelwasser", "Eiswasser"),
+    "Bouillon": (
+        "Gemüsebouillon", "Hühnerbouillon", "Geflügelbouillon", "Fleischbouillon", "Rindsbouillon", "Rinderbouillon",
+    ),
+}
+_KINDS = {
+    _base(sort_key(basic)): {_base(sort_key(kind)) for kind in kinds} for basic, kinds in EVERYDAY_KINDS.items()
+}
+
+
+_HYPHENATED = re.compile(r"[^\W\d_]+(?:-[^\W\d_]+)*")
+
+
+def _basic_words(part: str) -> list[tuple[str, tuple[str, ...]]]:
+    """The words of an ingredient for the basics check, a hyphenated one as a whole and by its parts:
+    ("trüffelöl", ("truffel", "öl")) for "Trüffel-Öl", so a hyphen can't turn a specialty into the plain basic.
+    Only nouns, as in _words."""
+    found = _HYPHENATED.findall(re.sub(r"\([^)]*\)", " ", part))
+    nouns = [w for w in found if w[0].isupper()]
+    return [
+        (_base(sort_key(w.replace("-", ""))), tuple(_base(sort_key(p)) for p in w.split("-"))) for w in (nouns or found)
+    ]
+
+
+def _basic_word(staple_base: str, joined: str, parts: tuple[str, ...]) -> bool:
+    """Is this word of an ingredient the basic? For a default basic: itself or one of its everyday kinds, a
+    hyphenated word as a whole ("Raps-Öl") or by a part that is an everyday kind ("HOLL-Rapsöl", "Meersalz-Flocken"),
+    never by a bare basic part ("Trüffel-Öl"); else the plain rule."""
+    kinds = _KINDS.get(staple_base)
+    if kinds is None:
+        forms = _GROUP.get(staple_base, (staple_base,))
+        return any(_matches_word(form, word, True) for form in forms for word in (joined, *parts))
+    return joined == staple_base or joined in kinds or any(part in kinds for part in parts)
+
+
 def covered(ingredient: str, staples: list[str]) -> bool:
     """Is the ingredient a basic? Read up to a comma (the rest describes it); each thing it names together
     ("Salz und Pfeffer") must be a basic, of alternatives ("Butter oder Öl") one is enough. "Zitronensaft und Salz"
@@ -119,7 +166,16 @@ def covered(ingredient: str, staples: list[str]) -> bool:
 
     def is_basic(part: str) -> bool:
         part = _PURPOSE.sub("", " " + part.strip()).strip()
-        return bool(part) and any(matches(staple, part, strict=True) for staple in staples)
+        if not part:
+            return False
+        words = _basic_words(part)
+        for staple in staples:
+            bases = _typed_words(staple)
+            if len(bases) == 1 and any(_basic_word(bases[0], joined, parts) for joined, parts in words):
+                return True
+            if len(bases) > 1 and matches(staple, part, strict=True):
+                return True
+        return False
 
     return any(
         all(is_basic(part) for part in _TOGETHER.split(alternative)) for alternative in _ALTERNATIVES.split(name)

@@ -197,3 +197,10 @@ def test_huge_picture_refused():
     assert len(out.getvalue()) < 1_000_000
     with pytest.raises(HTTPException):
         photos.downscale(out.getvalue())
+
+
+def test_big_phone_photos_still_fit():
+    """A 48 MP iPhone photo (8064 x 6048) is a normal upload, not a bomb."""
+    from app import photos
+
+    assert photos.MAX_PIXELS >= 8064 * 6048

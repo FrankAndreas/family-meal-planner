@@ -16,8 +16,9 @@ pillow_heif.register_heif_opener()  # HEIC photos from iPhones
 
 MAX_BYTES = 25 * 1024 * 1024
 MAX_SIDE = 1600
-# A picture is decoded only up to this size: a small file can unpack into a giant one (a decompression bomb)
-MAX_PIXELS = 40_000_000
+# A picture is decoded only up to this size (48 MP phone photos fit): a small file can unpack into a giant one
+# (a decompression bomb)
+MAX_PIXELS = 64_000_000
 NAME = re.compile(r"^[0-9a-f]{32}\.jpg$")
 
 

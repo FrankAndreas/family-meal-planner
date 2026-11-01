@@ -1,11 +1,12 @@
 import { useEffect, useId, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
+import { isPickedSuggestion } from '../../chips';
 import { FIELD } from '../../ui';
 
 interface IngredientChipsProps {
     values: string[];
     onChange: (values: string[]) => void;
-    // The input's name for screen readers and tests
+    // Shown above the chips, and the input's name
     label: string;
     placeholder?: string;
     // Words to offer while typing (the ingredient names of the collection)
@@ -18,6 +19,7 @@ interface IngredientChipsProps {
 export default function IngredientChips({ values, onChange, label, placeholder, suggest, max }: IngredientChipsProps) {
     const { t } = useTranslation();
     const listId = useId();
+    const inputId = useId();
     const [text, setText] = useState('');
     const [offered, setOffered] = useState<string[]>([]);
 
@@ -51,47 +53,50 @@ export default function IngredientChips({ values, onChange, label, placeholder, 
     };
 
     return (
-        <div className={`${FIELD} flex flex-wrap items-center gap-2`}>
-            {values.map((value) => (
-                <span key={value} className="inline-flex items-center gap-1 rounded-full bg-cyan-400/15 py-1 pl-3 pr-1 text-sm text-cyan-100">
-                    {value}
-                    <button
-                        type="button"
-                        aria-label={t('useUp.remove', { name: value })}
-                        onClick={() => onChange(values.filter((v) => v !== value))}
-                        className="h-6 w-6 rounded-full hover:bg-white/10"
-                    >
-                        ×
-                    </button>
-                </span>
-            ))}
-            {values.length >= max ? (
-                <span className="p-1 text-sm text-slate-400">{t('useUp.full', { max })}</span>
-            ) : (
-                <input
-                    role="combobox"
-                    aria-label={label}
-                    list={suggest ? listId : undefined}
-                    className="min-w-32 flex-1 bg-transparent p-1 focus:outline-none"
-                    placeholder={placeholder}
-                    maxLength={40}
-                    value={text}
-                    onChange={(e) => {
-                        // Picking from the list replaces the text at once: that's a choice, add it
-                        if ((e.nativeEvent as InputEvent).inputType === 'insertReplacementText') add(e.target.value);
-                        else setText(e.target.value);
-                    }}
-                    onKeyDown={onKey}
-                    onBlur={() => add(text)}
-                />
-            )}
-            {suggest && (
-                <datalist id={listId}>
-                    {offered.map((name) => (
-                        <option key={name} value={name} />
-                    ))}
-                </datalist>
-            )}
+        <div>
+            <label htmlFor={inputId} className="mb-1 block text-sm text-slate-300">
+                {label}
+            </label>
+            <div className={`${FIELD} flex flex-wrap items-center gap-2`}>
+                {values.map((value) => (
+                    <span key={value} className="inline-flex items-center gap-1 rounded-full bg-cyan-400/15 py-1 pl-3 pr-1 text-sm text-cyan-100">
+                        {value}
+                        <button
+                            type="button"
+                            aria-label={t('useUp.remove', { name: value })}
+                            onClick={() => onChange(values.filter((v) => v !== value))}
+                            className="h-8 w-8 rounded-full hover:bg-white/10"
+                        >
+                            ×
+                        </button>
+                    </span>
+                ))}
+                {values.length >= max ? (
+                    <span className="p-1 text-sm text-slate-400">{t('useUp.full', { max })}</span>
+                ) : (
+                    <input
+                        id={inputId}
+                        list={suggest ? listId : undefined}
+                        className="min-w-32 flex-1 bg-transparent p-1 focus:outline-none"
+                        placeholder={placeholder}
+                        maxLength={40}
+                        value={text}
+                        onChange={(e) => {
+                            if (isPickedSuggestion((e.nativeEvent as InputEvent).inputType, e.target.value, offered)) add(e.target.value);
+                            else setText(e.target.value);
+                        }}
+                        onKeyDown={onKey}
+                        onBlur={() => add(text)}
+                    />
+                )}
+                {suggest && (
+                    <datalist id={listId}>
+                        {offered.map((name) => (
+                            <option key={name} value={name} />
+                        ))}
+                    </datalist>
+                )}
+            </div>
         </div>
     );
 }

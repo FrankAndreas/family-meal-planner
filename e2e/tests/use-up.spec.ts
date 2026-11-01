@@ -14,7 +14,7 @@ test('find recipes by what is at home', async ({ page, request }) => {
     const errors = await login(page, parent.name);
     await page.goto('/rezepte');
     await page.getByRole('tab', { name: '🧺 What do I have?' }).click();
-    const input = page.getByRole('combobox', { name: 'Ingredient' });
+    const input = page.getByLabel('What’s at home?');
     await input.fill('Kartoffeln');
     await input.press('Enter');
     await input.fill('Lauch');
@@ -51,13 +51,13 @@ test('a parent edits the basics and a missing one disappears', async ({ page, re
         await page.getByRole('tab', { name: '🧺 What do I have?' }).click();
         const clear = page.getByRole('button', { name: 'Clear' });
         if (await clear.isVisible()) await clear.click();
-        await page.getByRole('combobox', { name: 'Ingredient' }).fill('Kartoffeln');
-        await page.getByRole('combobox', { name: 'Ingredient' }).press('Enter');
+        await page.getByLabel('What’s at home?').fill('Kartoffeln');
+        await page.getByLabel('What’s at home?').press('Enter');
         const result = page.getByRole('link', { name: new RegExp(title) });
         await expect(result).toContainText(`missing: ${spice}`);
 
         await page.goto('/einstellungen');
-        const basics = page.getByRole('combobox', { name: 'Always at home' });
+        const basics = page.getByLabel('Always at home');
         await basics.fill(spice);
         await basics.press('Enter');
         await page.getByRole('button', { name: 'Save family settings' }).click();
@@ -83,10 +83,75 @@ test('at most 20 ingredients, as many as the search takes', async ({ page, reque
     const errors = await login(page, parent.name);
     await page.goto('/rezepte');
     await expect(page.getByRole('button', { name: /^Remove / })).toHaveCount(20);
-    await expect(page.getByRole('combobox', { name: 'Ingredient' })).toHaveCount(0);
+    await expect(page.getByLabel('What’s at home?')).toHaveCount(0);
     await expect(page.getByText('That’s the most: 20 ingredients.')).toBeVisible();
     await expect(page.getByText('No recipe fits.')).toBeVisible();
     await page.getByRole('button', { name: 'Remove Zutata' }).click();
-    await expect(page.getByRole('combobox', { name: 'Ingredient' })).toBeVisible();
+    await expect(page.getByLabel('What’s at home?')).toBeVisible();
     expect(errors).toEqual([]);
+});
+
+test('no old results or errors once the ingredients change', async ({ page, request }) => {
+    const parent = await newPerson(request);
+    const title = uniqueName('Rösti ');
+    await createRecipe(request, parent, { title, ingredients: ['Kartoffeln', 'Butter'].map(ingredient) });
+    const errors = await login(page, parent.name);
+    await page.goto('/rezepte');
+    await page.getByRole('tab', { name: '🧺 What do I have?' }).click();
+    const clear = page.getByRole('button', { name: 'Clear' });
+    if (await clear.isVisible()) await clear.click();
+    const input = page.getByLabel('What’s at home?');
+    await input.fill('Kartoffeln');
+    await input.press('Enter');
+    const result = page.getByRole('link', { name: new RegExp(title) });
+    await expect(result).toBeVisible();
+
+    // The next answer is held back: until it comes, the old results must not show for the new ingredients
+    let release = () => {};
+    const held = new Promise<void>((resolve) => (release = resolve));
+    await page.route('**/api/use-up?*', async (route) => {
+        await held;
+        await route.continue();
+    });
+    await clear.click();
+    await input.fill(uniqueName('Zutat'));
+    await input.press('Enter');
+    await expect(result).toHaveCount(0);
+    release();
+    await expect(page.getByText('No recipe fits.')).toBeVisible();
+
+    // A failing search shows its error, and clearing the ingredients takes it away
+    await page.unroute('**/api/use-up?*');
+    await page.route('**/api/use-up?*', (route) => route.fulfill({ status: 500, body: '{}' }));
+    await input.fill('Lauch');
+    await input.press('Enter');
+    const failure = page.locator('.border-red-400\\/30');
+    await expect(failure).toBeVisible();
+    await clear.click();
+    await expect(failure).toHaveCount(0);
+    expect(errors.filter((e) => !e.includes('500'))).toEqual([]);
+});
+
+test('the search tabs and chips work for every hand', async ({ page, request }) => {
+    const parent = await newPerson(request);
+    await login(page, parent.name);
+    await page.goto('/rezepte');
+    const search = page.getByRole('tab', { name: 'Search' });
+    await search.click();
+    await search.press('ArrowRight');
+    const useUp = page.getByRole('tab', { name: '🧺 What do I have?' });
+    await expect(useUp).toHaveAttribute('aria-selected', 'true');
+    await expect(useUp).toBeFocused();
+    await expect(page.getByRole('tabpanel', { name: '🧺 What do I have?' })).toBeVisible();
+    const clear = page.getByRole('button', { name: 'Clear' });
+    if (await clear.isVisible()) await clear.click();
+    // A visible label, not only a placeholder
+    await expect(page.locator('label', { hasText: 'What’s at home?' })).toBeVisible();
+    await page.getByLabel('What’s at home?').fill('Lauch');
+    await page.getByLabel('What’s at home?').press('Enter');
+    const remove = await page.getByRole('button', { name: 'Remove Lauch' }).boundingBox();
+    expect(remove!.width).toBeGreaterThanOrEqual(32);
+    expect(remove!.height).toBeGreaterThanOrEqual(32);
+    await useUp.press('ArrowLeft');
+    await expect(search).toHaveAttribute('aria-selected', 'true');
 });

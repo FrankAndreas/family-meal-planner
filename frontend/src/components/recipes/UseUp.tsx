@@ -46,6 +46,15 @@ export default function UseUp({ have, mode, onChange }: UseUpProps) {
         };
     }, [have, mode]);
 
+    // No results or error of an earlier search once everything is cleared: they'd show for the next ingredients
+    const change = (nextHave: string[], nextMode: UseUpMode) => {
+        if (!nextHave.length) {
+            setResults(null);
+            setError('');
+        }
+        onChange(nextHave, nextMode);
+    };
+
     const modeButton = (key: UseUpMode) =>
         `rounded-full border px-3 py-1 text-sm ${
             mode === key ? 'border-cyan-400 bg-cyan-400/15 text-white' : 'border-white/10 text-slate-300 hover:bg-white/5'
@@ -57,7 +66,7 @@ export default function UseUp({ have, mode, onChange }: UseUpProps) {
                 <div className="min-w-0 flex-1 basis-72">
                     <IngredientChips
                         values={have}
-                        onChange={(next) => onChange(next, mode)}
+                        onChange={(next) => change(next, mode)}
                         label={t('useUp.ingredient')}
                         placeholder={t('useUp.placeholder')}
                         suggest={fetchIngredientNames}
@@ -65,7 +74,7 @@ export default function UseUp({ have, mode, onChange }: UseUpProps) {
                     />
                 </div>
                 {have.length > 0 && (
-                    <button type="button" className={BUTTON_SECONDARY} onClick={() => onChange([], mode)}>
+                    <button type="button" className={BUTTON_SECONDARY} onClick={() => change([], mode)}>
                         {t('useUp.clear')}
                     </button>
                 )}
@@ -77,7 +86,7 @@ export default function UseUp({ have, mode, onChange }: UseUpProps) {
                         type="button"
                         aria-pressed={mode === key}
                         className={modeButton(key)}
-                        onClick={() => onChange(have, key)}
+                        onClick={() => change(have, key)}
                     >
                         {t(`useUp.modes.${key}`)}
                     </button>

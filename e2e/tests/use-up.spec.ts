@@ -103,16 +103,24 @@ test('no old results or errors once the ingredients change', async ({ page, requ
     const input = page.getByLabel('What’s at home?');
     await input.fill('Kartoffeln');
     await input.press('Enter');
+    await input.fill('Butter');
+    await input.press('Enter');
     const result = page.getByRole('link', { name: new RegExp(title) });
-    await expect(result).toBeVisible();
+    await expect(result).toContainText('✓ Kartoffeln, Butter');
 
-    // The next answer is held back: until it comes, the old results must not show for the new ingredients
+    // The next answers are held back: until they come, old results must not show for the new ingredients
     let release = () => {};
-    const held = new Promise<void>((resolve) => (release = resolve));
+    let held = new Promise<void>((resolve) => (release = resolve));
     await page.route('**/api/use-up?*', async (route) => {
         await held;
         await route.continue();
     });
+    await page.getByRole('button', { name: 'Remove Butter' }).click();
+    await page.waitForTimeout(500);
+    await expect(page.getByText('✓ Kartoffeln, Butter')).toHaveCount(0);
+    release();
+    await expect(result).toContainText('✓ Kartoffeln');
+    held = new Promise<void>((resolve) => (release = resolve));
     await clear.click();
     await input.fill(uniqueName('Zutat'));
     await input.press('Enter');

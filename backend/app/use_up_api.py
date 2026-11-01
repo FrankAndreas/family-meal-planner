@@ -57,7 +57,7 @@ def use_up(
             if _optional(i) or any(matches(word, i.name) for word in typed) or covered(i.name, staples):
                 continue
             # The same thing in two groups ("Butter" for dough and topping) is one thing to buy
-            if sort_key(i.name.strip()) not in {sort_key(m.strip()) for m in missing}:
+            if canonical(i.name) not in {canonical(m) for m in missing}:
                 missing.append(i.name)
         if mode == "cook_now" and len(missing) > MAX_MISSING:
             continue

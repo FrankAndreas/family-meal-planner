@@ -82,10 +82,26 @@ def test_typed_text_is_read_like_an_ingredient_name(typed, ingredient):
     assert matches(typed, ingredient, strict=True)
 
 
-def test_covered_needs_every_food_word():
-    staples = ["Salz", "Pfeffer", "Öl"]
-    assert covered("Salz und Pfeffer", staples)
-    assert covered("Olivenöl", staples)
-    assert not covered("Zitronensaft und Salz", staples)
-    assert not covered("Karfiol", staples)
-    assert not covered("Salz, Pfeffer, Muskat", staples)
+COVERED = [
+    "Salz und Pfeffer", "salz und pfeffer", "Salz, Pfeffer", "Olivenöl", "Pfeffer aus der Mühle", "Öl zum Braten",
+    "Öl für die Pfanne", "Mehl zum Bestäuben", "Mehl für die Arbeitsfläche", "Salz zum Abschmecken",
+    "Salz und Pfeffer zum Würzen", "Zucker zum Bestreuen", "Wasser zum Kochen", "Prise Salz", "1 Prise Salz",
+    "Etwas Salz", "Weisser Pfeffer", "Schwarzer Pfeffer", "Grobes Salz", "Kaltes Wasser", "Natives Olivenöl",
+    "Gemüse-Bouillon", "Meersalz-Flocken", "Bouillon, Gemüse", "Butter oder Öl",
+]
+NOT_COVERED = ["Zitronensaft und Salz", "Karfiol", "Zitronensaft mit Salz", "Butter und Öl", "Muskat"]
+
+
+@pytest.mark.parametrize("ingredient", COVERED)
+def test_covered(ingredient):
+    assert covered(ingredient, DEFAULT_STAPLES)
+
+
+@pytest.mark.parametrize("ingredient", NOT_COVERED)
+def test_not_covered(ingredient):
+    assert not covered(ingredient, DEFAULT_STAPLES)
+
+
+def test_covered_by_a_basic_of_two_words():
+    assert covered("Crème fraîche", ["Crème fraîche"])
+    assert not covered("Crème double", ["Crème fraîche"])

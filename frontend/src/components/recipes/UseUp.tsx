@@ -19,7 +19,10 @@ const MODES: UseUpMode[] = ['use_up', 'cook_now'];
 // "Was habe ich?": recipes of the collection for what's at home, e.g. what needs using soon
 export default function UseUp({ have, mode, onChange }: UseUpProps) {
     const { t } = useTranslation();
-    const [results, setResults] = useState<UseUpResult[] | null>(null);
+    // The answer and the search it answers: shown only while that is still the search on screen
+    const [answer, setAnswer] = useState<{ key: string; results: UseUpResult[] } | null>(null);
+    const key = JSON.stringify([have, mode]);
+    const results = answer?.key === key ? answer.results : null;
     const [error, setError] = useState('');
 
     useEffect(() => {
@@ -30,13 +33,12 @@ export default function UseUp({ have, mode, onChange }: UseUpProps) {
             fetchUseUp(have, mode)
                 .then((found) => {
                     if (!current) return;
-                    setResults(found);
+                    setAnswer({ key: JSON.stringify([have, mode]), results: found });
                     setError('');
                 })
                 .catch((err) => {
                     if (!current) return;
-                    // No old results under an error: they'd look like the answer
-                    setResults(null);
+                    setAnswer(null);
                     setError(errorMessage(err));
                 });
         }, 200);
@@ -46,12 +48,9 @@ export default function UseUp({ have, mode, onChange }: UseUpProps) {
         };
     }, [have, mode]);
 
-    // No results or error of an earlier search once everything is cleared: they'd show for the next ingredients
+    // No error of an earlier search once everything is cleared
     const change = (nextHave: string[], nextMode: UseUpMode) => {
-        if (!nextHave.length) {
-            setResults(null);
-            setError('');
-        }
+        if (!nextHave.length) setError('');
         onChange(nextHave, nextMode);
     };
 

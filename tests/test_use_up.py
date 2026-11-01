@@ -97,9 +97,9 @@ def test_ingredient_names(client, admin_headers):
 
 
 def test_missing_named_once(client, admin_headers, today):
-    _recipe(client, admin_headers, "A", "Kartoffeln", "Butter", "butter")
+    _recipe(client, admin_headers, "A", "Kartoffeln", "Butter", "butter", "Zwiebel", "Zwiebeln")
     found = _search(client, admin_headers, "Kartoffeln", mode="cook_now")
-    assert found[0]["missing"] == ["Butter"]
+    assert found[0]["missing"] == ["Butter", "Zwiebel"]
 
 
 def test_a_basic_with_something_else_is_missing(client, admin_headers, today):

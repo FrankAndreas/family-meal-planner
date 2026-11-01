@@ -105,15 +105,22 @@ def matches(typed: str, ingredient: str, *, strict: bool = False) -> bool:
     )
 
 
+# Where an ingredient name stops naming the food: "Öl zum Braten", "Pfeffer aus der Mühle"
+_PURPOSE = re.compile(r"\s(?:zum|zur|für|fur|aus|nach|mit|von|vom|in|im|am|auf)\s.*$", re.IGNORECASE)
+_ALTERNATIVES = re.compile(r"\s+oder\s+", re.IGNORECASE)
+_TOGETHER = re.compile(r"\s+und\s+|\s*[&/+]\s*", re.IGNORECASE)
+
+
 def covered(ingredient: str, staples: list[str]) -> bool:
-    """Is the ingredient a basic? Each of its food words must be one ("Salz und Pfeffer" yes, "Zitronensaft und Salz"
-    no: the lemon juice is still to buy)."""
-    words = _words(ingredient)
+    """Is the ingredient a basic? Read up to a comma (the rest describes it); each thing it names together
+    ("Salz und Pfeffer") must be a basic, of alternatives ("Butter oder Öl") one is enough. "Zitronensaft und Salz"
+    is no basic: the lemon juice is still to buy."""
+    name = re.sub(r"\([^)]*\)", " ", ingredient).split(",")[0]
 
-    def covers(staple: str, word: str) -> bool:
-        bases = _typed_words(staple)
-        if len(bases) > 1 and not matches(staple, ingredient, strict=True):
-            return False
-        return any(_matches_word(form, word, True) for base in bases for form in _GROUP.get(base, (base,)))
+    def is_basic(part: str) -> bool:
+        part = _PURPOSE.sub("", " " + part.strip()).strip()
+        return bool(part) and any(matches(staple, part, strict=True) for staple in staples)
 
-    return bool(words) and all(any(covers(staple, word) for staple in staples) for word in words)
+    return any(
+        all(is_basic(part) for part in _TOGETHER.split(alternative)) for alternative in _ALTERNATIVES.split(name)
+    )

@@ -80,6 +80,8 @@ export default function FamilySettings() {
                             values={settings.staples}
                             onChange={(staples) => setSettings({ ...settings, staples })}
                             label={t('settings.staples')}
+                            // As many as the server takes (backend/app/schemas.py SettingsPatch)
+                            max={50}
                         />
                         <p className="mt-1 text-xs text-slate-400">{t('settings.staplesHint')}</p>
                     </div>

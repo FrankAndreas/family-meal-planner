@@ -16,7 +16,6 @@ SYNONYMS: list[tuple[str, ...]] = [
     ("ruebli", "karott", "mohr"),
     ("quark", "topf"),
     ("zucchetti", "zucchini"),
-    ("peperon", "paprika"),
     ("nusslisalat", "feldsalat"),
 ]
 _GROUP = {word: group for group in SYNONYMS for word in group}
@@ -25,13 +24,17 @@ _GROUP = {word: group for group in SYNONYMS for word in group}
 EXCEPTIONS: dict[str, tuple[str, ...]] = {
     "lauch": ("knob", "schnitt", "bar"),
     "kartoffel": ("suss",),
-    "zwiebel": ("fruhlings",),
-    "milch": ("kokos",),
+    "zwiebel": ("fruhlings", "lauch"),
+    "milch": ("kokos", "butter", "mandel", "hafer", "soja"),
     "butt": ("erdnuss",),
-    "ei": ("br", "salb"),
+    "ei": ("br", "salb", "kl"),
+    "nuss": ("muskat",),
+    "apfel": ("granat", "erd"),
 }
 
 _ENDINGS = ("en", "er", "n", "e", "s")
+# A final "s" after these stays: "Reis", "Mais", "Nuss" are no plurals
+_KEEP_S_AFTER = ("i", "s")
 _LETTERS = re.compile(r"[^\W\d_]+")
 # The start of a compound counts only from this length on: "Lauch" finds "Lauchstange", "Ei" not "Eisbergsalat"
 _MIN_START = 4
@@ -40,24 +43,35 @@ _MIN_FRONT = 3
 
 
 def _base(word: str) -> str:
-    """Without one plural or inflection ending: "tomaten" and "tomate" → "tomat", "eier" → "ei"."""
+    """Without one plural or inflection ending: "tomaten" and "tomate" → "tomat", "eier" → "ei", "nusse" → "nuss"."""
     for ending in _ENDINGS:
+        if ending == "s" and word[:-1].endswith(_KEEP_S_AFTER):
+            continue
         if word.endswith(ending) and len(word) - len(ending) >= 2:
             return word[: -len(ending)]
     return word
 
 
-def _words(name: str) -> list[str]:
+# Words that start with a typed word but are a different food: "Butter" isn't "Buttermilch"
+NOT_STARTS = {_base(w) for w in ("buttermilch", "zitronengras", "kohlrabi")}
+
+
+def _words(name: str, nouns_only: bool = True) -> list[str]:
     """The words of an ingredient name that can name the food: nothing in brackets, and only the nouns when the
     name has capitalized words ("festkochende Kartoffeln" → Kartoffeln)."""
     found = _LETTERS.findall(re.sub(r"\([^)]*\)", " ", name))
-    nouns = [w for w in found if w[0].isupper()]
+    nouns = [w for w in found if w[0].isupper()] if nouns_only else []
     return [_base(sort_key(w)) for w in (nouns or found)]
+
+
+def _typed_words(text: str) -> list[str]:
+    """What someone typed, word by word, whatever the case: the part before a comma ("Lauch, in Ringen" → Lauch)."""
+    return _words(text.split(",")[0], nouns_only=False)
 
 
 def canonical(word: str) -> str:
     """Equal for plurals and synonyms: counts "Rahm" and "Sahne" once."""
-    return " ".join(_GROUP.get(base, (base,))[0] for base in _words(word))
+    return " ".join(_GROUP.get(base, (base,))[0] for base in _typed_words(word))
 
 
 def _matches_word(typed: str, word: str, strict: bool) -> bool:
@@ -66,15 +80,16 @@ def _matches_word(typed: str, word: str, strict: bool) -> bool:
     front = word[: -len(typed)] if word.endswith(typed) else None
     if front is not None and len(front) >= _MIN_FRONT:
         return not front.endswith(EXCEPTIONS.get(typed, ()))
-    return not strict and len(typed) >= _MIN_START and word.startswith(typed)
+    return not strict and len(typed) >= _MIN_START and word.startswith(typed) and word not in NOT_STARTS
 
 
 def matches(typed: str, ingredient: str, *, strict: bool = False) -> bool:
     """Does the typed word match this ingredient name? `strict` (for basics): the whole word or the end of a compound,
     never its start ("Salz" is in "Meersalz", not in "Salzkartoffeln")."""
-    # Typed text is read like an ingredient name ("Crème fraîche", "rote Zwiebeln"): each of its words must be there
-    typed_words = _words(typed)
-    words = _words(ingredient)
+    # One typed word looks at the nouns only ("Mehl" isn't in "mehlige Kartoffeln"); several must all be there,
+    # whatever the case ("crème fraîche" is in "Crème fraîche", not in "Crème double")
+    typed_words = _typed_words(typed)
+    words = _words(ingredient, nouns_only=len(typed_words) == 1)
     return bool(typed_words) and all(
         any(_matches_word(form, word, strict) for form in _GROUP.get(base, (base,)) for word in words)
         for base in typed_words

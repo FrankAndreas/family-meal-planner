@@ -171,6 +171,7 @@ const de = {
         used: '✓ {{names}}',
         missing: 'fehlt: {{names}}',
         none: 'Kein Rezept passt.',
+        full: 'Mehr geht nicht: {{max}} Zutaten.',
         remove: '{{name}} entfernen',
     },
     units: {

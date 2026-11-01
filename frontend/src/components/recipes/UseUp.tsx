@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { errorMessage } from '../../api';
 import { sinceText } from '../../lastEaten';
-import { fetchIngredientNames, fetchUseUp, type UseUpMode, type UseUpResult } from '../../useUp';
+import { fetchIngredientNames, fetchUseUp, MAX_HAVE, type UseUpMode, type UseUpResult } from '../../useUp';
 import { BUTTON_SECONDARY, ERROR } from '../../ui';
 import IngredientChips from './IngredientChips';
 import { RecipeThumb } from './RecipeCard';
@@ -33,7 +33,12 @@ export default function UseUp({ have, mode, onChange }: UseUpProps) {
                     setResults(found);
                     setError('');
                 })
-                .catch((err) => current && setError(errorMessage(err)));
+                .catch((err) => {
+                    if (!current) return;
+                    // No old results under an error: they'd look like the answer
+                    setResults(null);
+                    setError(errorMessage(err));
+                });
         }, 200);
         return () => {
             current = false;
@@ -56,6 +61,7 @@ export default function UseUp({ have, mode, onChange }: UseUpProps) {
                         label={t('useUp.ingredient')}
                         placeholder={t('useUp.placeholder')}
                         suggest={fetchIngredientNames}
+                        max={MAX_HAVE}
                     />
                 </div>
                 {have.length > 0 && (

@@ -172,6 +172,7 @@ const en: typeof de = {
         used: '✓ {{names}}',
         missing: 'missing: {{names}}',
         none: 'No recipe fits.',
+        full: 'That’s the most: {{max}} ingredients.',
         remove: 'Remove {{name}}',
     },
     units: {

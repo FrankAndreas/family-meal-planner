@@ -23,6 +23,8 @@ export interface UseUpState {
 }
 
 const KEY = 'meals.useUp';
+// The most ingredients one search takes (backend/app/use_up_api.py)
+export const MAX_HAVE = 20;
 const EMPTY: UseUpState = { tab: 'search', have: [], mode: 'use_up' };
 
 export function loadUseUp(): UseUpState {
@@ -31,7 +33,7 @@ export function loadUseUp(): UseUpState {
         if (!stored) return EMPTY;
         return {
             tab: stored.tab === 'use_up' ? 'use_up' : 'search',
-            have: Array.isArray(stored.have) ? stored.have.filter((h) => typeof h === 'string') : [],
+            have: Array.isArray(stored.have) ? stored.have.filter((h) => typeof h === 'string').slice(0, MAX_HAVE) : [],
             mode: stored.mode === 'cook_now' ? 'cook_now' : 'use_up',
         };
     } catch {

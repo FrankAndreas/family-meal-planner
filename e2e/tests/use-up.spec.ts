@@ -75,3 +75,18 @@ test('a parent edits the basics and a missing one disappears', async ({ page, re
         });
     }
 });
+
+test('at most 20 ingredients, as many as the search takes', async ({ page, request }) => {
+    const parent = await newPerson(request);
+    const have = Array.from({ length: 20 }, (_, n) => `Zutat${String.fromCharCode(97 + n)}`);
+    await page.addInitScript((stored) => localStorage.setItem('meals.useUp', stored), JSON.stringify({ tab: 'use_up', have, mode: 'use_up' }));
+    const errors = await login(page, parent.name);
+    await page.goto('/rezepte');
+    await expect(page.getByRole('button', { name: /^Remove / })).toHaveCount(20);
+    await expect(page.getByRole('combobox', { name: 'Ingredient' })).toHaveCount(0);
+    await expect(page.getByText('That’s the most: 20 ingredients.')).toBeVisible();
+    await expect(page.getByText('No recipe fits.')).toBeVisible();
+    await page.getByRole('button', { name: 'Remove Zutata' }).click();
+    await expect(page.getByRole('combobox', { name: 'Ingredient' })).toBeVisible();
+    expect(errors).toEqual([]);
+});

@@ -112,13 +112,16 @@ EVERYDAY = [
     "Kräutersalz", "weisser Pfeffer", "Schwarzer Pfeffer", "Pfeffer aus der Mühle", "Kristallzucker", "Rohzucker",
     "Rohrzucker", "Puderzucker", "Vanillezucker", "Weissmehl", "Halbweissmehl", "Ruchmehl", "Weizenmehl", "Zopfmehl",
     "Leitungswasser", "Salzwasser", "Mineralwasser", "Gemüsebouillon", "Hühnerbouillon", "Fleischbouillon",
-    "Rindsbouillon", "Gemüse-Bouillon",
+    "Rindsbouillon", "Gemüse-Bouillon", "Raps-Öl", "HOLL-Rapsöl", "Pflanzenöl", "Frittieröl", "Eiswasser",
+    "Rinderbouillon", "Geflügelbouillon", "Sprudelwasser", "Feinkristallzucker", "Griesszucker", "Haushaltzucker",
+    "Steinsalz",
 ]
 SPECIALTY = [
     "Trüffelöl", "Sesamöl", "Kokosöl", "Walnussöl", "Kürbiskernöl", "Chiliöl", "Fleur de Sel", "Rauchsalz",
     "Selleriesalz", "Cayennepfeffer", "Szechuanpfeffer", "Hagelzucker", "Gelierzucker", "Kokosblütenzucker",
     "Dinkelmehl", "Paniermehl", "Mandelmehl", "Kichererbsenmehl", "Maismehl", "Rosenwasser", "Orangenblütenwasser",
-    "Kokoswasser", "Dashibouillon",
+    "Kokoswasser", "Dashibouillon", "Trüffel-Öl", "Sesam-Öl", "Kokos-Wasser", "Dinkel-Mehl", "Cayenne-Pfeffer",
+    "Erdnussöl", "Distelöl", "Kalbsbouillon", "Vollrohrzucker", "Backmehl", "Knöpflimehl",
 ]
 
 

@@ -29,14 +29,14 @@ def photo_path(name: str) -> Path | None:
     return folder() / name
 
 
-def downscale(data: bytes) -> bytes:
-    """Any picture as a JPEG of at most MAX_SIDE pixels, without the original's metadata."""
+def downscale(data: bytes, side: int = MAX_SIDE) -> bytes:
+    """Any picture as a JPEG of at most `side` pixels, without the original's metadata."""
     try:
         with Image.open(io.BytesIO(data)) as source:
             image = ImageOps.exif_transpose(source).convert("RGB")
     except (UnidentifiedImageError, OSError, ValueError, Image.DecompressionBombError):
         raise api_error(400, "photo_unreadable")
-    image.thumbnail((MAX_SIDE, MAX_SIDE))
+    image.thumbnail((side, side))
     out = io.BytesIO()
     # Saved without exif=..., so nothing of the original's metadata is kept
     image.save(out, "JPEG", quality=85)

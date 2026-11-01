@@ -105,7 +105,7 @@ def test_photo_is_downscaled_and_cached(monkeypatch):
     data = swissmilk.photo(url)
     assert swissmilk.photo(url) == data and calls == [url]
     with Image.open(io.BytesIO(data)) as image:
-        assert image.format == "JPEG" and max(image.size) == 1600
+        assert image.format == "JPEG" and max(image.size) == swissmilk.THUMB_SIDE == 320
 
 
 def test_recipe_id():
@@ -113,3 +113,26 @@ def test_recipe_id():
     assert swissmilk.recipe_id("https://www.swissmilk.ch/fr/recettes-idees/recettes/LM_div_0812_03/gratin/?x=1") == "LM_div_0812_03"
     assert swissmilk.recipe_id("https://www.swissmilk.ch/de/suche/") is None
     assert swissmilk.is_swissmilk(FIRST) and not swissmilk.is_swissmilk("https://swissmilk.ch.evil.example/")
+
+
+def test_original_photo_only_from_swissmilk(monkeypatch):
+    monkeypatch.setattr(swissmilk, "_get", lambda url, accept=None: fetch.Page(url, "image/jpeg", b"raw"))
+    assert swissmilk.original_photo(swissmilk.PHOTO_PREFIX + "a.jpg") == b"raw"
+    with pytest.raises(fetch.FetchRefused):
+        swissmilk.original_photo("https://res.cloudinary.com/a.jpg")
+
+
+def test_photo_keys_outlive_a_full_cache(monkeypatch):
+    monkeypatch.setattr(swissmilk, "_get", lambda url, accept=None: fetch.Page(url, "text/html", b"<html></html>"))
+    key = swissmilk.remember_photo(swissmilk.PHOTO_PREFIX + "a.jpg")
+    for n in range(swissmilk.CACHE_ENTRIES + 50):
+        swissmilk.recipe(f"https://www.swissmilk.ch/de/rezepte-kochideen/rezepte/X{n}/y/")
+    assert swissmilk.photo_for(key) == swissmilk.PHOTO_PREFIX + "a.jpg"
+
+
+def test_every_spelling_of_swissmilk():
+    for url in ("https://swissmilk.ch/x", "https://www.swissmilk.ch./x", "https://api.swissmilk.ch/x", FIRST):
+        assert swissmilk.is_swissmilk(url)
+    assert not swissmilk.is_swissmilk("https://notswissmilk.ch/x")
+    assert swissmilk.page_url("http://swissmilk.ch./de/a/?b=1") == "https://www.swissmilk.ch/de/a/?b=1"
+    assert swissmilk.page_url("https://api.swissmilk.ch/x") is None

@@ -21,7 +21,8 @@ export default function SwissmilkResults({ have, mode }: SwissmilkResultsProps) 
     // The answer and the search it answers: shown only while that is still the search on screen
     const [answer, setAnswer] = useState<{ key: string; results: SwissmilkResult[] } | null>(null);
     const [error, setError] = useState('');
-    // Taken over here: waiting in the inbox now
+    // Taken over here: being sent, then waiting in the inbox
+    const [sending, setSending] = useState<string[]>([]);
     const [taken, setTaken] = useState<string[]>([]);
     const lastSearch = useRef(0);
     const key = JSON.stringify([have, mode]);
@@ -54,13 +55,17 @@ export default function SwissmilkResults({ have, mode }: SwissmilkResultsProps) 
         };
     }, [open, have, mode]);
 
+    // The button makes way at once, so a second tap meanwhile can't send it twice (nor hit a link in its place)
     const takeOver = async (url: string) => {
         setError('');
+        setSending((before) => [...before, url]);
         try {
             await api.post('/api/inbox/urls', { url });
             setTaken((before) => [...before, url]);
         } catch (err) {
             setError(errorMessage(err));
+        } finally {
+            setSending((before) => before.filter((u) => u !== url));
         }
     };
 
@@ -108,6 +113,8 @@ export default function SwissmilkResults({ have, mode }: SwissmilkResultsProps) 
                                             <Link to={`/rezepte/${recipe.recipe_id}`} className="text-slate-300 underline">
                                                 {t('swissmilk.already')}
                                             </Link>
+                                        ) : sending.includes(recipe.url) ? (
+                                            <span className="text-slate-400">{t('swissmilk.waiting')}</span>
                                         ) : waiting ? (
                                             <Link to="/posteingang" className="text-slate-300 underline">
                                                 {t('swissmilk.waiting')}

@@ -20,9 +20,11 @@ test('find and take over a Swissmilk recipe from What do I have?', async ({ page
         });
     });
     const taken: unknown[] = [];
-    await page.route('**/api/inbox/urls', (route) => {
+    await page.route('**/api/inbox/urls', async (route) => {
         taken.push(route.request().postDataJSON());
-        return route.fulfill({ status: 201, json: { id: 1, kind: 'url', status: 'processing' } });
+        // A slow answer: a second tap meanwhile must not take it over again
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        await route.fulfill({ status: 201, json: { id: 1, kind: 'url', status: 'processing' } });
     });
     const errors = await login(page, parent.name);
     await page.goto('/rezepte');
@@ -45,7 +47,7 @@ test('find and take over a Swissmilk recipe from What do I have?', async ({ page
     await expect(salat.getByRole('link', { name: 'already in your recipes' })).toHaveAttribute('href', `/rezepte/${mine.id}`);
     await expect(salat.getByRole('button', { name: 'Take over' })).toHaveCount(0);
 
-    await gratin.getByRole('button', { name: 'Take over' }).click();
+    await gratin.getByRole('button', { name: 'Take over' }).dblclick();
     await expect(gratin).toContainText('waiting in the inbox');
     await expect(gratin.getByRole('button', { name: 'Take over' })).toHaveCount(0);
     expect(taken).toEqual([{ url: GRATIN }]);

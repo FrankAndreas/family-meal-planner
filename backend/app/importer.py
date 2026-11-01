@@ -62,21 +62,27 @@ def _photo(url: str | None) -> str | None:
         return None
 
 
-def _from_swissmilk(link: str) -> dict | None:
+def _swissmilk_draft(page: fetch.Page) -> dict | None:
     """A Swissmilk page read without any AI: its recipe microdata, its photo from Swissmilk's photo host."""
-    try:
-        page = swissmilk._get(link)
-    except (fetch.FetchFailed, fetch.FetchRefused):
-        return None
     draft = swissmilk.read_recipe(page.text, page.url)
     if not draft:
         return None
     image = draft.pop("image_url", None)
     try:
-        draft["photo"] = photos.store_photo(swissmilk.photo(image)) if image else None
+        draft["photo"] = photos.store_photo(swissmilk.original_photo(image)) if image else None
     except (fetch.FetchFailed, fetch.FetchRefused, HTTPException):
         draft["photo"] = None
     return draft
+
+
+def _from_swissmilk(link: str) -> dict | None:
+    address = swissmilk.page_url(link)
+    if address is None:
+        return None
+    try:
+        return _swissmilk_draft(swissmilk._get(address))
+    except (fetch.FetchFailed, fetch.FetchRefused):
+        return None
 
 
 def _followable(link: str) -> bool:
@@ -119,6 +125,14 @@ def process(db, item: models.InboxItem, user: models.User) -> None:
         try:
             page = fetch.fetch(link)
         except (fetch.FetchFailed, fetch.FetchRefused):
+            continue
+        if swissmilk.is_swissmilk(page.url):
+            # Reached by a redirect (a newsletter's click tracker): still Swissmilk, still never the AI
+            draft = _swissmilk_draft(page)
+            if draft:
+                _finish(db, item, draft)
+                return
+            swissmilk_unreadable = True
             continue
         draft = jsonld.recipe_from_html(page.text, page.url) or microdata.recipe_from_html(page.text, page.url)
         if draft:

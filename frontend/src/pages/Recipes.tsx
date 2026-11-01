@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
 import api, { errorMessage } from '../api';
@@ -9,6 +9,8 @@ import UseUp from '../components/recipes/UseUp';
 import { fetchRecipes, type RecipeSummary } from '../recipes';
 import { BUTTON, BUTTON_SECONDARY, ERROR, INPUT } from '../ui';
 import { loadUseUp, saveUseUp, type UseUpState } from '../useUp';
+
+const TABS = ['search', 'use_up'] as const;
 
 export default function Recipes() {
     const { t } = useTranslation();
@@ -27,6 +29,14 @@ export default function Recipes() {
     const changeUseUp = (next: UseUpState) => {
         setUseUp(next);
         saveUseUp(next);
+    };
+    // Arrow keys move between the two tabs, as in any tab list
+    const onTabKey = (e: KeyboardEvent<HTMLDivElement>) => {
+        if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+        e.preventDefault();
+        const next = TABS[(TABS.indexOf(useUp.tab) + 1) % TABS.length];
+        changeUseUp({ ...useUp, tab: next });
+        document.getElementById(`recipes-tab-${next}`)?.focus();
     };
 
     useEffect(() => {
@@ -71,13 +81,16 @@ export default function Recipes() {
             {/* Same as in the inbox: the draft shows up there (a parent's link is read at once) */}
             {panel === 'link' && <UrlPaste onAdded={() => navigate('/posteingang')} />}
             {panel === 'scan' && <ScanRecipe onDone={() => navigate('/posteingang')} />}
-            <div role="tablist" className="flex gap-2">
-                {(['search', 'use_up'] as const).map((key) => (
+            <div role="tablist" className="flex gap-2" onKeyDown={onTabKey}>
+                {TABS.map((key) => (
                     <button
                         key={key}
+                        id={`recipes-tab-${key}`}
                         type="button"
                         role="tab"
                         aria-selected={useUp.tab === key}
+                        aria-controls="recipes-panel"
+                        tabIndex={useUp.tab === key ? 0 : -1}
                         onClick={() => changeUseUp({ ...useUp, tab: key })}
                         className={`rounded-lg px-3 py-1.5 text-sm ${
                             useUp.tab === key ? 'bg-fuchsia-400/20 text-fuchsia-100' : 'text-slate-400 hover:bg-white/5'
@@ -87,48 +100,50 @@ export default function Recipes() {
                     </button>
                 ))}
             </div>
-            {useUp.tab === 'use_up' ? (
-                <UseUp have={useUp.have} mode={useUp.mode} onChange={(have, mode) => changeUseUp({ ...useUp, have, mode })} />
-            ) : (
-                <>
-                    <div className="flex flex-wrap items-center gap-3">
-                        <input
-                            className={`${INPUT} max-w-sm`}
-                            type="search"
-                            aria-label={t('recipes.search')}
-                            placeholder={t('recipes.searchPlaceholder')}
-                            value={q}
-                            onChange={(e) => setQ(e.target.value)}
-                        />
-                        <label className="flex items-center gap-2 text-sm text-slate-300">
-                            <input type="checkbox" checked={onlyMine} onChange={(e) => setOnlyMine(e.target.checked)} />
-                            {t('recipes.onlyMyFavorites')}
-                        </label>
-                    </div>
-                    {tags.length > 0 && (
-                        <div className="flex flex-wrap gap-2">
-                            <button type="button" className={chip(tag === '')} onClick={() => setTag('')}>
-                                {t('recipes.allTags')}
-                            </button>
-                            {tags.map((item) => (
-                                <button
-                                    key={item.name}
-                                    type="button"
-                                    className={chip(tag === item.name)}
-                                    onClick={() => setTag(tag === item.name ? '' : item.name)}
-                                >
-                                    {item.name} <span className="text-slate-500">{item.count}</span>
-                                </button>
-                            ))}
+            <div role="tabpanel" id="recipes-panel" aria-labelledby={`recipes-tab-${useUp.tab}`} className="space-y-5">
+                {useUp.tab === 'use_up' ? (
+                    <UseUp have={useUp.have} mode={useUp.mode} onChange={(have, mode) => changeUseUp({ ...useUp, have, mode })} />
+                ) : (
+                    <>
+                        <div className="flex flex-wrap items-center gap-3">
+                            <input
+                                className={`${INPUT} max-w-sm`}
+                                type="search"
+                                aria-label={t('recipes.search')}
+                                placeholder={t('recipes.searchPlaceholder')}
+                                value={q}
+                                onChange={(e) => setQ(e.target.value)}
+                            />
+                            <label className="flex items-center gap-2 text-sm text-slate-300">
+                                <input type="checkbox" checked={onlyMine} onChange={(e) => setOnlyMine(e.target.checked)} />
+                                {t('recipes.onlyMyFavorites')}
+                            </label>
                         </div>
-                    )}
-                    {error && <p className={ERROR}>{error}</p>}
-                    {recipes && recipes.length === 0 && <p className="text-slate-400">{t('recipes.none')}</p>}
-                    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-                        {recipes?.map((recipe) => <RecipeCard key={recipe.id} recipe={recipe} />)}
-                    </div>
-                </>
-            )}
+                        {tags.length > 0 && (
+                            <div className="flex flex-wrap gap-2">
+                                <button type="button" className={chip(tag === '')} onClick={() => setTag('')}>
+                                    {t('recipes.allTags')}
+                                </button>
+                                {tags.map((item) => (
+                                    <button
+                                        key={item.name}
+                                        type="button"
+                                        className={chip(tag === item.name)}
+                                        onClick={() => setTag(tag === item.name ? '' : item.name)}
+                                    >
+                                        {item.name} <span className="text-slate-500">{item.count}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                        {error && <p className={ERROR}>{error}</p>}
+                        {recipes && recipes.length === 0 && <p className="text-slate-400">{t('recipes.none')}</p>}
+                        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+                            {recipes?.map((recipe) => <RecipeCard key={recipe.id} recipe={recipe} />)}
+                        </div>
+                    </>
+                )}
+            </div>
         </div>
     );
 }

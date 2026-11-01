@@ -75,7 +75,6 @@ export default function FamilySettings() {
                         </div>
                     </div>
                     <div>
-                        <p className="mb-1 text-sm text-slate-300">{t('settings.staples')}</p>
                         <IngredientChips
                             values={settings.staples}
                             onChange={(staples) => setSettings({ ...settings, staples })}

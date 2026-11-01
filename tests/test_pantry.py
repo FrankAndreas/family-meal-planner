@@ -1,6 +1,6 @@
 import pytest
 
-from app.pantry import DEFAULT_STAPLES, canonical, matches
+from app.pantry import DEFAULT_STAPLES, canonical, covered, matches
 
 MATCH = [
     ("Kartoffeln", "Kartoffel"), ("Kartoffeln", "festkochende Kartoffeln"), ("Kartoffeln", "Kartoffeln (mehlig)"),
@@ -27,12 +27,15 @@ NO_MATCH = [
     ("Apfel", "Granatapfel"), ("Apfel", "Erdäpfel"), ("Paprika", "Peperoncini"), ("Zitrone", "Zitronengras"),
     ("Kohl", "Kohlrabi"), ("Peperoni", "Paprika"), ("Paprika", "Peperoni"),
     ("Crème fraîche", "Crème double"), ("Crème fraîche", "Vanillecreme"),
+    # Describing words, also capitalized at the start or in an all-lowercase name
+    ("Mehl", "Mehligkochende Kartoffeln"), ("Mehl", "kartoffeln, mehlig"),
 ]
 STRICT_MATCH = [
     ("Öl", "Olivenöl"), ("Salz", "Meersalz"), ("Bouillon", "Gemüsebouillon"), ("Pfeffer", "Pfeffer"),
     ("Salz", "Salz und Pfeffer"),
 ]
 STRICT_NO_MATCH = [
+    ("Öl", "Karfiol"),
     ("Zucker", "Zuckerschoten"), ("Zucker", "Zuckermais"), ("Wasser", "Wassermelone"),
     ("Pfeffer", "Pfefferminze"), ("Salz", "Salzkartoffeln"), ("Mehl", "Kartoffeln (mehlig)"),
 ]
@@ -77,3 +80,28 @@ def test_default_staples():
 def test_typed_text_is_read_like_an_ingredient_name(typed, ingredient):
     assert matches(typed, ingredient)
     assert matches(typed, ingredient, strict=True)
+
+
+COVERED = [
+    "Salz und Pfeffer", "salz und pfeffer", "Salz, Pfeffer", "Olivenöl", "Pfeffer aus der Mühle", "Öl zum Braten",
+    "Öl für die Pfanne", "Mehl zum Bestäuben", "Mehl für die Arbeitsfläche", "Salz zum Abschmecken",
+    "Salz und Pfeffer zum Würzen", "Zucker zum Bestreuen", "Wasser zum Kochen", "Prise Salz", "1 Prise Salz",
+    "Etwas Salz", "Weisser Pfeffer", "Schwarzer Pfeffer", "Grobes Salz", "Kaltes Wasser", "Natives Olivenöl",
+    "Gemüse-Bouillon", "Meersalz-Flocken", "Bouillon, Gemüse", "Butter oder Öl",
+]
+NOT_COVERED = ["Zitronensaft und Salz", "Karfiol", "Zitronensaft mit Salz", "Butter und Öl", "Muskat"]
+
+
+@pytest.mark.parametrize("ingredient", COVERED)
+def test_covered(ingredient):
+    assert covered(ingredient, DEFAULT_STAPLES)
+
+
+@pytest.mark.parametrize("ingredient", NOT_COVERED)
+def test_not_covered(ingredient):
+    assert not covered(ingredient, DEFAULT_STAPLES)
+
+
+def test_covered_by_a_basic_of_two_words():
+    assert covered("Crème fraîche", ["Crème fraîche"])
+    assert not covered("Crème double", ["Crème fraîche"])

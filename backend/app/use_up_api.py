@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from . import auth, models, schemas
 from .database import get_db
-from .pantry import canonical, matches
+from .pantry import canonical, covered, matches
 from .recipes_api import Votes, live_recipes
 from .settings_store import get_settings
 from .text import sort_key
@@ -52,13 +52,13 @@ def use_up(
         used = [word for word in typed if any(matches(word, i.name) for i in recipe.ingredients)]
         if not used:
             continue
-        missing = [
-            i.name
-            for i in recipe.ingredients
-            if not _optional(i)
-            and not any(matches(word, i.name) for word in typed)
-            and not any(matches(staple, i.name, strict=True) for staple in staples)
-        ]
+        missing: list[str] = []
+        for i in recipe.ingredients:
+            if _optional(i) or any(matches(word, i.name) for word in typed) or covered(i.name, staples):
+                continue
+            # The same thing in two groups ("Butter" for dough and topping) is one thing to buy
+            if canonical(i.name) not in {canonical(m) for m in missing}:
+                missing.append(i.name)
         if mode == "cook_now" and len(missing) > MAX_MISSING:
             continue
         hits.append((recipe, used, missing))

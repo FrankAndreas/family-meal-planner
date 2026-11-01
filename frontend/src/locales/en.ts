@@ -165,7 +165,7 @@ const en: typeof de = {
     useUp: {
         tabs: { search: 'Search', use_up: '🧺 What do I have?' },
         modes: { use_up: 'Use up', cook_now: 'Cook now' },
-        ingredient: 'Ingredient',
+        ingredient: 'What’s at home?',
         placeholder: 'e.g. potatoes',
         hint: 'Type what’s at home, e.g. what needs using soon.',
         clear: 'Clear',

@@ -164,7 +164,7 @@ const de = {
     useUp: {
         tabs: { search: 'Suchen', use_up: '🧺 Was habe ich?' },
         modes: { use_up: 'Aufbrauchen', cook_now: 'Jetzt kochen' },
-        ingredient: 'Zutat',
+        ingredient: 'Was hast du zu Hause?',
         placeholder: 'z. B. Kartoffeln',
         hint: 'Gib ein, was du zu Hause hast, z. B. was bald weg muss.',
         clear: 'Leeren',

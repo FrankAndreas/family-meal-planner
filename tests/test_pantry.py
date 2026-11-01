@@ -57,3 +57,12 @@ def test_canonical():
 
 def test_default_staples():
     assert DEFAULT_STAPLES == ["Salz", "Pfeffer", "Öl", "Wasser", "Zucker", "Mehl", "Bouillon"]
+
+
+@pytest.mark.parametrize(
+    "typed, ingredient",
+    [("Crème fraîche", "Crème fraîche"), ("Kartoffeln!", "Kartoffeln"), ("rote Zwiebeln", "Zwiebeln"), ("Gewuerz12x", "Gewuerz12x")],
+)
+def test_typed_text_is_read_like_an_ingredient_name(typed, ingredient):
+    assert matches(typed, ingredient)
+    assert matches(typed, ingredient, strict=True)

@@ -57,8 +57,7 @@ def _words(name: str) -> list[str]:
 
 def canonical(word: str) -> str:
     """Equal for plurals and synonyms: counts "Rahm" and "Sahne" once."""
-    base = _base(sort_key(word.strip()))
-    return _GROUP.get(base, (base,))[0]
+    return " ".join(_GROUP.get(base, (base,))[0] for base in _words(word))
 
 
 def _matches_word(typed: str, word: str, strict: bool) -> bool:
@@ -73,8 +72,10 @@ def _matches_word(typed: str, word: str, strict: bool) -> bool:
 def matches(typed: str, ingredient: str, *, strict: bool = False) -> bool:
     """Does the typed word match this ingredient name? `strict` (for basics): the whole word or the end of a compound,
     never its start ("Salz" is in "Meersalz", not in "Salzkartoffeln")."""
-    base = _base(sort_key(typed.strip()))
-    if not base:
-        return False
-    forms = _GROUP.get(base, (base,))
-    return any(_matches_word(form, word, strict) for form in forms for word in _words(ingredient))
+    # Typed text is read like an ingredient name ("Crème fraîche", "rote Zwiebeln"): each of its words must be there
+    typed_words = _words(typed)
+    words = _words(ingredient)
+    return bool(typed_words) and all(
+        any(_matches_word(form, word, strict) for form in _GROUP.get(base, (base,)) for word in words)
+        for base in typed_words
+    )

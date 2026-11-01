@@ -52,6 +52,8 @@ const de = {
         family: 'Familie',
         familySize: 'Personen am Tisch',
         familySizeHint: 'Standard für jede geplante Mahlzeit',
+        staples: 'Immer im Haus',
+        staplesHint: 'Wird nie als fehlend angezeigt, z. B. Salz und Pfeffer.',
         weekStart: 'Erster Tag der Woche',
         saveFamily: 'Familien-Einstellungen speichern',
         members: 'Familienmitglieder',

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import api, { errorMessage } from '../../api';
 import { WEEKDAYS, type FamilySettings as Settings } from '../../types';
 import { BUTTON, CARD, ERROR, FIELD } from '../../ui';
+import IngredientChips from '../recipes/IngredientChips';
 
 export default function FamilySettings() {
     const { t } = useTranslation();
@@ -72,6 +73,15 @@ export default function FamilySettings() {
                                 ))}
                             </select>
                         </div>
+                    </div>
+                    <div>
+                        <p className="mb-1 text-sm text-slate-300">{t('settings.staples')}</p>
+                        <IngredientChips
+                            values={settings.staples}
+                            onChange={(staples) => setSettings({ ...settings, staples })}
+                            label={t('settings.staples')}
+                        />
+                        <p className="mt-1 text-xs text-slate-400">{t('settings.staplesHint')}</p>
                     </div>
                     <button type="submit" className={BUTTON} aria-label={t('settings.saveFamily')}>
                         {t('common.save')}

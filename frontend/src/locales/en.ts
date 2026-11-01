@@ -53,6 +53,8 @@ const en: typeof de = {
         family: 'Family',
         familySize: 'People at the table',
         familySizeHint: 'Default for every planned meal',
+        staples: 'Always at home',
+        staplesHint: 'Never shown as missing, e.g. salt and pepper.',
         weekStart: 'First day of the week',
         saveFamily: 'Save family settings',
         members: 'Family members',

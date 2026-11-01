@@ -167,6 +167,13 @@ class RecipeSummary(BaseModel):
     times_eaten: int
 
 
+class UseUpOut(RecipeSummary):
+    """A recipe for what's at home: which typed ingredients it uses, and what's missing (neither typed nor a basic)."""
+
+    used: list[str]
+    missing: list[str]
+
+
 class SourceMail(BaseModel):
     """The mail or pasted link a recipe was saved from: who sent it, and when."""
 

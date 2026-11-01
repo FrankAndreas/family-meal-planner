@@ -32,13 +32,17 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-.glass-card {
-  background: var(--bg-glass);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: var(--border-glass);
-  box-shadow: var(--shadow-glass);
-  border-radius: 16px;
+/* In the components layer, so classes on the element win over it: a dialog's solid bg-slate-900/95, a banner's
+   amber border (unlayered, it would beat every Tailwind utility) */
+@layer components {
+  .glass-card {
+    background: var(--bg-glass);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: var(--border-glass);
+    box-shadow: var(--shadow-glass);
+    border-radius: 16px;
+  }
 }
 
 .btn-primary {

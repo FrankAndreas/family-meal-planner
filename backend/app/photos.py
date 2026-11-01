@@ -3,6 +3,7 @@
 import io
 import re
 import uuid
+import warnings
 from pathlib import Path
 
 import pillow_heif
@@ -15,6 +16,8 @@ pillow_heif.register_heif_opener()  # HEIC photos from iPhones
 
 MAX_BYTES = 25 * 1024 * 1024
 MAX_SIDE = 1600
+# A picture is decoded only up to this size: a small file can unpack into a giant one (a decompression bomb)
+MAX_PIXELS = 40_000_000
 NAME = re.compile(r"^[0-9a-f]{32}\.jpg$")
 
 
@@ -32,9 +35,13 @@ def photo_path(name: str) -> Path | None:
 def downscale(data: bytes, side: int = MAX_SIDE) -> bytes:
     """Any picture as a JPEG of at most `side` pixels, without the original's metadata."""
     try:
-        with Image.open(io.BytesIO(data)) as source:
-            image = ImageOps.exif_transpose(source).convert("RGB")
-    except (UnidentifiedImageError, OSError, ValueError, Image.DecompressionBombError):
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", Image.DecompressionBombWarning)
+            with Image.open(io.BytesIO(data)) as source:
+                if source.width * source.height > MAX_PIXELS:
+                    raise ValueError("too many pixels")
+                image = ImageOps.exif_transpose(source).convert("RGB")
+    except (UnidentifiedImageError, OSError, ValueError, Image.DecompressionBombError, Image.DecompressionBombWarning):
         raise api_error(400, "photo_unreadable")
     image.thumbnail((side, side))
     out = io.BytesIO()

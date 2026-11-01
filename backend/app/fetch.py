@@ -7,11 +7,13 @@ import http.client
 import ipaddress
 import socket
 import ssl
+import time
 from dataclasses import dataclass
 from urllib.parse import urljoin, urlsplit
 
 MAX_BYTES = 3 * 1024 * 1024
 MAX_REDIRECTS = 5
+CHUNK = 64 * 1024
 TIMEOUT = 10
 USER_AGENT = "Mozilla/5.0 (Menüplaner; family use)"
 PAGE_TYPES = ("text/html", "application/ld+json", "application/xhtml+xml")
@@ -70,14 +72,30 @@ class _PinnedHTTP(http.client.HTTPConnection):
         self.sock = socket.create_connection((self._ip, self.port), self.timeout)
 
 
-def _open(scheme: str, host: str, port: int, target: str, ip: str, timeout: float) -> tuple[int, dict, bytes]:
+def _open(
+    scheme: str, host: str, port: int, target: str, ip: str, timeout: float, deadline: float | None = None
+) -> tuple[int, dict, bytes]:
     kind = _PinnedHTTPS if scheme == "https" else _PinnedHTTP
     connection = kind(host, ip, port=port, timeout=timeout)
     try:
         connection.request("GET", target, headers={"User-Agent": USER_AGENT, "Accept": "text/html,*/*;q=0.5"})
         response = connection.getresponse()
         headers = {k.lower(): v for k, v in response.getheaders()}
-        return response.status, headers, response.read(MAX_BYTES + 1)
+        if deadline is None:
+            return response.status, headers, response.read(MAX_BYTES + 1)
+        # Read in pieces, each waiting no longer than what's left: a trickling server can't hold the fetch
+        body = b""
+        while len(body) <= MAX_BYTES:
+            left = deadline - time.monotonic()
+            if left <= 0:
+                raise FetchFailed("deadline")
+            if connection.sock is not None:
+                connection.sock.settimeout(min(timeout, left))
+            piece = response.read1(CHUNK)
+            if not piece:
+                break
+            body += piece
+        return response.status, headers, body
     except (OSError, http.client.HTTPException) as error:
         raise FetchFailed("connection") from error
     finally:
@@ -120,12 +138,25 @@ def _allowed(url: str, allowed_hosts: frozenset[str]) -> None:
         raise FetchRefused(url)
 
 
-def fetch(url: str, accept: tuple[str, ...] = PAGE_TYPES, *, allowed_hosts: frozenset[str] | None = None) -> Page:
+def fetch(
+    url: str,
+    accept: tuple[str, ...] = PAGE_TYPES,
+    *,
+    allowed_hosts: frozenset[str] | None = None,
+    deadline: float | None = None,
+) -> Page:
+    """`deadline` (time.monotonic()): the whole fetch, redirects and reading included, ends by then."""
     for _ in range(MAX_REDIRECTS + 1):
         if allowed_hosts is not None:
             _allowed(url, allowed_hosts)
+        if deadline is not None and deadline <= time.monotonic():
+            raise FetchFailed("deadline")
         scheme, host, port, target, ip = _checked(url)
-        status, headers, body = _open(scheme, host, port, target, ip, TIMEOUT)
+        if deadline is None:
+            status, headers, body = _open(scheme, host, port, target, ip, TIMEOUT)
+        else:
+            timeout = max(0.1, min(TIMEOUT, deadline - time.monotonic()))
+            status, headers, body = _open(scheme, host, port, target, ip, timeout, deadline=deadline)
         if status in (301, 302, 303, 307, 308) and headers.get("location"):
             url = urljoin(url, headers["location"])
             continue

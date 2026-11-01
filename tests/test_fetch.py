@@ -122,3 +122,43 @@ def test_allowlist_refuses_other_hosts_and_redirects(net):
     # Without an allowlist the redirect is followed as before
     pages[("evil.example", "/x")] = (200, HTML, b"<html></html>")
     assert fetch.fetch("https://www.swissmilk.ch/a/").url == "https://evil.example/x"
+
+
+def test_deadline_ends_a_slow_trickle():
+    """A server that sends one byte at a time can't hold a fetch past its deadline."""
+    import socket
+    import threading
+    import time
+
+    server = socket.socket()
+    server.bind(("127.0.0.1", 0))
+    server.listen(1)
+
+    def drip():
+        conn, _ = server.accept()
+        conn.recv(1024)
+        conn.sendall(b"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: 100000\r\n\r\n")
+        try:
+            for _ in range(50):
+                conn.sendall(b"x")
+                time.sleep(0.2)
+        except OSError:
+            pass
+        conn.close()
+
+    threading.Thread(target=drip, daemon=True).start()
+    started = time.monotonic()
+    with pytest.raises(fetch.FetchFailed):
+        fetch._open("http", "127.0.0.1", server.getsockname()[1], "/", "127.0.0.1", 10, deadline=started + 0.6)
+    assert time.monotonic() - started < 1.5
+    server.close()
+
+
+def test_deadline_passed_opens_nothing(net):
+    import time
+
+    _, pages, opened = net
+    pages[("public.example", "/")] = (200, HTML, b"<html></html>")
+    with pytest.raises(fetch.FetchFailed):
+        fetch.fetch("https://public.example/", deadline=time.monotonic() - 1)
+    assert opened == []

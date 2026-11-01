@@ -66,7 +66,7 @@ def test_search_url_encodes_words():
 
 def test_recipe_and_photo_refuse_other_addresses(monkeypatch):
     calls = []
-    monkeypatch.setattr(swissmilk, "_get", lambda url, accept=None: calls.append(url))
+    monkeypatch.setattr(swissmilk, "_get", lambda url, accept=None, deadline=None: calls.append(url))
     with pytest.raises(fetch.FetchRefused):
         swissmilk.recipe("https://www.swissmilk.ch/de/suche/")
     with pytest.raises(fetch.FetchRefused):
@@ -77,7 +77,7 @@ def test_recipe_and_photo_refuse_other_addresses(monkeypatch):
 def test_recipe_is_cached(monkeypatch):
     calls = []
 
-    def get(url, accept=None):
+    def get(url, accept=None, deadline=None):
         calls.append(url)
         return fetch.Page(url, "text/html", PAGE.encode())
 
@@ -96,7 +96,7 @@ def test_photo_is_downscaled_and_cached(monkeypatch):
     Image.new("RGB", (3000, 2000), "red").save(buffer, "PNG")
     calls = []
 
-    def get(url, accept=None):
+    def get(url, accept=None, deadline=None):
         calls.append(url)
         return fetch.Page(url, "image/png", buffer.getvalue())
 
@@ -116,14 +116,14 @@ def test_recipe_id():
 
 
 def test_original_photo_only_from_swissmilk(monkeypatch):
-    monkeypatch.setattr(swissmilk, "_get", lambda url, accept=None: fetch.Page(url, "image/jpeg", b"raw"))
+    monkeypatch.setattr(swissmilk, "_get", lambda url, accept=None, deadline=None: fetch.Page(url, "image/jpeg", b"raw"))
     assert swissmilk.original_photo(swissmilk.PHOTO_PREFIX + "a.jpg") == b"raw"
     with pytest.raises(fetch.FetchRefused):
         swissmilk.original_photo("https://res.cloudinary.com/a.jpg")
 
 
 def test_photo_keys_outlive_a_full_cache(monkeypatch):
-    monkeypatch.setattr(swissmilk, "_get", lambda url, accept=None: fetch.Page(url, "text/html", b"<html></html>"))
+    monkeypatch.setattr(swissmilk, "_get", lambda url, accept=None, deadline=None: fetch.Page(url, "text/html", b"<html></html>"))
     key = swissmilk.remember_photo(swissmilk.PHOTO_PREFIX + "a.jpg")
     for n in range(swissmilk.CACHE_ENTRIES + 50):
         swissmilk.recipe(f"https://www.swissmilk.ch/de/rezepte-kochideen/rezepte/X{n}/y/")
@@ -136,3 +136,44 @@ def test_every_spelling_of_swissmilk():
     assert not swissmilk.is_swissmilk("https://notswissmilk.ch/x")
     assert swissmilk.page_url("http://swissmilk.ch./de/a/?b=1") == "https://www.swissmilk.ch/de/a/?b=1"
     assert swissmilk.page_url("https://api.swissmilk.ch/x") is None
+
+
+def test_candidates_only_plain_swissmilk_addresses():
+    page = (
+        '<a href="//x@www.swissmilk.ch/de/rezepte-kochideen/rezepte/A1/b/">u</a>'
+        '<a href="https://www.swissmilk.ch:443/de/rezepte-kochideen/rezepte/A2/b/">p</a>'
+        '<a href="/de/rezepte-kochideen/rezepte/A3/b/">ok</a>'
+    )
+    assert swissmilk.candidates(page) == ["https://www.swissmilk.ch/de/rezepte-kochideen/rezepte/A3/b/"]
+
+
+def test_one_fetch_for_a_page_asked_twice_at_once(monkeypatch):
+    import threading
+    import time
+
+    calls = []
+
+    def slow(url, accept=None, deadline=None):
+        calls.append(url)
+        time.sleep(0.3)
+        return fetch.Page(url, "text/html", PAGE.encode())
+
+    monkeypatch.setattr(swissmilk, "_get", slow)
+    threads = [threading.Thread(target=swissmilk.recipe, args=(FIRST,)) for _ in range(3)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert calls == [FIRST]
+
+
+def test_search_page_is_cached(monkeypatch):
+    calls = []
+
+    def get(url, accept=None, deadline=None):
+        calls.append(url)
+        return fetch.Page(url, "text/html", SEARCH.encode())
+
+    monkeypatch.setattr(swissmilk, "_get", get)
+    assert swissmilk.search(["Kartoffeln"]) == swissmilk.search(["Kartoffeln"])
+    assert calls == [swissmilk.search_url(["Kartoffeln"])]

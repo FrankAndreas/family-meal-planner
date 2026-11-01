@@ -70,28 +70,53 @@ def clear_cache() -> None:
     with _lock:
         _cache.clear()
         _keys.clear()
+        _inflight.clear()
+
+
+# Pages being fetched right now: a second search asking for the same page waits for it instead of fetching again
+_inflight: dict[str, threading.Event] = {}
+
+
+def _fresh(key: str):
+    hit = _cache.get(key)
+    return hit if hit and time.monotonic() - hit[0] < CACHE_SECONDS else None
 
 
 def _cached(key: str, make):
-    now = time.monotonic()
     with _lock:
-        hit = _cache.get(key)
-        if hit and now - hit[0] < CACHE_SECONDS:
+        hit = _fresh(key)
+        if hit:
             return hit[1]
-    value = make()
-    with _lock:
-        _cache[key] = (now, value)
-        _cache.move_to_end(key)
-        while len(_cache) > CACHE_ENTRIES:
-            _cache.popitem(last=False)
-    return value
+        waiting = _inflight.get(key)
+        if waiting is None:
+            _inflight[key] = done = threading.Event()
+    if waiting is not None:
+        waiting.wait()
+        with _lock:
+            hit = _fresh(key)
+        if hit:
+            return hit[1]
+        # The other fetch failed: try once more ourselves
+        return make()
+    try:
+        value = make()
+        with _lock:
+            _cache[key] = (time.monotonic(), value)
+            _cache.move_to_end(key)
+            while len(_cache) > CACHE_ENTRIES:
+                _cache.popitem(last=False)
+        return value
+    finally:
+        with _lock:
+            _inflight.pop(key, None)
+        done.set()
 
 
-def _get(url: str, accept: tuple[str, ...] = fetch.PAGE_TYPES) -> fetch.Page:
+def _get(url: str, accept: tuple[str, ...] = fetch.PAGE_TYPES, deadline: float | None = None) -> fetch.Page:
     """The one network call: HTTPS to Swissmilk's page host, or its photo host, and nowhere else (also not by
-    redirect)."""
+    redirect); ended by `deadline` if given."""
     host = PHOTO_HOST if url.startswith(PHOTO_PREFIX) else PAGE_HOST
-    return fetch.fetch(url, accept=accept, allowed_hosts=frozenset({host}))
+    return fetch.fetch(url, accept=accept, allowed_hosts=frozenset({host}), deadline=deadline)
 
 
 def _host(url: str) -> str:
@@ -121,7 +146,8 @@ def is_recipe_url(url: str) -> bool:
         parts = urlsplit(url)
     except ValueError:
         return False
-    return parts.scheme == "https" and parts.hostname == PAGE_HOST and not parts.query and bool(
+    # The plain host only: no login details ("x@") and no port in a link handed on to the family
+    return parts.scheme == "https" and parts.netloc == PAGE_HOST and not parts.query and bool(
         _RECIPE_PATH.match(parts.path)
     )
 
@@ -149,10 +175,16 @@ def candidates(page: str) -> list[str]:
     return found
 
 
-def recipe(url: str) -> dict | None:
+def search(words: list[str], deadline: float | None = None) -> list[str]:
+    """Swissmilk's recipe links for these words; the same search within a day asks Swissmilk once."""
+    url = search_url(words)
+    return _cached(f"search:{url}", lambda: candidates(_get(url, deadline=deadline).text))
+
+
+def recipe(url: str, deadline: float | None = None) -> dict | None:
     if not is_recipe_url(url):
         raise fetch.FetchRefused(url)
-    return _cached(f"recipe:{url}", lambda: read_recipe(_get(url).text, url))
+    return _cached(f"recipe:{url}", lambda: read_recipe(_get(url, deadline=deadline).text, url))
 
 
 def _check_photo(url: str) -> None:

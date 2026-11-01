@@ -104,3 +104,21 @@ def test_http_error(net):
 def test_malformed_urls_refused(net, url):
     with pytest.raises(fetch.FetchRefused):
         fetch.fetch(url)
+
+
+def test_allowlist_refuses_other_hosts_and_redirects(net):
+    dns, pages, opened = net
+    dns["www.swissmilk.ch"] = ["93.184.216.40"]
+    dns["evil.example"] = ["93.184.216.41"]
+    allowed = frozenset({"www.swissmilk.ch"})
+    pages[("www.swissmilk.ch", "/a/")] = (302, {"location": "https://evil.example/x"}, b"")
+    with pytest.raises(fetch.FetchRefused):
+        fetch.fetch("https://www.swissmilk.ch/a/", allowed_hosts=allowed)
+    assert [o[0] for o in opened] == ["www.swissmilk.ch"]
+    with pytest.raises(fetch.FetchRefused):
+        fetch.fetch("http://www.swissmilk.ch/a/", allowed_hosts=allowed)
+    with pytest.raises(fetch.FetchRefused):
+        fetch.fetch("https://evil.example/x", allowed_hosts=allowed)
+    # Without an allowlist the redirect is followed as before
+    pages[("evil.example", "/x")] = (200, HTML, b"<html></html>")
+    assert fetch.fetch("https://www.swissmilk.ch/a/").url == "https://evil.example/x"

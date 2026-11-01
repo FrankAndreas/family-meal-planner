@@ -1,4 +1,4 @@
-from app import config
+from app import config, models
 from helpers import create_user, login
 from mails import build_mail
 
@@ -146,3 +146,17 @@ def test_svg_attachment_not_served(client, admin_headers, monkeypatch):
     raw = build_mail(from_addr="papa@x.ch", attachments=[("x.svg", svg, "image/svg+xml")])
     item = client.post("/api/inbound", content=raw, headers={"X-Inbound-Secret": "s"}).json()["id"]
     assert client.get(f"/api/inbox/{item}/attachments/0", headers=admin_headers).status_code == 404
+
+
+def test_same_swissmilk_recipe_taken_over_once(client, admin_headers, db):
+    gratin = "https://www.swissmilk.ch/de/rezepte-kochideen/rezepte/LM_div_0812_03/kartoffelgratin/"
+    create_user(client, admin_headers, "Lena")
+    kid = login(client, "Lena", "5678")
+    first = client.post("/api/inbox/urls", json={"url": gratin}, headers=kid).json()
+    # A double tap, or the French page of the same recipe
+    again = client.post("/api/inbox/urls", json={"url": gratin}, headers=kid).json()
+    french = client.post(
+        "/api/inbox/urls", json={"url": "https://www.swissmilk.ch/fr/recettes-idees/recettes/LM_div_0812_03/gratin/"}, headers=kid
+    ).json()
+    assert again["id"] == first["id"] == french["id"]
+    assert db.query(models.InboxItem).filter(models.InboxItem.kind == "url").count() == 1

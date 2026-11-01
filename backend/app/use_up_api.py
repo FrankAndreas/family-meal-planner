@@ -20,9 +20,28 @@ MAX_MISSING = 2
 MAX_NAMES = 10
 
 
-def _optional(ingredient: models.RecipeIngredient) -> bool:
-    note = sort_key(ingredient.note or "")
+def _optional(note: str) -> bool:
+    note = sort_key(note or "")
     return "belieben" in note or "optional" in note
+
+
+def check(ingredients: list[tuple[str, str]], typed: list[str], staples: list[str]) -> tuple[list[str], list[str]]:
+    """For a recipe's (name, note) ingredients: which typed words it uses, and what is missing (neither typed nor
+    a basic nor optional), each thing once."""
+    used = [word for word in typed if any(matches(word, name) for name, _ in ingredients)]
+    missing: list[str] = []
+    for name, note in ingredients:
+        if _optional(note) or any(matches(word, name) for word in typed) or covered(name, staples):
+            continue
+        # The same thing in two groups ("Butter" for dough and topping) is one thing to buy
+        if canonical(name) not in {canonical(m) for m in missing}:
+            missing.append(name)
+    return used, missing
+
+
+def fit(mode: str, used: list[str], missing: list[str]) -> tuple[int, int]:
+    """How well a recipe fits, for sorting: Aufbrauchen by used first, Jetzt kochen by missing first."""
+    return (-len(used), len(missing)) if mode == "use_up" else (len(missing), -len(used))
 
 
 def _typed(have: list[str]) -> list[str]:
@@ -49,16 +68,9 @@ def use_up(
     staples = get_settings(db).staples
     hits = []
     for recipe in live_recipes(db):
-        used = [word for word in typed if any(matches(word, i.name) for i in recipe.ingredients)]
+        used, missing = check([(i.name, i.note) for i in recipe.ingredients], typed, staples)
         if not used:
             continue
-        missing: list[str] = []
-        for i in recipe.ingredients:
-            if _optional(i) or any(matches(word, i.name) for word in typed) or covered(i.name, staples):
-                continue
-            # The same thing in two groups ("Butter" for dough and topping) is one thing to buy
-            if canonical(i.name) not in {canonical(m) for m in missing}:
-                missing.append(i.name)
         if mode == "cook_now" and len(missing) > MAX_MISSING:
             continue
         hits.append((recipe, used, missing))
@@ -70,8 +82,7 @@ def use_up(
         recipe, used, missing = hit
         # Never eaten counts as longest ago
         eaten = summaries[recipe.id]["last_eaten"] or date.min
-        fit = (-len(used), len(missing)) if mode == "use_up" else (len(missing), -len(used))
-        return (*fit, eaten, sort_key(recipe.title))
+        return (*fit(mode, used, missing), eaten, sort_key(recipe.title))
 
     return [
         {**summaries[recipe.id], "used": used, "missing": missing} for recipe, used, missing in sorted(hits, key=order)

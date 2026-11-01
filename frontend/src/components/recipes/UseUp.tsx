@@ -7,6 +7,7 @@ import { fetchIngredientNames, fetchUseUp, MAX_HAVE, type UseUpMode, type UseUpR
 import { BUTTON_SECONDARY, ERROR } from '../../ui';
 import IngredientChips from './IngredientChips';
 import { RecipeThumb } from './RecipeCard';
+import SwissmilkResults from './SwissmilkResults';
 
 interface UseUpProps {
     have: string[];
@@ -129,6 +130,7 @@ export default function UseUp({ have, mode, onChange }: UseUpProps) {
                     </>
                 )
             )}
+            {have.length > 0 && <SwissmilkResults have={have} mode={mode} />}
         </div>
     );
 }

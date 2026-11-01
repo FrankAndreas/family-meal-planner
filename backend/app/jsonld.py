@@ -133,30 +133,37 @@ def recipe_from_html(page: str, page_url: str) -> dict | None:
         except ValueError:
             continue
         node = next((n for n in _nodes(document) if _is_recipe(n)), None)
-        if node is None or not _text(node.get("name")):
-            continue
-        servings, servings_unit = _yield(node.get("recipeYield"))
-        prep, cook = _minutes(node.get("prepTime")), _minutes(node.get("cookTime"))
-        if prep is None and cook is None:
-            cook = _minutes(node.get("totalTime"))
-        language = str(node.get("inLanguage") or "")[:2].lower()
-        ingredients = [parse_line(_text(line)) for line in node.get("recipeIngredient") or []]
-        return {
-            "title": _text(node.get("name"))[:200],
-            "servings": servings,
-            "servings_unit": servings_unit,
-            "prep_minutes": prep,
-            "cook_minutes": cook,
-            "ingredients": [i for i in ingredients if i["name"]][:100],
-            "steps": _steps(node.get("recipeInstructions") or [])[:60],
-            "tags": _tags(node),
-            "notes": "",
-            "language": language if language in ("de", "en") else None,
-            "source_url": page_url,
-            "image_url": _image(node.get("image")),
-            "uncertain": [],
-        }
+        draft = draft_from_node(node, page_url) if node is not None else None
+        if draft:
+            return draft
     return None
+
+
+def draft_from_node(node: dict, page_url: str) -> dict | None:
+    """A recipe draft from schema.org Recipe data (JSON-LD, or microdata read into the same shape)."""
+    if not _text(node.get("name")):
+        return None
+    servings, servings_unit = _yield(node.get("recipeYield"))
+    prep, cook = _minutes(node.get("prepTime")), _minutes(node.get("cookTime"))
+    if prep is None and cook is None:
+        cook = _minutes(node.get("totalTime"))
+    language = str(node.get("inLanguage") or "")[:2].lower()
+    ingredients = [parse_line(_text(line)) for line in node.get("recipeIngredient") or []]
+    return {
+        "title": _text(node.get("name"))[:200],
+        "servings": servings,
+        "servings_unit": servings_unit,
+        "prep_minutes": prep,
+        "cook_minutes": cook,
+        "ingredients": [i for i in ingredients if i["name"]][:100],
+        "steps": _steps(node.get("recipeInstructions") or [])[:60],
+        "tags": _tags(node),
+        "notes": "",
+        "language": language if language in ("de", "en") else None,
+        "source_url": page_url,
+        "image_url": _image(node.get("image")),
+        "uncertain": [],
+    }
 
 
 def page_image(page: str, page_url: str) -> str | None:

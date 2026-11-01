@@ -10,7 +10,7 @@ from urllib.parse import urlsplit
 
 from fastapi import HTTPException
 
-from . import ai, database, fetch, jsonld, mail, models, photos
+from . import ai, database, fetch, jsonld, mail, microdata, models, photos, swissmilk
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +62,29 @@ def _photo(url: str | None) -> str | None:
         return None
 
 
+def _swissmilk_draft(page: fetch.Page) -> dict | None:
+    """A Swissmilk page read without any AI: its recipe microdata, its photo from Swissmilk's photo host."""
+    draft = swissmilk.read_recipe(page.text, page.url)
+    if not draft:
+        return None
+    image = draft.pop("image_url", None)
+    try:
+        draft["photo"] = photos.store_photo(swissmilk.original_photo(image)) if image else None
+    except (fetch.FetchFailed, fetch.FetchRefused, HTTPException):
+        draft["photo"] = None
+    return draft
+
+
+def _from_swissmilk(link: str) -> dict | None:
+    address = swissmilk.page_url(link)
+    if address is None:
+        return None
+    try:
+        return _swissmilk_draft(swissmilk._get(address))
+    except (fetch.FetchFailed, fetch.FetchRefused):
+        return None
+
+
 def _followable(link: str) -> bool:
     try:
         host = (urlsplit(link).hostname or "").lower()
@@ -89,12 +112,29 @@ def process(db, item: models.InboxItem, user: models.User) -> None:
         links = [link for link in content.links if _followable(link)][:MAX_LINKS]
 
     page_without_recipe = None
+    swissmilk_unreadable = False
     for link in links:
+        if swissmilk.is_swissmilk(link):
+            # Swissmilk: only its own hosts, only its structured data, never the AI (spec 2026-11-01)
+            draft = _from_swissmilk(link)
+            if draft:
+                _finish(db, item, draft)
+                return
+            swissmilk_unreadable = True
+            continue
         try:
             page = fetch.fetch(link)
         except (fetch.FetchFailed, fetch.FetchRefused):
             continue
-        draft = jsonld.recipe_from_html(page.text, page.url)
+        if swissmilk.is_swissmilk(page.url):
+            # Reached by a redirect (a newsletter's click tracker): still Swissmilk, still never the AI
+            draft = _swissmilk_draft(page)
+            if draft:
+                _finish(db, item, draft)
+                return
+            swissmilk_unreadable = True
+            continue
+        draft = jsonld.recipe_from_html(page.text, page.url) or microdata.recipe_from_html(page.text, page.url)
         if draft:
             draft["photo"] = _photo(draft.pop("image_url", None))
             _finish(db, item, draft)
@@ -130,4 +170,4 @@ def process(db, item: models.InboxItem, user: models.User) -> None:
         _finish(db, item, draft, raw)
         return
 
-    _fail(db, item, "nothing_found")
+    _fail(db, item, "swissmilk_unreadable" if swissmilk_unreadable else "nothing_found")

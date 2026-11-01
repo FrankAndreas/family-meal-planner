@@ -14,7 +14,7 @@ from fastapi.responses import FileResponse
 from PIL import Image, ImageOps, UnidentifiedImageError
 from sqlalchemy.orm import Session
 
-from . import ai, auth, config, importer, mail, models, photos, schemas  # noqa: F401  (photos: HEIC opener)
+from . import ai, auth, config, importer, mail, models, photos, schemas, swissmilk  # noqa: F401  (photos: HEIC opener)
 from .database import get_db
 from .errors import api_error
 from .timeutil import utcnow
@@ -150,6 +150,14 @@ def discard_item(item_id: int, parent: models.User = Depends(auth.require_parent
 @router.post("/inbox/urls", response_model=schemas.InboxItemOut, status_code=201)
 def add_url(body: schemas.UrlIn, user: models.User = Depends(auth.get_current_user), db: Session = Depends(get_db)):
     """A link found while browsing. A parent's paste is the release: it is processed right away."""
+    # A Swissmilk recipe already on its way in (a double tap on "Übernehmen", another language's page): that one
+    number = swissmilk.recipe_id(body.url)
+    if number:
+        for open_item in db.query(models.InboxItem).filter(
+            models.InboxItem.kind == "url", models.InboxItem.status.in_(("waiting", "processing", "draft"))
+        ):
+            if swissmilk.recipe_id(open_item.url or "") == number:
+                return item_out(open_item)
     parent = user.role == models.UserRole.PARENT
     item = models.InboxItem(
         kind="url",

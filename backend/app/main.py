@@ -14,6 +14,7 @@ from . import (
     recipes_api,
     settings_api,
     suggestions_api,
+    swissmilk_api,
     use_up_api,
     users_api,
 )
@@ -41,6 +42,7 @@ app.include_router(recipes_api.router, prefix="/api")
 app.include_router(plan_api.router, prefix="/api")
 app.include_router(suggestions_api.router, prefix="/api")
 app.include_router(use_up_api.router, prefix="/api")
+app.include_router(swissmilk_api.router, prefix="/api")
 app.include_router(inbox_api.router, prefix="/api")
 app.include_router(ai.router, prefix="/api")
 

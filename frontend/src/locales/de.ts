@@ -276,6 +276,7 @@ const de = {
         recipe_deleted: 'Dieses Rezept wurde gelöscht und kann nicht mehr geplant werden.',
         week_not_over: 'Diese Woche ist noch nicht vorbei.',
         recipe_or_note: 'Bitte ein Rezept oder eine Notiz angeben.',
+        staple_empty: 'Ein leerer Eintrag kann nicht immer im Haus sein.',
         not_a_web_link: 'Das ist keine Web-Adresse (http/https).',
         inbound_off: 'Rezept-Mails sind nicht eingerichtet.',
         inbound_wrong_secret: 'Falsches Geheimnis für Rezept-Mails.',

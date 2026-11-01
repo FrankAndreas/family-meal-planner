@@ -277,6 +277,7 @@ const en: typeof de = {
         recipe_deleted: 'This recipe was deleted and can’t be planned any more.',
         week_not_over: 'This week isn’t over yet.',
         recipe_or_note: 'Please give a recipe or a note.',
+        staple_empty: 'An empty entry can’t be always at home.',
         not_a_web_link: 'That isn’t a web address (http/https).',
         inbound_off: 'Recipe mails are not set up.',
         inbound_wrong_secret: 'Wrong secret for recipe mails.',

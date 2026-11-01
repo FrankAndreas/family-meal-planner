@@ -4,7 +4,7 @@ a false ✓ is worse than a miss)."""
 
 import re
 
-from .recipes_api import sort_key
+from .text import sort_key
 
 # What's always at home unless parents say otherwise
 DEFAULT_STAPLES = ["Salz", "Pfeffer", "Öl", "Wasser", "Zucker", "Mehl", "Bouillon"]

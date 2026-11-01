@@ -4,6 +4,7 @@ from sqlalchemy import JSON, Boolean, Column, Date, DateTime, Enum, Float, Forei
 from sqlalchemy.orm import relationship
 
 from .database import Base
+from .pantry import DEFAULT_STAPLES
 from .timeutil import utcnow
 
 
@@ -41,6 +42,8 @@ class Settings(Base):
     family_size = Column(Integer, default=4, nullable=False)
     # Python weekday: 0 = Monday ... 6 = Sunday; Saturday suits Friday planning and weekend shopping
     week_start = Column(Integer, default=5, nullable=False)
+    # What's always at home: never shown as missing ("Was habe ich?")
+    staples = Column(JSON, default=lambda: list(DEFAULT_STAPLES), nullable=False)
 
 
 class Recipe(Base):

@@ -1,6 +1,7 @@
 """Swissmilk (swissmilk.ch): the only code that talks to it. Fixed addresses, structured data only, never the AI
 (spec 2026-11-01-swissmilk-search-design)."""
 
+import hashlib
 import re
 import threading
 import time
@@ -140,3 +141,20 @@ def photo(url: str) -> bytes:
     if not url.startswith(PHOTO_PREFIX) or urlsplit(url).hostname != PHOTO_HOST:
         raise fetch.FetchRefused(url)
     return _cached(f"photo:{url}", lambda: photos.downscale(_get(url, accept=IMAGE_TYPES).body))
+
+
+def remember_photo(url: str) -> str:
+    """A short key for a photo a search handed out; the photo endpoint serves only those."""
+    key = hashlib.sha256(url.encode()).hexdigest()[:16]
+    with _lock:
+        _cache[f"photokey:{key}"] = (time.monotonic(), url)
+        _cache.move_to_end(f"photokey:{key}")
+    return key
+
+
+def photo_for(key: str) -> str | None:
+    with _lock:
+        hit = _cache.get(f"photokey:{key}")
+    if hit and time.monotonic() - hit[0] < CACHE_SECONDS:
+        return hit[1]
+    return None

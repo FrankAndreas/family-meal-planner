@@ -174,6 +174,19 @@ class UseUpOut(RecipeSummary):
     missing: list[str]
 
 
+class SwissmilkResult(BaseModel):
+    """A Swissmilk recipe for what's at home: its photo comes through the app, never from Swissmilk directly."""
+
+    title: str
+    url: str
+    photo: str | None
+    used: list[str]
+    missing: list[str]
+    # The family's recipe from this Swissmilk recipe, or it's waiting in the inbox
+    recipe_id: int | None
+    waiting: bool
+
+
 class SourceMail(BaseModel):
     """The mail or pasted link a recipe was saved from: who sent it, and when."""
 

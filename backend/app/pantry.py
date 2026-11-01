@@ -111,6 +111,31 @@ _ALTERNATIVES = re.compile(r"\s+oder\s+", re.IGNORECASE)
 _TOGETHER = re.compile(r"\s+und\s+|\s*[&/+]\s*", re.IGNORECASE)
 
 
+# The default basics' everyday kinds: another compound ("Trüffelöl", "Paniermehl", "Rosenwasser") is a specialty
+# that's still to buy. A basic not listed here (one added in Settings) keeps the plain rule: the word itself or the
+# end of a compound. A specialty that is at home anyway is added in Settings as its own basic.
+EVERYDAY_KINDS: dict[str, tuple[str, ...]] = {
+    "Öl": ("Speiseöl", "Olivenöl", "Rapsöl", "Sonnenblumenöl", "Bratöl"),
+    "Salz": ("Meersalz", "Kochsalz", "Speisesalz", "Jodsalz", "Kräutersalz"),
+    "Pfeffer": (),
+    "Zucker": ("Kristallzucker", "Rohzucker", "Rohrzucker", "Puderzucker", "Vanillezucker"),
+    "Mehl": ("Weissmehl", "Halbweissmehl", "Ruchmehl", "Weizenmehl", "Zopfmehl"),
+    "Wasser": ("Leitungswasser", "Salzwasser", "Mineralwasser"),
+    "Bouillon": ("Gemüsebouillon", "Hühnerbouillon", "Fleischbouillon", "Rindsbouillon"),
+}
+_KINDS = {
+    _base(sort_key(basic)): {_base(sort_key(kind)) for kind in kinds} for basic, kinds in EVERYDAY_KINDS.items()
+}
+
+
+def _basic_word(staple_base: str, word: str) -> bool:
+    """Is this word of an ingredient the basic? For a default basic: itself or one of its everyday kinds."""
+    kinds = _KINDS.get(staple_base)
+    if kinds is None:
+        return any(_matches_word(form, word, True) for form in _GROUP.get(staple_base, (staple_base,)))
+    return word == staple_base or word in kinds
+
+
 def covered(ingredient: str, staples: list[str]) -> bool:
     """Is the ingredient a basic? Read up to a comma (the rest describes it); each thing it names together
     ("Salz und Pfeffer") must be a basic, of alternatives ("Butter oder Öl") one is enough. "Zitronensaft und Salz"
@@ -119,7 +144,16 @@ def covered(ingredient: str, staples: list[str]) -> bool:
 
     def is_basic(part: str) -> bool:
         part = _PURPOSE.sub("", " " + part.strip()).strip()
-        return bool(part) and any(matches(staple, part, strict=True) for staple in staples)
+        if not part:
+            return False
+        words = _words(part)
+        for staple in staples:
+            bases = _typed_words(staple)
+            if len(bases) == 1 and any(_basic_word(bases[0], word) for word in words):
+                return True
+            if len(bases) > 1 and matches(staple, part, strict=True):
+                return True
+        return False
 
     return any(
         all(is_basic(part) for part in _TOGETHER.split(alternative)) for alternative in _ALTERNATIVES.split(name)

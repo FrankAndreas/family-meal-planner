@@ -105,3 +105,35 @@ def test_not_covered(ingredient):
 def test_covered_by_a_basic_of_two_words():
     assert covered("Crème fraîche", ["Crème fraîche"])
     assert not covered("Crème double", ["Crème fraîche"])
+
+
+EVERYDAY = [
+    "Speiseöl", "Olivenöl", "Rapsöl", "Sonnenblumenöl", "Bratöl", "Meersalz", "Kochsalz", "Speisesalz", "Jodsalz",
+    "Kräutersalz", "weisser Pfeffer", "Schwarzer Pfeffer", "Pfeffer aus der Mühle", "Kristallzucker", "Rohzucker",
+    "Rohrzucker", "Puderzucker", "Vanillezucker", "Weissmehl", "Halbweissmehl", "Ruchmehl", "Weizenmehl", "Zopfmehl",
+    "Leitungswasser", "Salzwasser", "Mineralwasser", "Gemüsebouillon", "Hühnerbouillon", "Fleischbouillon",
+    "Rindsbouillon", "Gemüse-Bouillon",
+]
+SPECIALTY = [
+    "Trüffelöl", "Sesamöl", "Kokosöl", "Walnussöl", "Kürbiskernöl", "Chiliöl", "Fleur de Sel", "Rauchsalz",
+    "Selleriesalz", "Cayennepfeffer", "Szechuanpfeffer", "Hagelzucker", "Gelierzucker", "Kokosblütenzucker",
+    "Dinkelmehl", "Paniermehl", "Mandelmehl", "Kichererbsenmehl", "Maismehl", "Rosenwasser", "Orangenblütenwasser",
+    "Kokoswasser", "Dashibouillon",
+]
+
+
+@pytest.mark.parametrize("ingredient", EVERYDAY)
+def test_everyday_variants_are_basics(ingredient):
+    assert covered(ingredient, DEFAULT_STAPLES)
+
+
+@pytest.mark.parametrize("ingredient", SPECIALTY)
+def test_specialty_variants_are_missing(ingredient):
+    assert not covered(ingredient, DEFAULT_STAPLES)
+
+
+def test_own_basics_keep_the_compound_rule():
+    # A basic added in Settings: the word itself or the end of a compound, as before
+    assert covered("Bergkäse", ["Käse"]) and covered("Muskat", ["Muskat"])
+    # A specialty added on purpose counts
+    assert covered("Dinkelmehl", DEFAULT_STAPLES + ["Dinkelmehl"])

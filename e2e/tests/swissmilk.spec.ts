@@ -48,7 +48,9 @@ test('find and take over a Swissmilk recipe from What do I have?', async ({ page
     await expect(salat.getByRole('button', { name: 'Take over' })).toHaveCount(0);
 
     await gratin.getByRole('button', { name: 'Take over' }).dblclick();
-    await expect(gratin).toContainText('waiting in the inbox');
+    // The plain text shows while it is being sent; the link to the inbox only once the inbox has answered, so by then
+    // the request has surely reached the route above
+    await expect(gratin.getByRole('link', { name: 'waiting in the inbox' })).toHaveAttribute('href', '/posteingang');
     await expect(gratin.getByRole('button', { name: 'Take over' })).toHaveCount(0);
     expect(taken).toEqual([{ url: GRATIN }]);
 

@@ -49,6 +49,7 @@ const SOURCE_TEXT = {
   mail: "recipes.sourceByMail",
   url: "recipes.sourceByLink",
   scan: "recipes.sourceByScan",
+  text: "recipes.sourceByText",
 } as const;
 
 export default function RecipeView() {

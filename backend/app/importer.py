@@ -2,6 +2,7 @@
 1. links (the pasted URL, or links in the mail) → the page's schema.org Recipe, no AI;
 2. a fetched page without one → the AI reads the page's text;
 3. the mail itself → the AI reads its text and all its pictures in one go.
+A pasted text goes straight to 3: its link is only the source, never fetched.
 Runs in a thread of its own, so the request returns at once and the inbox page polls."""
 
 import logging
@@ -105,6 +106,11 @@ def process(db, item: models.InboxItem, user: models.User) -> None:
     content = None
     if item.kind == "url":
         links = [item.url]
+    elif item.kind == "text":
+        from .inbox_api import raw_path
+
+        content = mail.content(raw_path(item).read_bytes())
+        links = []
     else:
         from .inbox_api import raw_path
 
@@ -158,7 +164,8 @@ def process(db, item: models.InboxItem, user: models.User) -> None:
             return
 
     if content is not None and (content.text.strip() or content.images):
-        text = f"Betreff: {item.subject}\n\n{content.text}"
+        # A pasted text's subject is only its own first line
+        text = content.text if item.kind == "text" else f"Betreff: {item.subject}\n\n{content.text}"
         draft, raw, sent = _ask_ai(db, item, user, text, [data for _, data in content.images])
         index = draft.pop("image_index", None)
         # The picture the AI named (counted among those it got), else the first it got: as an attachment index,
@@ -166,7 +173,7 @@ def process(db, item: models.InboxItem, user: models.User) -> None:
         if sent:
             chosen = sent[index] if isinstance(index, int) and 0 <= index < len(sent) else sent[0]
             draft["image_attachment"] = content.images[chosen][0]
-        draft["source_url"] = links[0] if links else None
+        draft["source_url"] = item.url if item.kind == "text" else (links[0] if links else None)
         _finish(db, item, draft, raw)
         return
 

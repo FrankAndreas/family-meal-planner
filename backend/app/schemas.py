@@ -105,7 +105,7 @@ class RecipeIn(BaseModel):
     steps: Annotated[list[str], Field(max_length=100)] = []
     tags: Annotated[list[Annotated[str, StringConstraints(max_length=40)]], Field(max_length=20)] = []
     notes: Annotated[str, StringConstraints(max_length=10_000)] = ""
-    source_kind: Literal["manual", "url", "mail", "scan"] = "manual"
+    source_kind: Literal["manual", "url", "mail", "scan", "text"] = "manual"
     source_url: Annotated[str, StringConstraints(strip_whitespace=True, max_length=1000)] | None = None
     language: Literal["de", "en"] | None = None
     # Saving a draft from the inbox: the item it came from (its photo is taken over, the item is done)
@@ -325,22 +325,41 @@ class InboxItemOut(BaseModel):
     recipe_id: int | None
 
 
+def web_link(url: str) -> str:
+    try:
+        parts = urlsplit(url)
+        ok = parts.scheme.lower() in ("http", "https") and bool(parts.hostname) and parts.port in (None, 80, 443)
+    except ValueError:
+        ok = False
+    if not ok:
+        raise ValueError("not_a_web_link")
+    return url
+
+
 class UrlIn(BaseModel):
     url: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=1000)]
 
     @field_validator("url")
     @classmethod
     def web_link(cls, url: str) -> str:
-        try:
-            parts = urlsplit(url)
-            ok = parts.scheme.lower() in ("http", "https") and bool(parts.hostname) and parts.port in (None, 80, 443)
-        except ValueError:
-            ok = False
-        if not ok:
-            raise ValueError("not_a_web_link")
-        return url
+        return web_link(url)
+
+
+class TextIn(BaseModel):
+    """A recipe's text pasted in (a Facebook post's caption), with where it came from."""
+
+    text: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=20_000)]
+    # Only kept as the recipe's source, never fetched
+    url: Annotated[str, StringConstraints(strip_whitespace=True, max_length=1000)] | None = None
+
+    @field_validator("url")
+    @classmethod
+    def optional_link(cls, url: str | None) -> str | None:
+        return web_link(url) if url else None
 
 
 class InboxItemDetail(InboxItemOut):
     draft: dict | None
     ai_raw: str | None
+    # A pasted text, as it was pasted
+    text: str | None = None

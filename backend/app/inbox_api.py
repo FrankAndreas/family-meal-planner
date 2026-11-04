@@ -222,10 +222,57 @@ async def add_scan(
     return item_out(item)
 
 
+def _title(text: str) -> str:
+    """The pasted text's first line, cut to fit."""
+    first = next((line.strip() for line in text.splitlines() if line.strip()), "")
+    return mail.clean(first, 120) or "Text"
+
+
+@router.post("/inbox/texts", response_model=schemas.InboxItemOut, status_code=201)
+def add_text(body: schemas.TextIn, user: models.User = Depends(auth.get_current_user), db: Session = Depends(get_db)):
+    """A recipe's text pasted in (a Facebook post's caption), with the link it came from. Kept as a mail with only
+    that text, so it is processed and shown like one; the link is never fetched (Facebook shows nothing without a
+    login), only kept as the source. A parent's paste is the release: it is read right away."""
+    message = EmailMessage()
+    message["Subject"] = _title(body.text)
+    message["Date"] = formatdate()
+    message["Message-ID"] = make_msgid(domain="text.invalid")
+    message.set_content(body.text)
+    raw = message.as_bytes()
+    summary = mail.summarize(raw)
+    parent = user.role == models.UserRole.PARENT
+    item = models.InboxItem(
+        kind="text",
+        status="processing" if parent else "waiting",
+        user_id=user.id,
+        subject=_title(body.text),
+        url=body.url,
+        message_id=summary.message_id,
+        attachments=[],
+        size=len(raw),
+    )
+    if parent:
+        item.processing_since = utcnow()
+    db.add(item)
+    db.flush()
+    raw_path(item).write_bytes(raw)
+    db.commit()
+    if parent:
+        importer.start(item.id, user.id)
+    return item_out(item)
+
+
 @router.get("/inbox/{item_id}", response_model=schemas.InboxItemDetail)
 def read_item(item_id: int, user: models.User = Depends(auth.get_current_user), db: Session = Depends(get_db)):
     item = visible_item(db, item_id, user)
-    return schemas.InboxItemDetail(**item_out(item).model_dump(), draft=item.draft, ai_raw=item.ai_raw)
+    text = None
+    if item.kind == "text":
+        # Its file gone (a database restored without the inbox folder): the item and its draft still open
+        try:
+            text = mail.content(raw_path(item).read_bytes()).text
+        except OSError:
+            pass
+    return schemas.InboxItemDetail(**item_out(item).model_dump(), draft=item.draft, ai_raw=item.ai_raw, text=text)
 
 
 @router.post("/inbox/{item_id}/process", response_model=schemas.InboxItemOut, status_code=202)

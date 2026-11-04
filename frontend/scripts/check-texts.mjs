@@ -12,6 +12,8 @@ const ATTRIBUTES = new Set(['placeholder', 'aria-label', 'title', 'alt', 'label'
 const CALLS = new Set(['confirm', 'alert', 'setError', 'errorMessage', 'setMessage']);
 const PROPERTIES = new Set(['label', 'text', 'title', 'placeholder']);
 const WORD = /[A-Za-zÄÖÜäöü]{2,}/;
+// A key into src/locales ("recipes.sourceByText"), not text: e.g. as the value of a source kind named "text"
+const KEY = /^[a-z]\w*(\.\w+)+$/;
 
 const problems = [];
 for (const file of CHECKED) {
@@ -46,7 +48,7 @@ for (const file of CHECKED) {
         }
         if (ts.isPropertyAssignment(node) && PROPERTIES.has(node.name.getText())) {
             const text = literal(node.initializer);
-            if (text && WORD.test(text)) report(node, text);
+            if (text && WORD.test(text) && !KEY.test(text)) report(node, text);
         }
         ts.forEachChild(node, visit);
     };

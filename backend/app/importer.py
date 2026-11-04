@@ -3,6 +3,8 @@
 2. a fetched page without one → the AI reads the page's text;
 3. the mail itself → the AI reads its text and all its pictures in one go.
 A pasted text goes straight to 3: its link is only the source, never fetched.
+A draft in another language than the family's (DEFAULT_LANGUAGE) is then translated, the original kept with it
+(spec 2026-11-04); Swissmilk never, it uses no AI.
 Runs in a thread of its own, so the request returns at once and the inbox page polls."""
 
 import logging
@@ -11,7 +13,7 @@ from urllib.parse import urlsplit
 
 from fastapi import HTTPException
 
-from . import ai, database, fetch, jsonld, mail, microdata, models, photos, swissmilk
+from . import ai, config, database, fetch, jsonld, mail, microdata, models, photos, swissmilk
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +54,37 @@ def _fail(db, item: models.InboxItem, code: str) -> None:
 def _finish(db, item: models.InboxItem, draft: dict, raw: str | None = None) -> None:
     item.status, item.error, item.draft, item.ai_raw, item.processing_since = "draft", None, draft, raw, None
     db.commit()
+
+
+# Said in the draft's "Bitte prüfen" when the translation didn't work: the Translate button can still do it later
+NOT_TRANSLATED = {
+    "de": "Konnte nicht übersetzt werden – das geht später mit «Auf Deutsch übersetzen» beim Rezept.",
+    "en": "Could not be translated – use “Translate into English” on the recipe later.",
+}
+
+
+def _translated(db, item: models.InboxItem, user: models.User, draft: dict) -> dict:
+    """The draft in the family's language, its text before kept as "original"; as it was if its language is unknown,
+    already the family's, or the AI can't (off, its hourly limit, a failed answer)."""
+    target = config.default_language()
+    if draft.get("language") not in ("de", "en") or draft["language"] == target:
+        return draft
+    text = {
+        "title": draft.get("title") or "",
+        "ingredients": [{"name": i.get("name") or "", "note": i.get("note") or ""} for i in draft.get("ingredients", [])],
+        "steps": list(draft.get("steps") or []),
+        "notes": draft.get("notes") or "",
+    }
+    try:
+        call = ai.take_call(db, user, "translate", item_id=item.id)
+        done, tokens = ai.translate(ai.client_for(ai.Settings.from_env()), text, target)
+    except (HTTPException, ai.AiFailed):
+        return {**draft, "uncertain": [*draft.get("uncertain", []), NOT_TRANSLATED[target]]}
+    call.tokens = tokens
+    db.commit()
+    ingredients = [{**old, **new} for old, new in zip(draft.get("ingredients", []), done["ingredients"])]
+    original = {**text, "language": draft["language"]}
+    return {**draft, **done, "ingredients": ingredients, "language": target, "original": original}
 
 
 def _photo(url: str | None) -> str | None:
@@ -143,7 +176,7 @@ def process(db, item: models.InboxItem, user: models.User) -> None:
         draft = jsonld.recipe_from_html(page.text, page.url) or microdata.recipe_from_html(page.text, page.url)
         if draft:
             draft["photo"] = _photo(draft.pop("image_url", None))
-            _finish(db, item, draft)
+            _finish(db, item, _translated(db, item, user, draft))
             return
         page_without_recipe = page_without_recipe or page
 
@@ -160,7 +193,7 @@ def process(db, item: models.InboxItem, user: models.User) -> None:
         else:
             draft.pop("image_index", None)
             draft["source_url"] = page_without_recipe.url
-            _finish(db, item, draft, raw)
+            _finish(db, item, _translated(db, item, user, draft), raw)
             return
 
     if content is not None and (content.text.strip() or content.images):
@@ -174,7 +207,7 @@ def process(db, item: models.InboxItem, user: models.User) -> None:
             chosen = sent[index] if isinstance(index, int) and 0 <= index < len(sent) else sent[0]
             draft["image_attachment"] = content.images[chosen][0]
         draft["source_url"] = item.url if item.kind == "text" else (links[0] if links else None)
-        _finish(db, item, draft, raw)
+        _finish(db, item, _translated(db, item, user, draft), raw)
         return
 
     _fail(db, item, "swissmilk_unreadable" if swissmilk_unreadable else "nothing_found")

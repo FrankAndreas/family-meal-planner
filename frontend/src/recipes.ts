@@ -1,4 +1,5 @@
 import api from './api';
+import type { Language } from './i18n';
 
 // Mirrors backend/app/schemas.py (RecipeSummary, RecipeOut)
 export interface RecipeSummary {
@@ -53,6 +54,8 @@ export interface Recipe extends RecipeSummary {
         notes: string;
         language: Recipe['language'];
     } | null;
+    // Not in the family's language: into which a parent can have it translated
+    translate_into: Language | null;
 }
 
 export interface RecipeInput {

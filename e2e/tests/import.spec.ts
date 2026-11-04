@@ -37,7 +37,8 @@ test('a parent processes a mail, checks the draft and saves it', async ({ page, 
     await expect(card.getByText('Draft ready')).toBeVisible({ timeout: 15_000 });
     await card.getByRole('link', { name: 'Review draft' }).click();
 
-    await expect(page.getByLabel('Title')).toHaveValue('Fake-Risotto');
+    // The fake AI reads it in German; the browser tests' family speaks English (DEFAULT_LANGUAGE=en): translated
+    await expect(page.getByLabel('Title')).toHaveValue('EN Fake-Risotto');
     await expect(page.getByRole('list', { name: 'Please check' })).toContainText('1 l oder 1,2 l Bouillon?');
     await page.getByLabel('Title').fill(subject);
     await page.getByRole('button', { name: 'Save recipe' }).click();
@@ -48,14 +49,14 @@ test('a parent processes a mail, checks the draft and saves it', async ({ page, 
     expect(errors).toEqual([]);
 });
 
-test('a parent translates an English recipe, and can show the original', async ({ page, request }) => {
+test('a parent translates a German recipe into the family language, and can show the original', async ({ page, request }) => {
     const parent = await newPerson(request);
-    const title = uniqueName('Pancakes ');
-    const recipe = await createRecipe(request, parent, { title, language: 'en', steps: ['Mix.'] });
+    const title = uniqueName('Pfannkuchen ');
+    const recipe = await createRecipe(request, parent, { title, language: 'de', steps: ['Mischen.'] });
     await login(page, parent.name);
     await page.goto(`/rezepte/${recipe.id}`);
-    await page.getByRole('button', { name: 'Translate into German' }).click();
-    await expect(page.getByRole('heading', { name: `DE ${title}` })).toBeVisible();
+    await page.getByRole('button', { name: 'Translate into English' }).click();
+    await expect(page.getByRole('heading', { name: `EN ${title}` })).toBeVisible();
     await page.getByRole('button', { name: 'Show original' }).click();
     await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible();
 

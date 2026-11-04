@@ -76,8 +76,19 @@ def test_ingredient_count_must_match(client, admin_headers, translator):
 
 def test_already_german(client, admin_headers, translator):
     r = create_recipe(client, admin_headers, language="de")
+    assert r["translate_into"] is None and _english(client, admin_headers)["translate_into"] == "de"
     response = client.post(f"/api/recipes/{r['id']}/translate", headers=admin_headers)
-    assert response.status_code == 400 and response.json()["detail"] == "already_german"
+    assert response.status_code == 400 and response.json()["detail"] == "already_translated"
+
+
+def test_an_english_family_translates_into_english(client, admin_headers, translator, monkeypatch):
+    monkeypatch.setenv("DEFAULT_LANGUAGE", "en")
+    prompts = []
+    translator.append(lambda data: prompts.append(data) or {**data, "title": "Rösti, in English"})
+    german = create_recipe(client, admin_headers, "Rösti", language="de")
+    assert german["translate_into"] == "en" and _english(client, admin_headers)["translate_into"] is None
+    got = client.post(f"/api/recipes/{german['id']}/translate", headers=admin_headers).json()
+    assert got["language"] == "en" and got["original"]["language"] == "de"
 
 
 def test_parents_only(client, admin_headers, translator):

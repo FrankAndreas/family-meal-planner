@@ -119,7 +119,7 @@ class FakeClient:
         question = content[0].get("text", "") if content else ""
         if TRANSLATE_MARKER in question:
             data = json.loads(question.split(TRANSLATE_MARKER, 1)[1])
-            data["title"] = "DE " + data["title"]
+            data["title"] = ("EN " if INTO["en"] in question else "DE ") + data["title"]
             return Answer(json.dumps(data), 50)
         return Answer(
             json.dumps(
@@ -317,15 +317,21 @@ def ai_usage(_parent: models.User = Depends(auth.require_parent), db: Session = 
     return {"month": [{"user_name": name, "calls": calls} for name, calls in rows], "total": db.query(models.AiCall).count()}
 
 
-TRANSLATE_PROMPT = """Übersetze dieses Kochrezept ins Deutsche (Schweizer Rechtschreibung: ss statt ß).
+TRANSLATE_PROMPT = """Übersetze dieses Kochrezept {into}.
 Antworte NUR mit demselben JSON, in derselben Form: gleich viele Zutaten in derselben Reihenfolge, gleich viele
 Schritte. Übersetze title, name, note, steps und notes; erfinde nichts dazu.
 """
 
 
-def translate(client: AiClient, text: dict) -> tuple[dict, int | None]:
-    """The recipe's text in German: {title, ingredients: [{name, note}], steps, notes}, the same shape as given."""
-    answer = client.complete([{"type": "text", "text": TRANSLATE_PROMPT + TRANSLATE_MARKER + json.dumps(text, ensure_ascii=False)}])
+# Into which language, said in the prompt's German
+INTO = {"de": "ins Deutsche (Schweizer Rechtschreibung: ss statt ß)", "en": "ins Englische"}
+
+
+def translate(client: AiClient, text: dict, target: str = "de") -> tuple[dict, int | None]:
+    """The recipe's text in the target language (de or en): {title, ingredients: [{name, note}], steps, notes}, the
+    same shape as given."""
+    prompt = TRANSLATE_PROMPT.format(into=INTO[target])
+    answer = client.complete([{"type": "text", "text": prompt + TRANSLATE_MARKER + json.dumps(text, ensure_ascii=False)}])
     data = _json(answer.text)
     if (
         not isinstance(data, dict)

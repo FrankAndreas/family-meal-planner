@@ -41,3 +41,26 @@ test('a child pastes a text from the recipes page; it waits for a parent', async
     await expect(page).toHaveURL(/\/posteingang$/);
     await expect(page.getByRole('article').filter({ hasText: title }).getByText('Waiting for a parent')).toBeVisible();
 });
+
+test('a post in another language is translated while imported; the original can still be shown', async ({ page, request }) => {
+    // The fake AI reads every recipe as German; the browser tests' family speaks English (DEFAULT_LANGUAGE=en)
+    const parent = await newPerson(request);
+    const errors = await login(page, parent.name);
+    const title = uniqueName('Risotto ');
+    await page.goto('/posteingang');
+    await page.getByRole('button', { name: 'Paste recipe text' }).click();
+    await page.getByLabel('Recipe text').fill(`${title}\n300 g Risottoreis`);
+    await page.getByRole('button', { name: 'Make a recipe of it' }).click();
+
+    const card = page.getByRole('article').filter({ hasText: title });
+    await expect(card.getByText('Draft ready')).toBeVisible({ timeout: 15_000 });
+    await card.getByRole('link', { name: 'Review draft' }).click();
+    await expect(page.getByLabel('Title')).toHaveValue('EN Fake-Risotto');
+    await page.getByRole('button', { name: 'Save recipe' }).click();
+    await expect(page.getByRole('heading', { name: 'EN Fake-Risotto' }).first()).toBeVisible();
+    // Already in the family's language: no translate button, but the original
+    await expect(page.getByRole('button', { name: /^Translate into/ })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Show original' }).click();
+    await expect(page.getByRole('heading', { name: 'Fake-Risotto', exact: true })).toBeVisible();
+    expect(errors).toEqual([]);
+});

@@ -368,3 +368,109 @@ def test_childs_pasted_text_is_read_when_a_parent_processes_it(client, admin_hea
     assert client.post(f"/api/inbox/{item['id']}/process", headers=admin_headers).status_code == 202
     got = _item(client, admin_headers, item["id"])
     assert got["status"] == "draft" and len(calls) == 1 and got["draft"]["source_url"] is None
+
+
+ENGLISH = {
+    "title": "Fudgy brownies",
+    "servings": 9,
+    "ingredients": [
+        {"amount": 3, "unit": None, "name": "bananas", "note": "ripe"},
+        {"amount": 3, "unit": "g", "name": "cocoa powder", "note": ""},
+    ],
+    "steps": ["Blend.", "Bake at 180 °C."],
+    "uncertain": [],
+    "language": "en",
+}
+GERMAN = {
+    "title": "Saftige Brownies",
+    "ingredients": [{"name": "Bananen", "note": "reif"}, {"name": "Kakaopulver", "note": ""}],
+    "steps": ["Mixen.", "Bei 180 °C backen."],
+    "notes": "",
+}
+
+
+@pytest.fixture
+def bilingual(world, monkeypatch):
+    """The recording AI, reading an English recipe and translating it (or failing to, if told)."""
+    _, calls = world
+    failing = []
+
+    class Recorder:
+        def complete(self, content):
+            calls.append(content)
+            if ai.TRANSLATE_MARKER in content[0]["text"]:
+                if failing:
+                    raise ai.AiFailed("down")
+                return ai.Answer(json.dumps(GERMAN), 55)
+            return ai.Answer(json.dumps(ENGLISH), 99)
+
+    monkeypatch.setattr(importer.ai, "client_for", lambda settings: Recorder())
+    return calls, failing
+
+
+def _paste(client, headers, text="Fudgy brownies\n3 ripe bananas"):
+    return client.post("/api/inbox/texts", json={"text": text}, headers=headers).json()["id"]
+
+
+def test_english_import_is_translated_and_keeps_its_original(client, admin_headers, bilingual, db):
+    calls, _ = bilingual
+    item = _paste(client, admin_headers)
+    draft = _item(client, admin_headers, item)["draft"]
+    assert len(calls) == 2 and "ins Deutsche" in calls[1][0]["text"]
+    assert draft["title"] == "Saftige Brownies" and draft["language"] == "de" and draft["steps"][0] == "Mixen."
+    assert [(i["amount"], i["unit"], i["name"], i["note"]) for i in draft["ingredients"]] == [
+        (3, None, "Bananen", "reif"),
+        (3, "g", "Kakaopulver", ""),
+    ]
+    assert draft["original"]["title"] == "Fudgy brownies" and draft["original"]["language"] == "en"
+    assert [c.purpose for c in db.query(models.AiCall).order_by(models.AiCall.id)] == ["import", "translate"]
+
+    body = {k: draft[k] for k in ("title", "servings", "servings_unit", "ingredients", "steps", "tags", "language")}
+    recipe = client.post("/api/recipes", json={**body, "inbox_item_id": item}, headers=admin_headers).json()
+    assert recipe["language"] == "de" and recipe["translate_into"] is None
+    assert recipe["original"]["title"] == "Fudgy brownies" and recipe["original"]["ingredients"][0]["name"] == "bananas"
+
+
+def test_failed_translation_still_gives_the_draft(client, admin_headers, bilingual):
+    _, failing = bilingual
+    failing.append(True)
+    got = _item(client, admin_headers, _paste(client, admin_headers))
+    draft = got["draft"]
+    assert got["status"] == "draft" and draft["title"] == "Fudgy brownies" and draft["language"] == "en"
+    assert "original" not in draft and "Konnte nicht übersetzt werden" in draft["uncertain"][-1]
+
+
+def test_no_translation_when_the_hourly_limit_is_used_up(client, admin_headers, bilingual, monkeypatch):
+    calls, _ = bilingual
+    monkeypatch.setenv("AI_CALLS_PER_HOUR", "1")
+    draft = _item(client, admin_headers, _paste(client, admin_headers))["draft"]
+    assert len(calls) == 1 and draft["language"] == "en" and "Konnte nicht übersetzt werden" in draft["uncertain"][-1]
+
+
+def test_german_and_unknown_imports_are_not_translated(client, admin_headers, bilingual, monkeypatch):
+    calls, _ = bilingual
+    for language in ("de", None):
+        monkeypatch.setitem(ENGLISH, "language", language)
+        calls.clear()
+        draft = _item(client, admin_headers, _paste(client, admin_headers, f"Brownies {language}"))["draft"]
+        assert len(calls) == 1 and "original" not in draft
+
+
+def test_english_family_translates_german_imports_into_english(client, admin_headers, bilingual, monkeypatch):
+    calls, _ = bilingual
+    monkeypatch.setenv("DEFAULT_LANGUAGE", "en")
+    monkeypatch.setitem(ENGLISH, "language", "de")
+    draft = _item(client, admin_headers, _paste(client, admin_headers))["draft"]
+    assert "ins Englische" in calls[1][0]["text"] and draft["language"] == "en"
+    assert "Could not" not in " ".join(draft["uncertain"])
+
+
+def test_english_recipe_page_is_translated_too(client, admin_headers, world, bilingual):
+    pages, calls = world
+    page = json.dumps({"@context": "https://schema.org", "@type": "Recipe", "name": "Fudgy brownies", "inLanguage": "en",
+                       "recipeIngredient": ["3 bananas", "3 tbsp cocoa powder"], "recipeInstructions": ["Blend.", "Bake."]})
+    pages["https://blog.example/brownies"] = ("text/html", f'<script type="application/ld+json">{page}</script>'.encode())
+    item = client.post("/api/inbox/urls", json={"url": "https://blog.example/brownies"}, headers=admin_headers).json()
+    draft = _item(client, admin_headers, item["id"])["draft"]
+    assert len(calls) == 1 and ai.TRANSLATE_MARKER in calls[0][0]["text"]
+    assert draft["title"] == "Saftige Brownies" and draft["original"]["title"] == "Fudgy brownies"

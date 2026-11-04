@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session, selectinload
 
-from . import ai, auth, fetch, jsonld, models, photos, scaling, schemas, stats
+from . import ai, auth, config, fetch, jsonld, models, photos, scaling, schemas, stats
 from .database import get_db
 from .errors import api_error
 from .settings_store import get_settings
@@ -104,7 +104,16 @@ def recipe_out(
         if item
         else None,
         original=recipe.original,
+        # Not in the family's language (or unknown, from outside): into which a parent can have it translated
+        translate_into=_translate_into(recipe),
     )
+
+
+def _translate_into(recipe: models.Recipe) -> str | None:
+    target = config.default_language()
+    if recipe.language == target or (recipe.language is None and recipe.source_kind == "manual"):
+        return None
+    return target
 
 
 def get_recipe(db: Session, recipe_id: int, *, allow_deleted: bool = False) -> models.Recipe:
@@ -200,6 +209,10 @@ def create_recipe(
     if item is not None:
         recipe.source_kind = item.kind
         recipe.photo = _draft_photo(item)
+        # Translated while imported: the text before, to show as the original
+        original = (item.draft or {}).get("original")
+        if isinstance(original, dict):
+            recipe.original = original
     db.add(recipe)
     db.flush()
     if item is not None:
@@ -370,10 +383,12 @@ def read_photo(name: str):
 
 @router.post("/recipes/{recipe_id}/translate", response_model=schemas.RecipeOut)
 def translate_recipe(recipe_id: int, parent: models.User = Depends(auth.require_parent), db: Session = Depends(get_db)):
-    """The recipe in German, by the AI; amounts and units stay, the text before is kept as the original."""
+    """The recipe in the family's language (DEFAULT_LANGUAGE), by the AI; amounts and units stay, the text before is
+    kept as the original."""
     recipe = get_recipe(db, recipe_id)
-    if recipe.language == "de":
-        raise api_error(400, "already_german")
+    target = config.default_language()
+    if recipe.language == target:
+        raise api_error(400, "already_translated")
     text = {
         "title": recipe.title,
         "ingredients": [{"name": i.name, "note": i.note} for i in recipe.ingredients],
@@ -382,14 +397,14 @@ def translate_recipe(recipe_id: int, parent: models.User = Depends(auth.require_
     }
     call = ai.take_call(db, parent, "translate", recipe_id=recipe.id)
     try:
-        german, tokens = ai.translate(ai.client_for(ai.Settings.from_env()), text)
+        german, tokens = ai.translate(ai.client_for(ai.Settings.from_env()), text, target)
     except ai.AiFailed:
         raise api_error(502, "ai_failed")
     call.tokens = tokens
     # A second translation (after edits) keeps the very first original
     if recipe.original is None:
         recipe.original = {**text, "language": recipe.language}
-    recipe.title, recipe.steps, recipe.notes, recipe.language = german["title"], german["steps"], german["notes"], "de"
+    recipe.title, recipe.steps, recipe.notes, recipe.language = german["title"], german["steps"], german["notes"], target
     for ingredient, new in zip(recipe.ingredients, german["ingredients"]):
         ingredient.name, ingredient.note = new["name"], new["note"]
     db.commit()

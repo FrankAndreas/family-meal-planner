@@ -2,6 +2,7 @@ import { useEffect, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
 import api, { errorMessage } from '../api';
+import PasteText from '../components/inbox/PasteText';
 import ScanRecipe from '../components/inbox/ScanRecipe';
 import UrlPaste from '../components/inbox/UrlPaste';
 import RecipeCard from '../components/recipes/RecipeCard';
@@ -15,9 +16,9 @@ const TABS = ['search', 'use_up'] as const;
 export default function Recipes() {
     const { t } = useTranslation();
     const navigate = useNavigate();
-    // Getting a recipe in other than typing it: from a link, or photographed
-    const [panel, setPanel] = useState<'link' | 'scan' | null>(null);
-    const toggle = (which: 'link' | 'scan') => setPanel(panel === which ? null : which);
+    // Getting a recipe in other than typing it: from a link, photographed, or a pasted text
+    const [panel, setPanel] = useState<'link' | 'scan' | 'text' | null>(null);
+    const toggle = (which: 'link' | 'scan' | 'text') => setPanel(panel === which ? null : which);
     const [recipes, setRecipes] = useState<RecipeSummary[] | null>(null);
     const [tags, setTags] = useState<{ name: string; count: number }[]>([]);
     const [q, setQ] = useState('');
@@ -74,6 +75,9 @@ export default function Recipes() {
                 <button type="button" className={BUTTON_SECONDARY} aria-expanded={panel === 'link'} onClick={() => toggle('link')}>
                     {t('recipes.importFromLink')}
                 </button>
+                <button type="button" className={BUTTON_SECONDARY} aria-expanded={panel === 'text'} onClick={() => toggle('text')}>
+                    {t('recipes.pasteText')}
+                </button>
                 <Link to="/rezepte/neu" className={BUTTON}>
                     {t('recipes.new')}
                 </Link>
@@ -81,6 +85,7 @@ export default function Recipes() {
             {/* Same as in the inbox: the draft shows up there (a parent's link is read at once) */}
             {panel === 'link' && <UrlPaste onAdded={() => navigate('/posteingang')} />}
             {panel === 'scan' && <ScanRecipe onDone={() => navigate('/posteingang')} />}
+            {panel === 'text' && <PasteText onAdded={() => navigate('/posteingang')} />}
             <div role="tablist" className="flex gap-2" onKeyDown={onTabKey}>
                 {TABS.map((key) => (
                     <button

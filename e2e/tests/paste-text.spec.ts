@@ -1,0 +1,39 @@
+import { expect, test } from '@playwright/test';
+import { login, newPerson, uniqueName } from './helpers';
+
+const REEL = 'https://www.facebook.com/reel/2350975632311568';
+
+test('a parent pastes a Facebook post with its link; the AI reads the text, the link stays the source', async ({ page, request }) => {
+    const parent = await newPerson(request);
+    const errors = await login(page, parent.name);
+    const title = uniqueName('Brownies ');
+    await page.goto('/posteingang');
+    await page.getByRole('button', { name: 'Paste recipe text' }).click();
+    await page.getByLabel('Recipe text').fill(`${title}\n• 3 ripe bananas\n• 3 tbsp cocoa powder\nBake: 180°C for 18–20 mins.`);
+    await page.getByLabel('Source (link, optional)').fill(REEL);
+    await page.getByRole('button', { name: 'Make a recipe of it' }).click();
+
+    const card = page.getByRole('article').filter({ hasText: title });
+    await expect(card.getByText('Draft ready')).toBeVisible({ timeout: 15_000 });
+    await expect(card.getByRole('link', { name: 'Open link' })).toHaveAttribute('href', REEL);
+    await card.getByRole('link', { name: 'Original' }).click();
+    await expect(page.getByText('3 tbsp cocoa powder')).toBeVisible();
+    await page.goBack();
+
+    await card.getByRole('link', { name: 'Review draft' }).click();
+    await page.getByRole('button', { name: 'Save recipe' }).click();
+    await expect(page.getByText(new RegExp(`as text from ${parent.name}, \\d+\\.\\d+\\.\\d{4}`))).toBeVisible();
+    expect(errors).toEqual([]);
+});
+
+test('a child pastes a text from the recipes page; it waits for a parent', async ({ page, request }) => {
+    const child = await newPerson(request, 'CHILD');
+    await login(page, child.name);
+    const title = uniqueName('Pancakes ');
+    await page.goto('/rezepte');
+    await page.getByRole('button', { name: 'Paste recipe text' }).click();
+    await page.getByLabel('Recipe text').fill(`${title}\n2 eggs, 1 banana`);
+    await page.getByRole('button', { name: 'Make a recipe of it' }).click();
+    await expect(page).toHaveURL(/\/posteingang$/);
+    await expect(page.getByRole('article').filter({ hasText: title }).getByText('Waiting for a parent')).toBeVisible();
+});

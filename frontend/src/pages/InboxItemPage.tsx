@@ -67,6 +67,12 @@ export default function InboxItemPage() {
                     )}
                 </div>
             </section>
+            {item.text && (
+                <section className={`${CARD} space-y-2`}>
+                    <h2 className="text-sm text-slate-300">{t('inbox.pastedText')}</h2>
+                    <p className="whitespace-pre-wrap break-words">{item.text}</p>
+                </section>
+            )}
             {item.attachments.filter(isImage).map((a) => (
                 <AuthImage key={a.index} src={`/api/inbox/${item.id}/attachments/${a.index}`} alt={a.name} className="w-full rounded-2xl" />
             ))}

@@ -13,7 +13,7 @@ export interface Attachment {
 
 export interface InboxItem {
     id: number;
-    kind: 'mail' | 'url';
+    kind: 'mail' | 'url' | 'scan' | 'text';
     status: InboxStatus;
     user_name: string | null;
     from_addr: string;
@@ -35,6 +35,8 @@ export type Draft = Omit<RecipeInput, 'ingredients'> & {
 export interface InboxItemDetail extends InboxItem {
     draft: Draft | null;
     ai_raw: string | null;
+    // A pasted text, as it was pasted
+    text: string | null;
 }
 
 export const fetchInbox = async () => (await api.get<InboxItem[]>('/api/inbox')).data;
@@ -43,6 +45,8 @@ export const fetchInboxCount = async () => (await api.get<{ waiting: number }>('
 export const processItem = (id: number) => api.post(`/api/inbox/${id}/process`);
 export const discardItem = (id: number) => api.delete(`/api/inbox/${id}`);
 export const addUrl = (url: string) => api.post<InboxItem>('/api/inbox/urls', { url });
+// A recipe's text (a Facebook post's caption) and, if known, the link it came from: only kept as the source
+export const addText = (text: string, url: string) => api.post<InboxItem>('/api/inbox/texts', { text, url: url || null });
 // The photos of one recipe, as one inbox item
 export const addScan = (photos: Blob[]) => {
     const body = new FormData();

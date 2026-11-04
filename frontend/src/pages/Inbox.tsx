@@ -3,9 +3,10 @@ import { useTranslation } from 'react-i18next';
 import { errorMessage } from '../api';
 import { useAuth } from '../AuthContext';
 import InboxItemCard from '../components/inbox/InboxItemCard';
+import PasteText from '../components/inbox/PasteText';
 import UrlPaste from '../components/inbox/UrlPaste';
 import { discardItem, fetchInbox, type InboxItem, processItem } from '../inbox';
-import { ERROR } from '../ui';
+import { BUTTON_SECONDARY, ERROR } from '../ui';
 
 const POLL_MS = 2000;
 
@@ -14,6 +15,8 @@ export default function Inbox() {
     const { user } = useAuth();
     const [items, setItems] = useState<InboxItem[] | null>(null);
     const [error, setError] = useState('');
+    // The form for a pasted recipe text (a Facebook post's caption), open or not
+    const [pasting, setPasting] = useState(false);
     const parent = user?.role === 'PARENT';
 
     const load = useCallback(async () => {
@@ -59,6 +62,17 @@ export default function Inbox() {
                 <p className="text-sm text-slate-400">{parent ? t('inbox.introParent') : t('inbox.introChild')}</p>
             </div>
             <UrlPaste onAdded={load} />
+            <button type="button" className={BUTTON_SECONDARY} aria-expanded={pasting} onClick={() => setPasting(!pasting)}>
+                {t('recipes.pasteText')}
+            </button>
+            {pasting && (
+                <PasteText
+                    onAdded={() => {
+                        setPasting(false);
+                        load();
+                    }}
+                />
+            )}
             {error && <p className={ERROR}>{error}</p>}
             {items?.length === 0 && <p className="text-slate-400">{t('inbox.empty')}</p>}
             {items?.map((item) => (

@@ -174,7 +174,7 @@ class InboxItem(Base):
     __tablename__ = "inbox_items"
 
     id = Column(Integer, primary_key=True)
-    # mail or url
+    # mail, url, scan (photos taken in the app) or text (a pasted text)
     kind = Column(String(10), nullable=False)
     # waiting, processing, draft, failed, done
     status = Column(String(12), nullable=False, default="waiting")

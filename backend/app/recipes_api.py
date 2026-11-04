@@ -209,16 +209,34 @@ def create_recipe(
     if item is not None:
         recipe.source_kind = item.kind
         recipe.photo = _draft_photo(item)
-        # Translated while imported: the text before, to show as the original
-        original = (item.draft or {}).get("original")
-        if isinstance(original, dict):
-            recipe.original = original
+        recipe.original = _draft_original(item.draft or {}, recipe.ingredients)
     db.add(recipe)
     db.flush()
     if item is not None:
         item.status, item.recipe_id = "done", recipe.id
     db.commit()
     return recipe_out(db, recipe, me)
+
+
+def _draft_original(draft: dict, saved: list[models.RecipeIngredient]) -> dict | None:
+    """Translated while imported: the text before, to show as the original. Its ingredients follow the saved ones
+    (the original is shown by position): each saved one takes the original of the draft's ingredient it still is (by
+    name), one added or renamed while checking the draft its own text."""
+    original = draft.get("original")
+    if not isinstance(original, dict) or not isinstance(original.get("ingredients"), list):
+        return None
+    translated = [str((i or {}).get("name") or "") for i in draft.get("ingredients") or []]
+    before = original["ingredients"]
+    taken: set[int] = set()
+    ingredients = []
+    for ingredient in saved:
+        match = next((n for n, name in enumerate(translated) if name == ingredient.name and n not in taken), None)
+        if match is not None and match < len(before) and isinstance(before[match], dict):
+            taken.add(match)
+            ingredients.append(before[match])
+        else:
+            ingredients.append({"name": ingredient.name, "note": ingredient.note})
+    return {**original, "ingredients": ingredients}
 
 
 def _draft_photo(item: models.InboxItem) -> str | None:

@@ -61,6 +61,11 @@ NOT_TRANSLATED = {
     "de": "Konnte nicht übersetzt werden – das geht später mit «Auf Deutsch übersetzen» beim Rezept.",
     "en": "Could not be translated – use “Translate into English” on the recipe later.",
 }
+# ... unless the AI is switched off: then the button can't either
+AI_OFF = {
+    "de": "Nicht übersetzt: Die KI ist ausgeschaltet.",
+    "en": "Not translated: the AI is switched off.",
+}
 
 
 def _translated(db, item: models.InboxItem, user: models.User, draft: dict) -> dict:
@@ -78,8 +83,9 @@ def _translated(db, item: models.InboxItem, user: models.User, draft: dict) -> d
     try:
         call = ai.take_call(db, user, "translate", item_id=item.id)
         done, tokens = ai.translate(ai.client_for(ai.Settings.from_env()), text, target)
-    except (HTTPException, ai.AiFailed):
-        return {**draft, "uncertain": [*draft.get("uncertain", []), NOT_TRANSLATED[target]]}
+    except (HTTPException, ai.AiFailed) as error:
+        off = isinstance(error, HTTPException) and error.status_code == 503
+        return {**draft, "uncertain": [*draft.get("uncertain", []), (AI_OFF if off else NOT_TRANSLATED)[target]]}
     call.tokens = tokens
     db.commit()
     ingredients = [{**old, **new} for old, new in zip(draft.get("ingredients", []), done["ingredients"])]

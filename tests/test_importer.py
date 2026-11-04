@@ -474,3 +474,33 @@ def test_english_recipe_page_is_translated_too(client, admin_headers, world, bil
     draft = _item(client, admin_headers, item["id"])["draft"]
     assert len(calls) == 1 and ai.TRANSLATE_MARKER in calls[0][0]["text"]
     assert draft["title"] == "Saftige Brownies" and draft["original"]["title"] == "Fudgy brownies"
+
+
+def test_original_follows_the_ingredients_as_saved(client, admin_headers, bilingual):
+    item = _paste(client, admin_headers)
+    draft = _item(client, admin_headers, item)["draft"]
+    # Checking the draft: the bananas removed, salt added in front
+    ingredients = [{"amount": 1, "unit": "pinch", "name": "Salz", "note": ""}, draft["ingredients"][1]]
+    body = {k: draft[k] for k in ("title", "servings", "steps", "tags", "language")}
+    recipe = client.post("/api/recipes", json={**body, "ingredients": ingredients, "inbox_item_id": item}, headers=admin_headers).json()
+    assert recipe["original"]["ingredients"] == [{"name": "Salz", "note": ""}, {"name": "cocoa powder", "note": ""}]
+
+
+def test_english_mail_is_translated(client, admin_headers, bilingual):
+    calls, _ = bilingual
+    item = _mail(client, admin_headers)
+    client.post(f"/api/inbox/{item}/process", headers=admin_headers)
+    draft = _item(client, admin_headers, item)["draft"]
+    assert len(calls) == 2 and draft["title"] == "Saftige Brownies" and draft["original"]["language"] == "en"
+
+
+def test_ai_off_leaves_a_recipe_page_untranslated(client, admin_headers, world, bilingual, monkeypatch):
+    pages, calls = world
+    page = json.dumps({"@context": "https://schema.org", "@type": "Recipe", "name": "Fudgy brownies", "inLanguage": "en",
+                       "recipeIngredient": ["3 bananas"], "recipeInstructions": ["Bake."]})
+    pages["https://blog.example/brownies"] = ("text/html", f'<script type="application/ld+json">{page}</script>'.encode())
+    monkeypatch.delenv("INFOMANIAK_AI_TOKEN")
+    item = client.post("/api/inbox/urls", json={"url": "https://blog.example/brownies"}, headers=admin_headers).json()
+    got = _item(client, admin_headers, item["id"])
+    assert got["status"] == "draft" and calls == [] and got["draft"]["title"] == "Fudgy brownies"
+    assert got["draft"]["uncertain"] == ["Nicht übersetzt: Die KI ist ausgeschaltet."]

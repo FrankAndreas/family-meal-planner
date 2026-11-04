@@ -289,6 +289,7 @@ const de = {
         sourceLink: 'Quelle (Link, optional)',
         sendText: 'Rezept daraus machen',
         pastedText: 'Eingefügter Text',
+        textTooLong: 'Der Text ist zu lang (höchstens {{max}} Zeichen).',
     },
     errors: {
         generic: 'Etwas ist schiefgelaufen. Bitte versuche es nochmals.',

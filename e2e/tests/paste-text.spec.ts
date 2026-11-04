@@ -32,6 +32,10 @@ test('a child pastes a text from the recipes page; it waits for a parent', async
     const title = uniqueName('Pancakes ');
     await page.goto('/rezepte');
     await page.getByRole('button', { name: 'Paste recipe text' }).click();
+    // Too long: said so, not silently cut off
+    await page.getByLabel('Recipe text').fill('x'.repeat(20_001));
+    await expect(page.getByText('The text is too long (at most 20,000 characters).')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Make a recipe of it' })).toBeDisabled();
     await page.getByLabel('Recipe text').fill(`${title}\n2 eggs, 1 banana`);
     await page.getByRole('button', { name: 'Make a recipe of it' }).click();
     await expect(page).toHaveURL(/\/posteingang$/);

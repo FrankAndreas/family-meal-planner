@@ -14,6 +14,8 @@ export default function PasteText({ onAdded }: { onAdded: () => void }) {
     const [url, setUrl] = useState('');
     const [sending, setSending] = useState(false);
     const [error, setError] = useState('');
+    // Not cut off by the field: the AI would get half a recipe and nobody would notice
+    const tooLong = text.trim().length > MAX_CHARS;
     const submit = async (e: FormEvent) => {
         e.preventDefault();
         setSending(true);
@@ -36,7 +38,6 @@ export default function PasteText({ onAdded }: { onAdded: () => void }) {
                 className={`${INPUT} min-h-48`}
                 aria-label={t('inbox.text')}
                 placeholder={t('inbox.textPlaceholder')}
-                maxLength={MAX_CHARS}
                 value={text}
                 onChange={(e) => setText(e.target.value)}
             />
@@ -49,7 +50,8 @@ export default function PasteText({ onAdded }: { onAdded: () => void }) {
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
             />
-            <button type="submit" className={BUTTON} disabled={!text.trim() || sending}>
+            {tooLong && <p className={ERROR}>{t('inbox.textTooLong', { max: MAX_CHARS.toLocaleString() })}</p>}
+            <button type="submit" className={BUTTON} disabled={!text.trim() || tooLong || sending}>
                 {t('inbox.sendText')}
             </button>
             {error && <p className={ERROR}>{error}</p>}

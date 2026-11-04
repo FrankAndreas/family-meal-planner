@@ -225,7 +225,7 @@ async def add_scan(
 def _title(text: str) -> str:
     """The pasted text's first line, cut to fit."""
     first = next((line.strip() for line in text.splitlines() if line.strip()), "")
-    return first[:120] or "Text"
+    return mail.clean(first, 120) or "Text"
 
 
 @router.post("/inbox/texts", response_model=schemas.InboxItemOut, status_code=201)
@@ -245,7 +245,7 @@ def add_text(body: schemas.TextIn, user: models.User = Depends(auth.get_current_
         kind="text",
         status="processing" if parent else "waiting",
         user_id=user.id,
-        subject=summary.subject[:300],
+        subject=_title(body.text),
         url=body.url,
         message_id=summary.message_id,
         attachments=[],
@@ -265,7 +265,13 @@ def add_text(body: schemas.TextIn, user: models.User = Depends(auth.get_current_
 @router.get("/inbox/{item_id}", response_model=schemas.InboxItemDetail)
 def read_item(item_id: int, user: models.User = Depends(auth.get_current_user), db: Session = Depends(get_db)):
     item = visible_item(db, item_id, user)
-    text = mail.content(raw_path(item).read_bytes()).text if item.kind == "text" else None
+    text = None
+    if item.kind == "text":
+        # Its file gone (a database restored without the inbox folder): the item and its draft still open
+        try:
+            text = mail.content(raw_path(item).read_bytes()).text
+        except OSError:
+            pass
     return schemas.InboxItemDetail(**item_out(item).model_dump(), draft=item.draft, ai_raw=item.ai_raw, text=text)
 
 

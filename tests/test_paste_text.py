@@ -53,3 +53,25 @@ def test_text_is_checked(client, admin_headers, started, body):
 
 def test_text_needs_login(client, started):
     assert client.post("/api/inbox/texts", json={"text": "Brownies"}).status_code == 401
+
+
+def test_subject_is_the_first_line_as_written(client, admin_headers, started):
+    long = "🍫 " + "Brownies " * 30
+    item = client.post("/api/inbox/texts", json={"text": f"\n\n{long}\nmore"}, headers=admin_headers).json()
+    assert item["subject"] == long.strip()[:120]
+    tricky = client.post("/api/inbox/texts", json={"text": "=?utf-8?q?Hacked?= real"}, headers=admin_headers).json()
+    assert tricky["subject"] == "=?utf-8?q?Hacked?= real"
+
+
+def test_blank_link_is_no_link(client, admin_headers, started):
+    item = client.post("/api/inbox/texts", json={"text": "Brownies", "url": "   "}, headers=admin_headers).json()
+    assert item["url"] is None
+
+
+def test_item_still_opens_without_its_file(client, admin_headers, started):
+    from app import inbox_api, models
+
+    item = client.post("/api/inbox/texts", json={"text": "Brownies"}, headers=admin_headers).json()
+    inbox_api.raw_path(models.InboxItem(id=item["id"])).unlink()
+    response = client.get(f"/api/inbox/{item['id']}", headers=admin_headers)
+    assert response.status_code == 200 and response.json()["text"] is None

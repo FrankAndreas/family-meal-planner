@@ -290,6 +290,7 @@ const en: typeof de = {
         sourceLink: 'Source (link, optional)',
         sendText: 'Make a recipe of it',
         pastedText: 'Pasted text',
+        textTooLong: 'The text is too long (at most {{max}} characters).',
     },
     errors: {
         generic: 'Something went wrong. Please try again.',

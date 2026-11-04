@@ -357,3 +357,14 @@ def test_pasted_text_becomes_a_recipe_without_fetching(client, admin_headers, wo
     assert recipe["source_mail"]["kind"] == "text"
     again = client.put(f"/api/recipes/{recipe['id']}", json={**body, "source_kind": "text"}, headers=admin_headers)
     assert again.status_code == 200, again.text
+
+
+def test_childs_pasted_text_is_read_when_a_parent_processes_it(client, admin_headers, world):
+    _, calls = world
+    create_user(client, admin_headers, "Lena")
+    child = login(client, "Lena", "5678")
+    item = client.post("/api/inbox/texts", json={"text": "Brownies\n3 Bananen"}, headers=child).json()
+    assert item["status"] == "waiting" and calls == []
+    assert client.post(f"/api/inbox/{item['id']}/process", headers=admin_headers).status_code == 202
+    got = _item(client, admin_headers, item["id"])
+    assert got["status"] == "draft" and len(calls) == 1 and got["draft"]["source_url"] is None

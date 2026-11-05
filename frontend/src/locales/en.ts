@@ -332,6 +332,8 @@ const en: typeof de = {
         invalid_email: 'That isn’t a valid mail address.',
         email_not_found: 'This address no longer exists.',
         already_translated: 'The recipe is already in the family’s language.',
+        already_categorized: 'The recipe already has categories.',
+        categorize_failed: 'The AI couldn’t sort the recipes. Try again later.',
         draft_not_ready: 'The draft isn’t ready yet.',
         no_access: 'You have no access to the meal planner. A parent can give it in the family hub.',
         hub_unavailable: 'The family hub can’t be reached right now. Try again in a moment.',

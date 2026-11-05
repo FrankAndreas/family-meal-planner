@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from . import (
     ai,
+    categorize_api,
     config,
     database,
     database_setup,
@@ -38,6 +39,8 @@ logger.info("AI: %s", "configured" if ai.Settings.from_env().enabled else "not c
 app = FastAPI(title="Meal Planner API", version="0.1.0")
 app.include_router(users_api.router, prefix="/api")
 app.include_router(settings_api.router, prefix="/api")
+# Before recipes_api: its /recipes/{recipe_id} would catch /recipes/categorize
+app.include_router(categorize_api.router, prefix="/api")
 app.include_router(recipes_api.router, prefix="/api")
 app.include_router(plan_api.router, prefix="/api")
 app.include_router(suggestions_api.router, prefix="/api")

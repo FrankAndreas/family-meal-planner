@@ -372,3 +372,16 @@ class InboxItemDetail(InboxItemOut):
     ai_raw: str | None
     # A pasted text, as it was pasted
     text: str | None = None
+
+
+class CategorizeIn(BaseModel):
+    # One recipe (asked from its page), or the next batch of recipes without categories
+    recipe_id: int | None = None
+
+
+class CategorizeLeft(BaseModel):
+    remaining: int
+
+
+class CategorizeOut(CategorizeLeft):
+    categorized: int

@@ -331,6 +331,8 @@ const de = {
         invalid_email: 'Das ist keine gültige Mail-Adresse.',
         email_not_found: 'Diese Adresse gibt es nicht mehr.',
         already_translated: 'Das Rezept ist schon in der Sprache der Familie.',
+        already_categorized: 'Das Rezept hat schon Kategorien.',
+        categorize_failed: 'Die KI konnte die Rezepte nicht einordnen. Versuche es später nochmals.',
         draft_not_ready: 'Der Entwurf ist noch nicht bereit.',
         no_access: 'Du hast keinen Zugang zum Menüplaner. Ein Elternteil kann ihn im Familien-Hub geben.',
         hub_unavailable: 'Der Familien-Hub ist gerade nicht erreichbar. Versuche es gleich nochmals.',

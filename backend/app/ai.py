@@ -110,6 +110,7 @@ class InfomaniakClient:
 
 
 TRANSLATE_MARKER = "TRANSLATE:"
+CATEGORIZE_MARKER = "RECIPES:"
 
 
 class FakeClient:
@@ -121,6 +122,10 @@ class FakeClient:
             data = json.loads(question.split(TRANSLATE_MARKER, 1)[1])
             data["title"] = ("EN " if INTO["en"] in question else "DE ") + data["title"]
             return Answer(json.dumps(data), 50)
+        if CATEGORIZE_MARKER in question:
+            recipes = json.loads(question.split(CATEGORIZE_MARKER, 1)[1])
+            # "main" for each, and what a careless answer adds: an unknown key and a recipe that wasn't asked about
+            return Answer(json.dumps({"999999": ["main"], **{str(r["id"]): ["main", "pizza"] for r in recipes}}), 20)
         return Answer(
             json.dumps(
                 {
@@ -382,3 +387,32 @@ def translate(client: AiClient, text: dict, target: str = "de") -> tuple[dict, i
         },
         answer.tokens,
     )
+
+
+CATEGORIZE_PROMPT = """Ordne jedes dieser Kochrezepte in Kategorien ein.
+Antworte NUR mit einem JSON-Objekt, ohne Text davor oder danach: {{"<id>": [Kategorien], ...}}, für jede id.
+Kategorien: alle passenden aus dieser Liste (nur die Wörter vor dem Doppelpunkt), [] wenn unsicher:
+{glosses}
+"""
+
+
+def categorize(client: AiClient, recipes: list[dict]) -> tuple[dict[int, list[str]], int | None]:
+    """Categories for recipes given as [{id, title, tags, ingredients: [names]}]: only for the ids given, only known
+    keys; and the tokens the service reported."""
+    prompt = CATEGORIZE_PROMPT.format(glosses=CATEGORY_GLOSSES)
+    answer = client.complete(
+        [{"type": "text", "text": prompt + CATEGORIZE_MARKER + json.dumps(recipes, ensure_ascii=False)}]
+    )
+    data = _json(answer.text)
+    if not isinstance(data, dict):
+        raise AiFailed("no categories")
+    asked = {r["id"] for r in recipes}
+    found: dict[int, list[str]] = {}
+    for key, value in data.items():
+        try:
+            recipe_id = int(key)
+        except (TypeError, ValueError):
+            continue
+        if recipe_id in asked:
+            found[recipe_id] = categories.clean(_list(value))
+    return found, answer.tokens

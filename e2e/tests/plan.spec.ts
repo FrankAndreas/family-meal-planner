@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { call, createRecipe, login, newPerson, ownWeek } from './helpers';
+import { call, createRecipe, login, newPerson, ownWeek, uniqueName } from './helpers';
 
 test('the planner opens on the week of tomorrow', async ({ page, request }) => {
     const parent = await newPerson(request);
@@ -151,4 +151,40 @@ test('a meal another device removed: a clear message, and it disappears', async 
     await page.getByRole('dialog', { name: 'Weg' }).getByRole('button', { name: 'Remove' }).click();
     await expect(page.getByText('This meal is no longer in the plan.')).toBeVisible();
     await expect(page.getByTestId('cell-sat-lunch')).not.toContainText('Weg');
+});
+
+test('the "For" row puts what fits the slot first, and is remembered', async ({ page, request }) => {
+    const parent = await newPerson(request);
+    const prefix = uniqueName('Slot');
+    const cake = await createRecipe(request, parent, { title: `${prefix} Kuchen`, categories: ['baking'] });
+    const lasagne = await createRecipe(request, parent, { title: `${prefix} Lasagne`, categories: ['main'] });
+    const errors = await login(page, parent.name);
+    await page.goto(`/?woche=${ownWeek()}`);
+    const panel = page.getByRole('complementary');
+    await panel.getByRole('tab', { name: 'New' }).click();
+    await panel.getByRole('searchbox').fill(prefix);
+    const cards = panel.getByRole('button', { name: new RegExp(prefix) });
+    const forRow = panel.getByRole('group', { name: 'For' });
+
+    await expect(forRow.getByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed', 'true');
+    await expect(cards.first()).toContainText(lasagne.title);
+    await forRow.getByRole('button', { name: 'Snacks' }).click();
+    await expect(cards.first()).toContainText(cake.title);
+    await expect(cards).toHaveCount(2);
+    await forRow.getByRole('button', { name: 'Dinner' }).click();
+    await expect(cards.first()).toContainText(lasagne.title);
+    await forRow.getByRole('button', { name: 'Snacks' }).click();
+    await expect(cards.first()).toContainText(cake.title);
+
+    await page.reload();
+    await expect(page.getByRole('complementary').getByRole('group', { name: 'For' }).getByRole('button', { name: 'Snacks' }))
+        .toHaveAttribute('aria-pressed', 'true');
+
+    // The slot only orders the list: the cake still goes into a dinner cell
+    await panel.getByRole('tab', { name: 'New' }).click();
+    await panel.getByRole('searchbox').fill(prefix);
+    await cards.filter({ hasText: cake.title }).click();
+    await page.getByRole('button', { name: 'Plan on Saturday, Dinner' }).click();
+    await expect(page.getByTestId('cell-sat-dinner')).toContainText(cake.title);
+    expect(errors).toEqual([]);
 });

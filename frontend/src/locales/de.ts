@@ -237,6 +237,8 @@ const de = {
         closePrevious: 'Die letzte Woche ist noch offen: Was habt ihr wirklich gegessen?',
         closeWeek: 'Woche abschliessen',
         slots: { breakfast: 'Zmorge', snack: 'Znüni & Zvieri', lunch: 'Zmittag', dinner: 'Znacht' },
+        suggestFor: 'Für',
+        allSlots: 'Alle',
         tabs: { favorites: '★ Favoriten', long_ago: 'Lange her', new: 'Neu', again: 'Nochmals planen?' },
         empty: {
             favorites: 'Noch keine Favoriten. Markiere Rezepte mit ♥.',

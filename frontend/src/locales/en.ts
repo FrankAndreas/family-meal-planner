@@ -238,6 +238,8 @@ const en: typeof de = {
         closePrevious: 'Last week is still open: what did you really eat?',
         closeWeek: 'Close the week',
         slots: { breakfast: 'Breakfast', snack: 'Snacks', lunch: 'Lunch', dinner: 'Dinner' },
+        suggestFor: 'For',
+        allSlots: 'All',
         tabs: { favorites: '★ Favourites', long_ago: 'Long ago', new: 'New', again: 'Plan again?' },
         empty: {
             favorites: 'No favourites yet. Mark recipes with ♥.',

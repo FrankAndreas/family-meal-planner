@@ -7,6 +7,7 @@ import re
 from html.parser import HTMLParser
 from urllib.parse import urljoin
 
+from . import categories
 from .ingredient_parse import parse_line
 from .schemas import PEOPLE_WORDS
 
@@ -101,7 +102,9 @@ def _steps(value) -> list[str]:
     return steps
 
 
-def _tags(node: dict) -> list[str]:
+def _tags_and_categories(node: dict) -> tuple[list[str], list[str]]:
+    """The page's keywords and categories: the ones that name one of the app's categories become that category
+    (spec 2026-11-05), the others tags."""
     tags: list[str] = []
     for key in ("keywords", "recipeCategory"):
         value = node.get(key)
@@ -109,7 +112,8 @@ def _tags(node: dict) -> list[str]:
         for tag in (_text(t) for t in items):
             if tag and tag.casefold() not in {t.casefold() for t in tags}:
                 tags.append(tag[:40])
-    return tags[:MAX_TAGS]
+    found, rest = categories.from_words(tags)
+    return rest[:MAX_TAGS], found
 
 
 def _image(value) -> str | None:
@@ -149,6 +153,7 @@ def draft_from_node(node: dict, page_url: str) -> dict | None:
         cook = _minutes(node.get("totalTime"))
     language = str(node.get("inLanguage") or "")[:2].lower()
     ingredients = [parse_line(_text(line)) for line in node.get("recipeIngredient") or []]
+    tags, found = _tags_and_categories(node)
     return {
         "title": _text(node.get("name"))[:200],
         "servings": servings,
@@ -157,7 +162,8 @@ def draft_from_node(node: dict, page_url: str) -> dict | None:
         "cook_minutes": cook,
         "ingredients": [i for i in ingredients if i["name"]][:100],
         "steps": _steps(node.get("recipeInstructions") or [])[:60],
-        "tags": _tags(node),
+        "tags": tags,
+        "categories": found,
         "notes": "",
         "language": language if language in ("de", "en") else None,
         "source_url": page_url,

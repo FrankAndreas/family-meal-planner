@@ -7,6 +7,7 @@ import pytest
 from fastapi import HTTPException
 
 from app import ai, models
+from app.categories import CATEGORIES
 from app.timeutil import utcnow
 from helpers import create_user, login
 
@@ -149,3 +150,15 @@ def test_strings_where_lists_belong():
     draft = ai.validate_draft(json.dumps(answer))
     assert draft["tags"] == ["vegi"] and draft["steps"] == ["Reis andünsten. Dann Bouillon."]
     assert draft["uncertain"] == ["Menge?"] and draft["ingredients"] == []
+
+
+def test_draft_categories_cleaned():
+    assert ai.validate_draft(json.dumps({**GOOD, "categories": ["snack", "pizza", "snack", 7]}))["categories"] == ["snack"]
+    assert ai.validate_draft(json.dumps(GOOD))["categories"] == []
+    # A lone word counts as a list of one, as for tags
+    assert ai.validate_draft(json.dumps({**GOOD, "categories": "main"}))["categories"] == ["main"]
+
+
+def test_prompt_lists_every_category():
+    assert [line.split(":")[0].lstrip("- ") for line in ai.CATEGORY_GLOSSES.splitlines()] == list(CATEGORIES)
+    assert "{glosses}" in ai.RECIPE_PROMPT

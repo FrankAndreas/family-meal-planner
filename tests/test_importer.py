@@ -507,3 +507,25 @@ def test_ai_off_leaves_a_recipe_page_untranslated(client, admin_headers, world, 
     got = _item(client, admin_headers, item["id"])
     assert got["status"] == "draft" and calls == [] and got["draft"]["title"] == "Fudgy brownies"
     assert got["draft"]["uncertain"] == ["Nicht übersetzt: Die KI ist ausgeschaltet."]
+
+
+def test_ai_draft_has_categories(client, admin_headers, world, monkeypatch):
+    answer = {**GOOD, "categories": ["main", "pizza"]}
+    monkeypatch.setattr(importer.ai, "client_for", lambda settings: type("C", (), {"complete": lambda self, c: ai.Answer(json.dumps(answer), 1)})())
+    item = _paste(client, admin_headers, "Risotto\n300 g Reis")
+    assert _item(client, admin_headers, item)["draft"]["categories"] == ["main"]
+
+
+def test_jsonld_draft_has_categories(client, admin_headers, world):
+    pages, _ = world
+    pages["https://rezepte.example/r"] = _html("swissmilk-like.html")
+    item = client.post("/api/inbox/urls", json={"url": "https://rezepte.example/r"}, headers=admin_headers).json()
+    assert _item(client, admin_headers, item["id"])["draft"]["categories"] == ["main"]
+
+
+def test_translated_import_keeps_categories(client, admin_headers, bilingual, monkeypatch):
+    calls, _ = bilingual
+    monkeypatch.setitem(ENGLISH, "categories", ["dessert"])
+    draft = _item(client, admin_headers, _paste(client, admin_headers))["draft"]
+    assert draft["language"] == "de" and draft["categories"] == ["dessert"]
+    assert "categories" not in calls[1][0]["text"].split(ai.TRANSLATE_MARKER, 1)[1]

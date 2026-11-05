@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from app.jsonld import recipe_from_html
+from app.jsonld import draft_from_node, recipe_from_html
 
 PAGES = Path(__file__).parent / "pages"
 
@@ -16,7 +16,7 @@ def test_graph_recipe():
     assert draft["prep_minutes"] == 20 and draft["cook_minutes"] == 65
     assert draft["ingredients"][1] == {"amount": 300, "unit": "g", "name": "Kartoffeln", "note": "festkochend"}
     assert draft["steps"] == ["Sauce: Rahm & Käse aufkochen.", "Alles mischen."]
-    assert draft["tags"] == ["Pasta", "Käse", "Kartoffeln", "Hauptgericht"]
+    assert draft["tags"] == ["Pasta", "Käse", "Kartoffeln"] and draft["categories"] == ["main"]
     assert draft["image_url"] == "https://img.example.ch/a.jpg"
     assert draft["source_url"] == "https://www.swissmilk.ch/de/rezepte/a/" and draft["uncertain"] == []
 
@@ -32,3 +32,19 @@ def test_plain_recipe_other_yield():
 def test_no_recipe():
     assert recipe_from_html(_page("no-recipe.html"), "https://x") is None
     assert recipe_from_html("<html>nothing</html>", "https://x") is None
+
+
+def test_category_split_from_tags():
+    draft = draft_from_node({"name": "Wähe", "keywords": "schnell", "recipeCategory": "Hauptgericht, Vegetarisch"}, "https://x")
+    assert draft["categories"] == ["main"] and draft["tags"] == ["schnell", "Vegetarisch"]
+
+
+def test_all_values_are_categories():
+    draft = draft_from_node({"name": "Wähe", "recipeCategory": ["Hauptgericht", "Dessert"]}, "https://x")
+    assert draft["categories"] == ["main", "dessert"] and draft["tags"] == []
+
+
+def test_categories_dont_use_up_the_tags():
+    node = {"name": "Wähe", "recipeCategory": "Hauptgericht, Apéro", "keywords": "a, b, c, d, e, f"}
+    draft = draft_from_node(node, "https://x")
+    assert draft["categories"] == ["apero", "main"] and draft["tags"] == ["a", "b", "c", "d", "e"]

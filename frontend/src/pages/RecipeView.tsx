@@ -284,6 +284,21 @@ export default function RecipeView() {
               })}
             </p>
           )}
+          {recipe.categories.length > 0 && (
+            <ul
+              aria-label={t("recipes.categories")}
+              className="flex flex-wrap gap-2"
+            >
+              {recipe.categories.map((category) => (
+                <li
+                  key={category}
+                  className="rounded-full border border-amber-300/40 px-2 py-0.5 text-xs text-amber-100"
+                >
+                  {t(`recipes.category.${category}`)}
+                </li>
+              ))}
+            </ul>
+          )}
           {recipe.tags.length > 0 && (
             <div className="flex flex-wrap gap-2">
               {recipe.tags.map((tag) => (

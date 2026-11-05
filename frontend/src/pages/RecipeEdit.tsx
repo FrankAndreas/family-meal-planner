@@ -17,6 +17,7 @@ import {
   type Row,
 } from "../ingredientRows";
 import { isOtherLink, isWebLink } from "../links";
+import { CATEGORIES, inOrder, type Category } from "../categories";
 import { fetchRecipe, type Recipe, type RecipeInput } from "../recipes";
 import { BUTTON, BUTTON_SECONDARY, CARD, ERROR, FIELD, INPUT } from "../ui";
 
@@ -56,6 +57,11 @@ export default function RecipeEdit() {
   const navigate = useNavigate();
   const [form, setForm] = useState<Form>(EMPTY);
   const [rows, setRows] = useState<Row[]>(() => [emptyRow()]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const toggleCategory = (category: Category) =>
+    setCategories((now) =>
+      now.includes(category) ? now.filter((c) => c !== category) : inOrder([...now, category]),
+    );
   const [original, setOriginal] = useState<Recipe | null>(null);
   const [units, setUnits] = useState<string[]>([]);
   const [knownTags, setKnownTags] = useState<string[]>([]);
@@ -96,6 +102,7 @@ export default function RecipeEdit() {
           source: recipe.source_url ?? "",
         });
         setRows(rowsFrom(recipe.ingredients, i18next.language as Language));
+        setCategories(inOrder(recipe.categories));
       })
       .catch((err) => current && setError(errorMessage(err)));
     return () => {
@@ -122,6 +129,7 @@ export default function RecipeEdit() {
           notes: draft.notes ?? "",
           source: draft.source_url ?? "",
         });
+        setCategories(inOrder(draft.categories ?? []));
         setRows(
           rowsFrom(
             draft.ingredients.map((i, n) => ({
@@ -170,6 +178,7 @@ export default function RecipeEdit() {
         .split(",")
         .map((s) => s.trim())
         .filter(Boolean),
+      categories,
       notes: form.notes,
       // Kept as they were: an imported recipe stays imported
       source_kind: original?.source_kind ?? "manual",
@@ -317,6 +326,35 @@ export default function RecipeEdit() {
               <option key={tag} value={tag} />
             ))}
           </datalist>
+        </div>
+        <div
+          className="sm:col-span-2"
+          role="group"
+          aria-labelledby="categories-label"
+        >
+          <p id="categories-label" className={label}>
+            {t("recipes.categories")}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {CATEGORIES.map((category) => {
+              const on = categories.includes(category);
+              return (
+                <button
+                  key={category}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => toggleCategory(category)}
+                  className={`rounded-full border px-3 py-1 text-sm ${
+                    on
+                      ? "border-amber-300 bg-amber-300/15 text-white"
+                      : "border-white/10 text-slate-300 hover:bg-white/5"
+                  }`}
+                >
+                  {t(`recipes.category.${category}`)}
+                </button>
+              );
+            })}
+          </div>
         </div>
         <div className="sm:col-span-2">
           <label htmlFor="source" className={label}>

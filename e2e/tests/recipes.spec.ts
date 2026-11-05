@@ -91,3 +91,41 @@ test('search finds recipes by ingredient', async ({ page, request }) => {
     await page.getByLabel('Search recipes').fill(special.toLowerCase());
     await expect(page.getByRole('link', { name: recipe.title })).toBeVisible();
 });
+
+test('categories are ticked in the form, shown on the recipe and filter the list', async ({ page, request }) => {
+    const child = await newPerson(request, 'CHILD');
+    const errors = await login(page, child.name);
+    const title = uniqueName('Wähe ');
+    await page.goto('/rezepte/neu');
+    await page.getByLabel('Title').fill(title);
+    await page.getByLabel('Ingredient 1').fill('Teig');
+    const form = page.getByRole('group', { name: 'Categories' });
+    await form.getByRole('button', { name: 'Apéro' }).click();
+    await form.getByRole('button', { name: 'Main dish' }).click();
+    await expect(form.getByRole('button', { name: 'Main dish' })).toHaveAttribute('aria-pressed', 'true');
+    await page.getByRole('button', { name: 'Save recipe' }).click();
+    await expect(page.getByRole('heading', { name: title })).toBeVisible();
+    await expect(page.getByRole('list', { name: 'Categories' })).toHaveText(/Apéro\s*Main dish/);
+
+    await page.goto('/rezepte');
+    const filter = page.getByRole('group', { name: 'Filter by category' });
+    await filter.getByRole('button', { name: 'Main dish' }).click();
+    await expect(page.getByRole('link', { name: title })).toBeVisible();
+    await filter.getByRole('button', { name: 'Dessert' }).click();
+    await expect(page.getByRole('link', { name: title })).toHaveCount(0);
+    await filter.getByRole('button', { name: 'No category' }).click();
+    await expect(page.getByRole('link', { name: title })).toHaveCount(0);
+
+    await filter.getByRole('button', { name: 'All categories' }).click();
+    await page.getByRole('link', { name: title }).click();
+    await page.getByRole('link', { name: 'Edit' }).click();
+    await form.getByRole('button', { name: 'Apéro' }).click();
+    await form.getByRole('button', { name: 'Main dish' }).click();
+    await page.getByRole('button', { name: 'Save recipe' }).click();
+    await expect(page.getByRole('heading', { name: title })).toBeVisible();
+    await expect(page.getByRole('list', { name: 'Categories' })).toHaveCount(0);
+    await page.goto('/rezepte');
+    await filter.getByRole('button', { name: 'No category' }).click();
+    await expect(page.getByRole('link', { name: title })).toBeVisible();
+    expect(errors).toEqual([]);
+});

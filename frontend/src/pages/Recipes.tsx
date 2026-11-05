@@ -7,6 +7,7 @@ import ScanRecipe from '../components/inbox/ScanRecipe';
 import UrlPaste from '../components/inbox/UrlPaste';
 import RecipeCard from '../components/recipes/RecipeCard';
 import UseUp from '../components/recipes/UseUp';
+import { CATEGORIES, type Category } from '../categories';
 import { fetchRecipes, type RecipeSummary } from '../recipes';
 import { BUTTON, BUTTON_SECONDARY, ERROR, INPUT } from '../ui';
 import { loadUseUp, saveUseUp, type UseUpState } from '../useUp';
@@ -23,6 +24,7 @@ export default function Recipes() {
     const [tags, setTags] = useState<{ name: string; count: number }[]>([]);
     const [q, setQ] = useState('');
     const [tag, setTag] = useState('');
+    const [category, setCategory] = useState<Category | 'none' | ''>('');
     const [onlyMine, setOnlyMine] = useState(false);
     const [error, setError] = useState('');
     // Search, or "Was habe ich?"; kept on this device with what was typed there
@@ -50,7 +52,7 @@ export default function Recipes() {
         let current = true;
         // A short pause while typing, so not every letter asks the server
         const timer = setTimeout(() => {
-            fetchRecipes({ q, tag, favorites: onlyMine ? 'mine' : '' })
+            fetchRecipes({ q, tag, category, favorites: onlyMine ? 'mine' : '' })
                 .then((found) => current && setRecipes(found))
                 .catch((err) => current && setError(errorMessage(err)));
         }, 200);
@@ -58,7 +60,7 @@ export default function Recipes() {
             current = false;
             clearTimeout(timer);
         };
-    }, [q, tag, onlyMine]);
+    }, [q, tag, category, onlyMine]);
 
     const chip = (active: boolean) =>
         `rounded-full border px-3 py-1 text-sm ${
@@ -123,6 +125,22 @@ export default function Recipes() {
                                 <input type="checkbox" checked={onlyMine} onChange={(e) => setOnlyMine(e.target.checked)} />
                                 {t('recipes.onlyMyFavorites')}
                             </label>
+                        </div>
+                        <div className="flex flex-wrap gap-2" role="group" aria-label={t('recipes.filterCategory')}>
+                            <button type="button" className={chip(category === '')} aria-pressed={category === ''} onClick={() => setCategory('')}>
+                                {t('recipes.allCategories')}
+                            </button>
+                            {[...CATEGORIES, 'none' as const].map((key) => (
+                                <button
+                                    key={key}
+                                    type="button"
+                                    className={chip(category === key)}
+                                    aria-pressed={category === key}
+                                    onClick={() => setCategory(category === key ? '' : key)}
+                                >
+                                    {key === 'none' ? t('recipes.noCategory') : t(`recipes.category.${key}`)}
+                                </button>
+                            ))}
                         </div>
                         {tags.length > 0 && (
                             <div className="flex flex-wrap gap-2">

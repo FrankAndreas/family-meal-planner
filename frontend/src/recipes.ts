@@ -1,4 +1,5 @@
 import api from './api';
+import type { Category } from './categories';
 import type { Language } from './i18n';
 
 // Mirrors backend/app/schemas.py (RecipeSummary, RecipeOut)
@@ -7,6 +8,7 @@ export interface RecipeSummary {
     title: string;
     photo_url: string | null;
     tags: string[];
+    categories: Category[];
     servings: number;
     servings_unit: string | null;
     total_minutes: number | null;
@@ -67,6 +69,7 @@ export interface RecipeInput {
     ingredients: { group: string | null; amount: number | null; unit: string | null; name: string; note: string }[];
     steps: string[];
     tags: string[];
+    categories: Category[];
     notes: string;
     source_kind?: Recipe['source_kind'];
     source_url?: string | null;
@@ -77,6 +80,7 @@ export interface RecipeInput {
 export interface RecipeFilter {
     q?: string;
     tag?: string;
+    category?: Category | 'none' | '';
     favorites?: '' | 'mine' | 'any';
 }
 

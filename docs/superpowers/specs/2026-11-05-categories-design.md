@@ -24,6 +24,8 @@ signal to bring the fitting recipes up first.
   the AI.
 - Existing recipes get categories from their existing tags where the tags already say it, with no AI and no manual
   sorting session.
+- *Added 2026-11-05:* a parent can have the **AI sort the recipes that still have no category**, all at once or one
+  recipe at a time.
 - On the Rezepte page you can filter by category.
 
 ## Non-goals
@@ -34,7 +36,7 @@ signal to bring the fitting recipes up first.
   schnell, Kinder-Liebling*).
 - **No learning from history** (e.g. "this was always planned for Znacht"). It was considered, not chosen. It could
   come later as a second signal.
-- **No bulk AI run** to categorise old recipes.
+- **The AI never overwrites categories.** It only fills recipes that have none.
 - No change to which recipes a tab contains (Favoriten, Lange her, Neu, Nochmals planen?). Only their order changes.
 
 ## Anti-goals
@@ -159,6 +161,38 @@ The search box and tag filter work as today; the ranking applies to their result
 - Recipes with no matching tags stay uncategorised, and so rank neutral. The Rezepte filter's **"Ohne Kategorie"**
   choice (below) makes it quick to find and tag them over time.
 
+## Sorting existing recipes with the AI (added 2026-11-05)
+
+Andreas asked for this after the first version of the design: existing recipes should get the option to let the AI
+categorise them. The details are my calls.
+
+- **Who:** parents only, like the other AI actions (processing an import, translating). Hidden when the AI is off.
+- **Which recipes:** only live recipes with **no categories** that the AI **hasn't tried yet**. Recipes keep a
+  nullable timestamp `ai_categorized_at`, set whenever the AI was asked about them (even if it found nothing), so a
+  second run doesn't resend recipes the AI couldn't place. Saving a recipe by hand doesn't reset it. The recipe view's
+  single-recipe button (below) ignores the timestamp, so a parent can always ask again for one recipe.
+- **Applied directly**, no review step. Categories only change the order of suggestions, they're visible on the
+  recipe, and they're easy to change. They're written only if the recipe **still** has no categories when the answer
+  arrives (someone may have edited it meanwhile).
+- **Batched:** up to **25 recipes per AI call** (*builder's call* on the number). For each recipe the call sends the
+  title, the tags and the ingredient names (at most 15), never steps or photos. One batch counts as **one AI call** in
+  the hourly limit and the usage log (purpose `categorize`).
+- **The answer is untrusted:** an object `{"<recipe id>": [keys]}`. Ids that weren't in the batch are ignored, and
+  keys are cleaned (`categories.clean`). A recipe missing from the answer counts as tried.
+- **Where:**
+  - **Rezepte page:** when the "Ohne Kategorie" filter is chosen and there are recipes the AI hasn't tried, a
+    button **"Mit KI einordnen (n)"**. It runs batch after batch and shows progress ("12 von 40"), then reloads the
+    list. It stops on the first error and shows it. For the hourly limit, that's the usual "in n Minuten wieder"
+    text, and what was done so far stays done.
+  - **Recipe view:** for a recipe without categories, a **"Kategorien vorschlagen"** button (one batch of one
+    recipe). It fills the categories right away.
+- **API:** `POST /api/recipes/categorize` (parent). Body: `{"recipe_id": int | null}`. Without an id it handles the
+  next batch of untried recipes. It returns `{"categorized": n, "remaining": m}`, where `categorized` counts the
+  recipes that got at least one category and `remaining` counts the untried recipes left. Status codes as for
+  translation: 503 for AI off, 429 for the limit, 502 for a failed answer. On a 502 nothing is marked as tried.
+- `GET /api/recipes/categorize` returns `{"remaining": m}` for the button's number (*builder's call* whether this is
+  a separate endpoint or a field elsewhere).
+
 ## Rezepte page
 
 - Next to the tag filter: a category filter with the ten categories plus **Ohne Kategorie**, single choice
@@ -185,6 +219,9 @@ The search box and tag filter work as today; the ranking applies to their result
 - AI import: unknown and duplicate keys are dropped.
 - Migration: tags map to categories, tags stay.
 - Translation leaves categories untouched.
+- AI sorting: the batch holds only untried recipes without categories, at most 25. It's one counted call. Ids not in
+  the batch are ignored and unknown keys dropped. A recipe edited meanwhile isn't overwritten. Recipes the AI found
+  nothing for aren't sent again. A 502 marks nothing. Children get 403.
 - Frontend: the "Für" row changes the order; the phone sheet opens with the tapped slot selected; visible text comes
   from the locales (`npm run lint`, including `check-texts`).
 

@@ -4,7 +4,7 @@
 
 **Goal:** Recipes get zero or more categories from a fixed list of ten. Imports and a one-off migration fill them in, and the suggestion panel ranks recipes that fit the chosen slot first, without hiding any.
 
-**Architecture:** A new pure module `backend/app/categories.py` holds the keys, the slot → categories table, the word table and the matching. A JSON `categories` column on `recipes` is backfilled from tags by migration `0007` (frozen copy of the table). `GET /api/suggestions?slot=` regroups each tab's result before the limit is applied. `GET /api/recipes?category=` filters. The frontend adds category chips to the form, view and list, plus a "Für" slot row in `SuggestionPanel`.
+**Architecture:** A new pure module `backend/app/categories.py` holds the keys, the slot → categories table, the word table and the matching. A JSON `categories` column on `recipes` is backfilled from tags by migration `0007` (frozen copy of the table). `GET /api/suggestions?slot=` regroups each tab's result before the limit is applied. `GET /api/recipes?category=` filters. `POST /api/recipes/categorize` (parent) lets the AI fill uncategorised recipes, 25 per call. The frontend adds category chips to the form, view and list, plus a "Für" slot row in `SuggestionPanel`.
 
 **Tech Stack:** FastAPI, SQLAlchemy, Alembic (SQLite), pytest; React + TypeScript, i18next, Tailwind, Playwright e2e.
 
@@ -76,7 +76,7 @@
 ### Task 2: Store, save, return and filter categories
 
 **Files:**
-- Modify: `backend/app/models.py` (`Recipe`: `categories = Column(JSON, nullable=False, default=list)` after `tags`)
+- Modify: `backend/app/models.py`. On `Recipe`, after `tags`: `categories = Column(JSON, nullable=False, default=list)`, and `ai_categorized_at = Column(DateTime)` (when the AI was last asked to categorise it; used by Task 7).
 - Create: `backend/app/migrations/versions/0007_categories.py`
 - Modify: `backend/app/database_setup.py` (`HEAD = "0007"`)
 - Modify: `backend/app/schemas.py`: `RecipeIn.categories: list[Category] = []` with a validator returning `categories.clean(...)`; `RecipeSummary.categories: list[str]`
@@ -97,7 +97,7 @@
     - `test_categories_backfilled_from_tags`: upgrade to `"0006"` with `database_setup.run(engine, command.upgrade, "0006")`. Insert a recipe row with tags `["Hauptgericht", "vegi", "Dessert"]` (raw SQL, filling the NOT NULL columns). Upgrade to head. Expected: `categories == ["main", "dessert"]` and tags unchanged.
 - [ ] **Step 2: Run** `pytest tests/test_recipes.py tests/test_migrations.py -v`. Expected: the new tests FAIL.
 - [ ] **Step 3: Implement.** Migration `0007` does two things:
-  - `batch_alter_table("recipes")` adds `categories` as JSON, `nullable=False`, `server_default="[]"`.
+  - `batch_alter_table("recipes")` adds `categories` as JSON, `nullable=False`, `server_default="[]"`, and `ai_categorized_at` as a nullable DateTime.
   - It backfills every recipe row by running its tags through a **frozen copy** of the word table and matcher inside the migration file (no import from `app.categories`, so the migration never changes with the app; same reasoning as `0006`'s written-out defaults). Downgrade drops the column.
 - [ ] **Step 4: Run** `pytest -q`. Expected: all PASS, including `test_migration_matches_models`.
 - [ ] **Step 5: Commit** `feat(categories): stored on recipes, filled from tags, filter in the list`.
@@ -206,3 +206,80 @@
 - [ ] **Step 3: Implement** as described under Files.
 - [ ] **Step 4: Run** both specs, the full e2e suite, `npm run lint`, `npm run type-check`, `npm test` in `frontend/`, and `pytest -q`. Expected: all pass.
 - [ ] **Step 5: Commit** `feat(plan): suggestions for a chosen slot`.
+
+### Task 7: Sorting existing recipes with the AI (backend)
+
+**Files:**
+- Modify: `backend/app/ai.py`:
+  - `CATEGORIZE_PROMPT` (German, like the other prompts). It reuses the ten keys and their glosses from Task 4's `RECIPE_PROMPT` line; move that line into a shared constant `CATEGORY_GLOSSES` so both prompts use the same text. It asks for `{"<id>": [keys]}` only.
+  - `CATEGORIZE_MARKER`, so `FakeClient` can answer: it returns `["main"]` for every id it receives, and `["pizza"]` plus an extra id `"999999"` that wasn't sent, so validation is exercised.
+  - `categorize(client: AiClient, recipes: list[dict]) -> tuple[dict[int, list[str]], int | None]`. The input is `[{id, title, tags, ingredients: [str]}]`. The output maps only ids that were sent to cleaned keys, plus the tokens. Raises `AiFailed` when the answer isn't a JSON object.
+- Create: `backend/app/categorize_api.py`, with a router registered next to the others in `backend/app/main.py`:
+  - `BATCH = 25` and `MAX_INGREDIENTS = 15`.
+  - `_untried(db) -> list[models.Recipe]`: live recipes with `clean(categories) == []` and `ai_categorized_at IS NULL`, ordered by id.
+  - `GET /api/recipes/categorize`, parent only: returns `{"remaining": len(_untried(db))}`.
+  - `POST /api/recipes/categorize`, parent only, body `schemas.CategorizeIn {recipe_id: int | None = None}`. It returns `schemas.CategorizeOut {categorized: int, remaining: int}`. Steps:
+    1. Pick the batch: with an id, that one recipe (404 if it doesn't exist or is deleted, 400 `already_categorized` if it has categories); without an id, `_untried(db)[:BATCH]`. An empty batch returns `{0, 0}` without an AI call.
+    2. `ai.take_call(db, parent, "categorize")`, then `ai.categorize(...)`. On `AiFailed`, return a 502 `ai_failed` and change no recipe.
+    3. Record `call.tokens`. For every recipe in the batch, set `ai_categorized_at = utcnow()`, and set `categories` only if the recipe's cleaned categories are still empty. Refresh before writing.
+    4. Commit and return.
+  - In `backend/app/main.py`, include `categorize_api.router` **before** `recipes_api.router`. Otherwise `GET /api/recipes/{recipe_id}` (an int path) catches `/api/recipes/categorize` and answers 422.
+- Modify: `backend/app/schemas.py`: `CategorizeIn`, `CategorizeOut`.
+- Modify: the error-text tables, if `already_categorized` needs a text. Check how `tests/test_error_texts.py` finds error codes, and add `already_categorized` to both locales' error texts in Task 8.
+- Test: `tests/test_categorize.py`
+
+**Interfaces:**
+- Consumes: `categories.clean`, `ai.take_call`, `ai.client_for`, the `Recipe.ai_categorized_at` column from Task 2.
+- Produces: `GET`/`POST /api/recipes/categorize` as above.
+
+- [ ] **Step 1: Write the failing tests** in `tests/test_categorize.py`. They use the fake AI, so set `AI_FAKE=1` and whatever else the AI fixtures in `test_translate.py` set.
+  - `test_batch_fills_untried`:
+    - Recipes A `[]`, B `["dessert"]`, C `[]`.
+    - POST `{}` gives `{"categorized": 2, "remaining": 0}`.
+    - A and C are now `["main"]`, and B is unchanged.
+    - `GET` gives `{"remaining": 0}`.
+    - Exactly one `AiCall` was made, with purpose `"categorize"`.
+  - `test_batch_size`: 30 untried recipes. The first POST gives `{"categorized": 25, "remaining": 5}`; a second gives `{5, 0}`.
+  - `test_unknown_ids_and_keys_ignored`: the fake's extra id and the `"pizza"` key change nothing, and no error is raised.
+  - `test_not_sent_again`: monkeypatch `ai.categorize` to return `{}`. After one POST, the recipe is still `[]`, `remaining == 0`, and a second POST makes no AI call.
+  - `test_edited_meanwhile_not_overwritten`: monkeypatch `ai.categorize` to set the recipe's categories to `["soup"]` in the DB before returning `{id: ["main"]}`. Afterwards the recipe has `["soup"]`.
+  - `test_single_recipe_ignores_tried`: the recipe has `ai_categorized_at` set and no categories. POST `{"recipe_id": id}` fills it. A recipe that has categories gives 400 `already_categorized`.
+  - `test_failed_answer_marks_nothing`: `ai.categorize` raises `AiFailed`. The POST gives 502, and `remaining` is unchanged.
+  - `test_children_refused`: a child's POST and GET both give 403.
+  - `test_ai_off`: 503, as for translation.
+  - `test_empty_batch_no_call`: with no untried recipes, `{0, 0}` comes back and no `AiCall` is recorded.
+- [ ] **Step 2: Run** `pytest tests/test_categorize.py -v`. Expected: FAIL.
+- [ ] **Step 3: Implement** as described under Files.
+- [ ] **Step 4: Run** `pytest -q`. Expected: all PASS.
+- [ ] **Step 5: Commit** `feat(categories): the AI sorts recipes without a category`.
+
+### Task 8: The AI sorting buttons (frontend)
+
+**Files:**
+- Modify: `frontend/src/recipes.ts`:
+  - `fetchUncategorized(): Promise<number>`, from `GET /api/recipes/categorize`.
+  - `categorize(recipeId?: number): Promise<{ categorized: number; remaining: number }>`.
+- Modify: `frontend/src/pages/Recipes.tsx`:
+  - Shown when the "Ohne Kategorie" filter is chosen, the user is a parent, the AI is on (use the same check the recipe view's translate button uses) and the remaining count is above 0: a button "Mit KI einordnen ({{count}})".
+  - Clicking it loops `categorize()` until `remaining === 0`, showing "{{done}} von {{total}}" during the run.
+  - It stops at the first error and shows `errorMessage(err)`. Afterwards it reloads the list and the count.
+  - The button is disabled while running.
+- Modify: `frontend/src/pages/RecipeView.tsx`: for a parent, with the AI on and a recipe without categories, a button "Kategorien vorschlagen" calls `categorize(recipe.id)` and reloads the recipe. Errors are shown the same way as the translate button's.
+- Modify: locales (de/en):
+  - `recipes.categorizeAll`: "Mit KI einordnen ({{count}})" / "Sort with AI ({{count}})".
+  - `recipes.categorizeProgress`: "{{done}} von {{total}}" / "{{done}} of {{total}}".
+  - `recipes.categorizeOne`: "Kategorien vorschlagen" / "Suggest categories".
+  - The error text for `already_categorized`.
+- Test: `e2e/tests/recipes.spec.ts`
+
+**Interfaces:**
+- Consumes: Task 7's endpoints and Task 5's "Ohne Kategorie" filter.
+
+- [ ] **Step 1: Write the failing e2e tests.** They use the e2e fake AI, so check how `import.spec.ts` turns it on.
+  - `recipes.spec.ts › AI sorts uncategorised`: create two recipes without categories as a parent. On the "Ohne Kategorie" filter, the button reads "Mit KI einordnen (2)". After clicking it, the list under "Ohne Kategorie" is empty and "Hauptgericht" lists both.
+  - `recipes.spec.ts › suggest categories on one recipe`: the button on the view fills "Hauptgericht" and then disappears.
+  - `recipes.spec.ts › children don't see it`: logged in as a child, neither button shows.
+- [ ] **Step 2: Run** the spec. Expected: FAIL.
+- [ ] **Step 3: Implement** as described under Files.
+- [ ] **Step 4: Run** the full e2e suite, `npm run lint`, `npm run type-check` and `npm test` in `frontend/`, and `pytest -q`. Expected: all pass.
+- [ ] **Step 5: Commit** `feat(recipes): sort recipes with the AI`.

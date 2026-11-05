@@ -8,6 +8,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from . import auth, models, schemas, timeutil
+from .categories import slot_group
 from .database import get_db
 from .recipes_api import Votes, filter_recipes, live_recipes, sort_key
 
@@ -43,6 +44,8 @@ def suggestions(
     tab: Literal["favorites", "long_ago", "new", "again"],
     q: str = "",
     tag: str = "",
+    # The slot being planned: what fits it comes first, nothing is left out
+    slot: schemas.Slot | None = None,
     limit: int = Query(50, ge=1, le=200),
     me: models.User = Depends(auth.get_current_user),
     db: Session = Depends(get_db),
@@ -71,4 +74,7 @@ def suggestions(
         skipped = _skipped_not_replanned(db)
         chosen = [r for r in by_title if r.id in skipped]
         chosen.sort(key=lambda r: skipped[r.id], reverse=True)
+    if slot:
+        # A stable sort: inside each group the tab's own order stays
+        chosen.sort(key=lambda r: slot_group(r.categories, slot))
     return [summaries[r.id] for r in chosen[:limit]]

@@ -53,7 +53,7 @@ def upgrade() -> None:
         batch.add_column(sa.Column("ai_categorized_at", sa.DateTime(), nullable=True))
     connection = op.get_bind()
     for recipe_id, tags in connection.execute(sa.text("SELECT id, tags FROM recipes")).all():
-        found = _categories(json.loads(tags) if isinstance(tags, str) else (tags or []))
+        found = _categories((json.loads(tags) if isinstance(tags, str) else tags) or [])
         if found:
             connection.execute(
                 sa.text("UPDATE recipes SET categories = :c WHERE id = :id"), {"c": json.dumps(found), "id": recipe_id}

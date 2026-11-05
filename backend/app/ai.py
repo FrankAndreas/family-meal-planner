@@ -415,4 +415,7 @@ def categorize(client: AiClient, recipes: list[dict]) -> tuple[dict[int, list[st
             continue
         if recipe_id in asked:
             found[recipe_id] = categories.clean(_list(value))
+    # An answer about none of the recipes (another shape, other ids) failed: else the whole batch would count as tried
+    if not found:
+        raise AiFailed("no recipe answered")
     return found, answer.tokens

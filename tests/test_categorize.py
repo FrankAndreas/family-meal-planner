@@ -80,7 +80,8 @@ def test_unknown_ids_and_keys_ignored(client, admin_headers, monkeypatch):
 
 def test_not_sent_again(client, admin_headers, sorter, monkeypatch):
     r = create_recipe(client, admin_headers, "Rätsel")
-    monkeypatch.setattr(ai, "categorize", lambda client, recipes: (sorter.append(recipes) or {}, 3))
+    # The AI names the recipe, but finds no category for it
+    monkeypatch.setattr(ai, "categorize", lambda client, recipes: (sorter.append(recipes) or {r["id"]: []}, 3))
     assert _post(client, admin_headers).json() == {"categorized": 0, "remaining": 0}
     assert _categories(client, admin_headers, r) == []
     assert _post(client, admin_headers).json() == {"categorized": 0, "remaining": 0}
@@ -168,3 +169,19 @@ def test_hourly_limit(client, admin_headers, sorter, monkeypatch):
     response = _post(client, admin_headers)
     assert response.status_code == 429 and response.json()["detail"]["code"] == "ai_limit"
     assert client.get("/api/recipes/categorize", headers=admin_headers).json() == {"remaining": 5}
+
+
+@pytest.mark.parametrize(
+    "answer",
+    [{"recipes": [{"id": 1, "categories": ["main"]}]}, {"id 1": ["main"]}, {}],
+)
+def test_answer_naming_no_asked_recipe_fails(client, admin_headers, monkeypatch, answer):
+    """An answer that names none of the recipes sent is a failed answer, not "found nothing for all of them"."""
+    monkeypatch.setenv("INFOMANIAK_AI_TOKEN", "t")
+    monkeypatch.setenv("INFOMANIAK_AI_PRODUCT_ID", "p")
+    create_recipe(client, admin_headers, "A")
+    create_recipe(client, admin_headers, "B")
+    monkeypatch.setattr(ai, "client_for", lambda s: type("C", (), {"complete": lambda self, c: ai.Answer(json.dumps(answer), 5)})())
+    response = _post(client, admin_headers)
+    assert response.status_code == 502 and response.json()["detail"] == "categorize_failed"
+    assert client.get("/api/recipes/categorize", headers=admin_headers).json() == {"remaining": 2}

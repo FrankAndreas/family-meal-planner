@@ -178,7 +178,7 @@ categorise them. The details are my calls.
   title, the tags and the ingredient names (at most 15), never steps or photos. One batch counts as **one AI call** in
   the hourly limit and the usage log (purpose `categorize`).
 - **The answer is untrusted:** an object `{"<recipe id>": [keys]}`. Ids that weren't in the batch are ignored, and
-  keys are cleaned (`categories.clean`). A recipe missing from the answer counts as tried.
+  keys are cleaned (`categories.clean`). A recipe missing from the answer counts as tried. An answer that names none of the batch's recipes counts as failed (502, nothing marked).
 - **Where:**
   - **Rezepte page:** when the "Ohne Kategorie" filter is chosen and there are recipes the AI hasn't tried, a
     button **"Mit KI einordnen (n)"**. It runs batch after batch and shows progress ("12 von 40"), then reloads the

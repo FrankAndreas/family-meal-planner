@@ -60,3 +60,18 @@ def test_categories_backfilled_from_tags(tmp_path):
         ("Lasagne", ["Hauptgericht", "vegi", "Dessert"], ["main", "dessert"], None),
         ("Ohne", ["vegi"], [], None),
     ]
+
+
+def test_categories_backfill_survives_null_tags(tmp_path):
+    from alembic import command
+
+    engine = create_engine(f"sqlite:///{tmp_path}/m.db")
+    database_setup.run(engine, command.upgrade, "0006")
+    with engine.begin() as conn:
+        conn.exec_driver_sql(
+            "INSERT INTO recipes (title, servings, steps, tags, notes, source_kind, created_at, updated_at) "
+            "VALUES ('Alt', 4, '[]', 'null', '', 'manual', '2026-01-01', '2026-01-01')"
+        )
+    database_setup.setup(engine)
+    with engine.connect() as conn:
+        assert json.loads(conn.exec_driver_sql("SELECT categories FROM recipes").scalar()) == []

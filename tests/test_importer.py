@@ -378,6 +378,7 @@ ENGLISH = {
         {"amount": 3, "unit": "g", "name": "cocoa powder", "note": ""},
     ],
     "steps": ["Blend.", "Bake at 180 °C."],
+    "tags": ["dessert", "healthy"],
     "uncertain": [],
     "language": "en",
 }
@@ -386,6 +387,7 @@ GERMAN = {
     "ingredients": [{"name": "Bananen", "note": "reif"}, {"name": "Kakaopulver", "note": ""}],
     "steps": ["Mixen.", "Bei 180 °C backen."],
     "notes": "",
+    "tags": ["Dessert", "gesund"],
 }
 
 
@@ -423,6 +425,7 @@ def test_english_import_is_translated_and_keeps_its_original(client, admin_heade
         (3, "g", "Kakaopulver", ""),
     ]
     assert draft["original"]["title"] == "Fudgy brownies" and draft["original"]["language"] == "en"
+    assert draft["tags"] == ["Dessert", "gesund"] and draft["original"]["tags"] == ["dessert", "healthy"]
     assert [c.purpose for c in db.query(models.AiCall).order_by(models.AiCall.id)] == ["import", "translate"]
 
     body = {k: draft[k] for k in ("title", "servings", "servings_unit", "ingredients", "steps", "tags", "language")}

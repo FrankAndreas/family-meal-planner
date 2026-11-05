@@ -8,7 +8,8 @@ import UrlPaste from '../components/inbox/UrlPaste';
 import RecipeCard from '../components/recipes/RecipeCard';
 import UseUp from '../components/recipes/UseUp';
 import { CATEGORIES, type Category } from '../categories';
-import { fetchRecipes, type RecipeSummary } from '../recipes';
+import { useAuth } from '../AuthContext';
+import { categorize, fetchAiEnabled, fetchRecipes, fetchUncategorized, type RecipeSummary } from '../recipes';
 import { BUTTON, BUTTON_SECONDARY, ERROR, INPUT } from '../ui';
 import { loadUseUp, saveUseUp, type UseUpState } from '../useUp';
 
@@ -25,6 +26,12 @@ export default function Recipes() {
     const [q, setQ] = useState('');
     const [tag, setTag] = useState('');
     const [category, setCategory] = useState<Category | 'none' | ''>('');
+    const { user } = useAuth();
+    // Parents, with the AI on, can have it sort the recipes without a category ("Ohne Kategorie")
+    const [aiOn, setAiOn] = useState(false);
+    const [unsorted, setUnsorted] = useState(0);
+    const [sorting, setSorting] = useState<{ done: number; total: number } | null>(null);
+    const [reloads, setReloads] = useState(0);
     const [onlyMine, setOnlyMine] = useState(false);
     const [error, setError] = useState('');
     // Search, or "Was habe ich?"; kept on this device with what was typed there
@@ -49,6 +56,46 @@ export default function Recipes() {
     }, []);
 
     useEffect(() => {
+        if (user?.role !== 'PARENT') return;
+        fetchAiEnabled()
+            .then(setAiOn)
+            .catch(() => {});
+    }, [user?.role]);
+
+    useEffect(() => {
+        if (!aiOn || category !== 'none') return;
+        let current = true;
+        fetchUncategorized()
+            .then((count) => current && setUnsorted(count))
+            .catch(() => {});
+        return () => {
+            current = false;
+        };
+    }, [aiOn, category, reloads]);
+
+    const sortWithAi = async () => {
+        setError('');
+        const total = unsorted;
+        setSorting({ done: 0, total });
+        try {
+            let left = total;
+            for (;;) {
+                const result = await categorize();
+                setSorting({ done: Math.max(0, total - result.remaining), total });
+                // Done, or nothing moved (recipes being added as fast): stop instead of asking forever
+                if (result.remaining === 0 || result.remaining >= left) break;
+                left = result.remaining;
+            }
+        } catch (err) {
+            // What was sorted so far stays sorted
+            setError(errorMessage(err));
+        } finally {
+            setSorting(null);
+            setReloads((n) => n + 1);
+        }
+    };
+
+    useEffect(() => {
         let current = true;
         // A short pause while typing, so not every letter asks the server
         const timer = setTimeout(() => {
@@ -60,7 +107,7 @@ export default function Recipes() {
             current = false;
             clearTimeout(timer);
         };
-    }, [q, tag, category, onlyMine]);
+    }, [q, tag, category, onlyMine, reloads]);
 
     const chip = (active: boolean) =>
         `rounded-full border px-3 py-1 text-sm ${
@@ -142,6 +189,18 @@ export default function Recipes() {
                                 </button>
                             ))}
                         </div>
+                        {aiOn && category === 'none' && (unsorted > 0 || sorting) && (
+                            <div className="flex items-center gap-3">
+                                <button type="button" className={BUTTON_SECONDARY} disabled={sorting !== null} onClick={sortWithAi}>
+                                    {t('recipes.categorizeAll', { count: unsorted })}
+                                </button>
+                                {sorting && (
+                                    <span role="status" className="text-sm text-slate-300">
+                                        {t('recipes.categorizeProgress', sorting)}
+                                    </span>
+                                )}
+                            </div>
+                        )}
                         {tags.length > 0 && (
                             <div className="flex flex-wrap gap-2">
                                 <button type="button" className={chip(tag === '')} onClick={() => setTag('')}>

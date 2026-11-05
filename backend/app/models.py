@@ -58,6 +58,10 @@ class Recipe(Base):
     cook_minutes = Column(Integer)
     steps = Column(JSON, nullable=False, default=list)
     tags = Column(JSON, nullable=False, default=list)
+    # Keys from categories.CATEGORIES, in that order
+    categories = Column(JSON, nullable=False, default=list)
+    # When the AI was last asked to categorise it (also when it found nothing), so a bulk run doesn't ask again
+    ai_categorized_at = Column(DateTime)
     notes = Column(Text, nullable=False, default="")
     # manual, url or mail
     source_kind = Column(String(10), nullable=False, default="manual")

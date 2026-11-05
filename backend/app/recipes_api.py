@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session, selectinload
 
-from . import ai, auth, config, fetch, jsonld, models, photos, scaling, schemas, stats
+from . import ai, auth, categories, config, fetch, jsonld, models, photos, scaling, schemas, stats
 from .database import get_db
 from .errors import api_error
 from .settings_store import get_settings
@@ -47,6 +47,7 @@ class Votes:
             "title": recipe.title,
             "photo_url": _photo_url(recipe),
             "tags": recipe.tags,
+            "categories": categories.clean(recipe.categories),
             "servings": recipe.servings,
             "servings_unit": recipe.servings_unit,
             "total_minutes": _total_minutes(recipe),
@@ -132,8 +133,9 @@ def live_recipes(db: Session) -> list[models.Recipe]:
     )
 
 
-def filter_recipes(recipes: list[models.Recipe], q: str, tag: str) -> list[models.Recipe]:
-    """`q` in the title, a tag or an ingredient; `tag` one of the tags. Both ignore case and accents."""
+def filter_recipes(recipes: list[models.Recipe], q: str, tag: str, category: str = "") -> list[models.Recipe]:
+    """`q` in the title, a tag or an ingredient; `tag` one of the tags (both ignore case and accents); `category` one
+    of the categories, or "none" for recipes without any."""
     if q.strip():
         needle = sort_key(q.strip())
         recipes = [
@@ -146,6 +148,10 @@ def filter_recipes(recipes: list[models.Recipe], q: str, tag: str) -> list[model
     if tag.strip():
         wanted = sort_key(tag.strip())
         recipes = [r for r in recipes if any(sort_key(t) == wanted for t in r.tags)]
+    if category == "none":
+        recipes = [r for r in recipes if not categories.clean(r.categories)]
+    elif category:
+        recipes = [r for r in recipes if category in r.categories]
     return recipes
 
 
@@ -179,11 +185,12 @@ def _apply(db: Session, recipe: models.Recipe, body: schemas.RecipeIn) -> None:
 def list_recipes(
     q: str = "",
     tag: str = "",
+    category: str = Query("", pattern=f"^(|none|{'|'.join(categories.CATEGORIES)})$"),
     favorites: str = Query("", pattern="^(|mine|any)$"),
     me: models.User = Depends(auth.get_current_user),
     db: Session = Depends(get_db),
 ):
-    recipes = filter_recipes(live_recipes(db), q, tag)
+    recipes = filter_recipes(live_recipes(db), q, tag, category)
     votes = Votes(db, [r.id for r in recipes])
     if favorites == "mine":
         recipes = [r for r in recipes if me.id in votes.favorites[r.id]]

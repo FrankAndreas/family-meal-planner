@@ -1,3 +1,5 @@
+import json
+
 from sqlalchemy import create_engine, inspect
 
 from app import database_setup, models
@@ -35,3 +37,26 @@ def test_constraints_are_named(tmp_path):
     for table in models.Base.metadata.sorted_tables:
         for unique in inspector.get_unique_constraints(table.name):
             assert unique["name"], table.name
+
+
+def test_categories_backfilled_from_tags(tmp_path):
+    from alembic import command
+
+    engine = create_engine(f"sqlite:///{tmp_path}/m.db")
+    database_setup.run(engine, command.upgrade, "0006")
+    with engine.begin() as conn:
+        conn.exec_driver_sql(
+            "INSERT INTO recipes (title, servings, steps, tags, notes, source_kind, created_at, updated_at) "
+            """VALUES ('Lasagne', 4, '[]', '["Hauptgericht", "vegi", "Dessert"]', '', 'manual', '2026-01-01', '2026-01-01')"""
+        )
+        conn.exec_driver_sql(
+            "INSERT INTO recipes (title, servings, steps, tags, notes, source_kind, created_at, updated_at) "
+            """VALUES ('Ohne', 4, '[]', '["vegi"]', '', 'manual', '2026-01-01', '2026-01-01')"""
+        )
+    database_setup.setup(engine)
+    with engine.connect() as conn:
+        rows = conn.exec_driver_sql("SELECT title, tags, categories, ai_categorized_at FROM recipes ORDER BY id").all()
+    assert [(r[0], json.loads(r[1]), json.loads(r[2]), r[3]) for r in rows] == [
+        ("Lasagne", ["Hauptgericht", "vegi", "Dessert"], ["main", "dessert"], None),
+        ("Ohne", ["vegi"], [], None),
+    ]

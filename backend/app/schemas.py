@@ -5,6 +5,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator, model_validator
 
+from .categories import Category, clean
 from .models import UserRole
 from .units import UNITS
 
@@ -104,6 +105,7 @@ class RecipeIn(BaseModel):
     ingredients: Annotated[list[IngredientIn], Field(max_length=200)] = []
     steps: Annotated[list[str], Field(max_length=100)] = []
     tags: Annotated[list[Annotated[str, StringConstraints(max_length=40)]], Field(max_length=20)] = []
+    categories: Annotated[list[Category], Field(max_length=20)] = []
     notes: Annotated[str, StringConstraints(max_length=10_000)] = ""
     source_kind: Literal["manual", "url", "mail", "scan", "text"] = "manual"
     source_url: Annotated[str, StringConstraints(strip_whitespace=True, max_length=1000)] | None = None
@@ -126,6 +128,11 @@ class RecipeIn(BaseModel):
         if url and OTHER_ADDRESS.match(url) and not url.lower().startswith(("http://", "https://")):
             raise ValueError("not_a_web_link")
         return url or None
+
+    @field_validator("categories")
+    @classmethod
+    def categories_in_order(cls, categories: list[str]) -> list[str]:
+        return clean(categories)
 
     @field_validator("steps")
     @classmethod
@@ -155,6 +162,7 @@ class RecipeSummary(BaseModel):
     title: str
     photo_url: str | None
     tags: list[str]
+    categories: list[str]
     servings: float
     servings_unit: str | None
     total_minutes: int | None

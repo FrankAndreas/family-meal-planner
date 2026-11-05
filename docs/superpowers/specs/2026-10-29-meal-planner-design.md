@@ -38,7 +38,8 @@ pattern**; it doesn't invent a new one.
 - Nutrition values.
 - Importing recipe **videos** (Reels). A caption or a link in a video post can still be imported.
 - Installing as a share target (PWA Web Share Target). Mail covers Android, iPhone and desktop alike.
-- Automatic translation. Translation exists only as an action a parent triggers.
+- Automatic translation of recipes already saved. (Changed 2026-11-04: imports are translated while a parent
+  processes them, see below.)
 
 ## Anti-goals
 
@@ -70,9 +71,13 @@ pattern**; it doesn't invent a new one.
 
 - The interface is German by default, with English as an option. Each person picks theirs, as in the budget app
   (i18next, `locales/de.ts` and `locales/en.ts`, `DEFAULT_LANGUAGE` in `.env`, the same `check-texts` lint).
-- Recipes keep the language they were imported in. A parent can **translate a recipe into German** with the AI. This
-  creates a German version of the text (title, ingredient names and notes, steps) and keeps the original, so the
+- A parent can **translate a recipe into the family's language** (`DEFAULT_LANGUAGE`) with the AI. This creates a
+  version of the text in that language (title, ingredient names and notes, steps) and keeps the original, so the
   original can still be shown.
+- *Changed 2026-11-04:* an import in another language is translated right when a parent processes it (one more AI
+  call, counted as a translation), its original kept the same way. Not translated: a recipe whose language is
+  unknown, Swissmilk (never the AI), and when the AI can't (off, hourly limit, error): the draft then comes
+  untranslated, with a note in "Bitte prüfen".
 
 ## Recipes
 

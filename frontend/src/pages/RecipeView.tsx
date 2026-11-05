@@ -188,12 +188,9 @@ export default function RecipeView() {
           })),
         }
       : recipe;
-  // Imported in another language (or unknown, from outside): parents can have it translated
-  const canTranslate =
-    user?.role === "PARENT" &&
-    !recipe.deleted &&
-    recipe.language !== "de" &&
-    (recipe.language === "en" || recipe.source_kind !== "manual");
+  // Not in the family's language (or unknown, from outside; the backend knows DEFAULT_LANGUAGE): parents can have
+  // it translated
+  const canTranslate = user?.role === "PARENT" && !recipe.deleted && recipe.translate_into !== null;
 
   const place = (day: string, slot: Slot) =>
     t("plan.place", {
@@ -383,7 +380,7 @@ export default function RecipeView() {
                 >
                   {translating
                     ? t("recipes.translating")
-                    : t("recipes.translate")}
+                    : t(`recipes.translateInto.${recipe.translate_into ?? "de"}`)}
                 </button>
               )}
               {user?.role === "PARENT" && (

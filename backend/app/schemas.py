@@ -213,6 +213,7 @@ class RecipeOut(RecipeSummary):
     inbox_item_id: int | None
     source_mail: SourceMail | None
     original: dict | None
+    translate_into: Literal["de", "en"] | None = None
 
 
 class TagCount(BaseModel):

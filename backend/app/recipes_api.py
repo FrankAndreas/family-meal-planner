@@ -412,6 +412,7 @@ def translate_recipe(recipe_id: int, parent: models.User = Depends(auth.require_
         "ingredients": [{"name": i.name, "note": i.note} for i in recipe.ingredients],
         "steps": list(recipe.steps),
         "notes": recipe.notes,
+        "tags": list(recipe.tags),
     }
     call = ai.take_call(db, parent, "translate", recipe_id=recipe.id)
     try:
@@ -423,6 +424,8 @@ def translate_recipe(recipe_id: int, parent: models.User = Depends(auth.require_
     if recipe.original is None:
         recipe.original = {**text, "language": recipe.language}
     recipe.title, recipe.steps, recipe.notes, recipe.language = german["title"], german["steps"], german["notes"], target
+    # In the spelling the family already uses for a tag ("vegi" → "Vegi")
+    recipe.tags = normalize_tags(db, german["tags"], except_id=recipe.id)
     for ingredient, new in zip(recipe.ingredients, german["ingredients"]):
         ingredient.name, ingredient.note = new["name"], new["note"]
     db.commit()

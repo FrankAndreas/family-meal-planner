@@ -319,7 +319,8 @@ def ai_usage(_parent: models.User = Depends(auth.require_parent), db: Session = 
 
 TRANSLATE_PROMPT = """Übersetze dieses Kochrezept {into}.
 Antworte NUR mit demselben JSON, in derselben Form: gleich viele Zutaten in derselben Reihenfolge, gleich viele
-Schritte. Übersetze title, name, note, steps und notes; erfinde nichts dazu.
+Schritte und gleich viele tags. Übersetze title, name, note, steps, notes und tags (kurze Stichworte bleiben kurz);
+erfinde nichts dazu.
 """
 
 
@@ -327,9 +328,15 @@ Schritte. Übersetze title, name, note, steps und notes; erfinde nichts dazu.
 INTO = {"de": "ins Deutsche (Schweizer Rechtschreibung: ss statt ß)", "en": "ins Englische"}
 
 
+def _tags(translated, before: list[str]) -> list[str]:
+    if not isinstance(translated, list) or len(translated) != len(before):
+        return before
+    return [_str(tag, 40) or old for tag, old in zip(translated, before)]
+
+
 def translate(client: AiClient, text: dict, target: str = "de") -> tuple[dict, int | None]:
-    """The recipe's text in the target language (de or en): {title, ingredients: [{name, note}], steps, notes}, the
-    same shape as given."""
+    """The recipe's text in the target language (de or en): {title, ingredients: [{name, note}], steps, notes, tags},
+    the same shape as given. Tags that don't come back one for one stay as they were."""
     prompt = TRANSLATE_PROMPT.format(into=INTO[target])
     answer = client.complete([{"type": "text", "text": prompt + TRANSLATE_MARKER + json.dumps(text, ensure_ascii=False)}])
     data = _json(answer.text)
@@ -353,6 +360,7 @@ def translate(client: AiClient, text: dict, target: str = "de") -> tuple[dict, i
             ],
             "steps": [_str(step, 2000) or old for step, old in zip(data["steps"], text["steps"])],
             "notes": str(data.get("notes") or "")[:10_000],
+            "tags": _tags(data.get("tags"), list(text.get("tags") or [])),
         },
         answer.tokens,
     )

@@ -72,7 +72,7 @@ pattern**; it doesn't invent a new one.
 - The interface is German by default, with English as an option. Each person picks theirs, as in the budget app
   (i18next, `locales/de.ts` and `locales/en.ts`, `DEFAULT_LANGUAGE` in `.env`, the same `check-texts` lint).
 - A parent can **translate a recipe into the family's language** (`DEFAULT_LANGUAGE`) with the AI. This creates a
-  version of the text in that language (title, ingredient names and notes, steps) and keeps the original, so the
+  version of the text in that language (title, ingredient names and notes, steps, tags) and keeps the original, so the
   original can still be shown.
 - *Changed 2026-11-04:* an import in another language is translated right when a parent processes it (one more AI
   call, counted as a translation), its original kept the same way. Not translated: a recipe whose language is

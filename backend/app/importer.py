@@ -79,6 +79,7 @@ def _translated(db, item: models.InboxItem, user: models.User, draft: dict) -> d
         "ingredients": [{"name": i.get("name") or "", "note": i.get("note") or ""} for i in draft.get("ingredients", [])],
         "steps": list(draft.get("steps") or []),
         "notes": draft.get("notes") or "",
+        "tags": list(draft.get("tags") or []),
     }
     try:
         call = ai.take_call(db, user, "translate", item_id=item.id)

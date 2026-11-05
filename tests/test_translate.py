@@ -101,3 +101,20 @@ def test_ai_off(client, admin_headers, monkeypatch):
     r = _english(client, admin_headers)
     response = client.post(f"/api/recipes/{r['id']}/translate", headers=admin_headers)
     assert response.status_code == 503 and response.json()["detail"] == "ai_off"
+
+
+def test_tags_are_translated_in_the_familys_spelling(client, admin_headers, translator):
+    create_recipe(client, admin_headers, "Rösti", tags=["Vegi"])
+    r = create_recipe(client, admin_headers, "Pancakes", language="en", tags=["vegetarian", "breakfast"],
+                      ingredients=[{"amount": 200, "unit": "g", "name": "flour"}, {"amount": 3, "unit": "dl", "name": "milk"}])
+    translator.append(lambda data: {**data, "tags": ["vegi", "Frühstück"]})
+    got = client.post(f"/api/recipes/{r['id']}/translate", headers=admin_headers).json()
+    assert got["tags"] == ["Vegi", "Frühstück"] and got["original"]["tags"] == ["vegetarian", "breakfast"]
+
+
+def test_tags_that_dont_fit_stay(client, admin_headers, translator):
+    r = create_recipe(client, admin_headers, "Pancakes", language="en", tags=["breakfast", "quick"],
+                      ingredients=[{"amount": 200, "unit": "g", "name": "flour"}, {"amount": 3, "unit": "dl", "name": "milk"}])
+    translator.append(lambda data: {**data, "tags": ["Frühstück"]})
+    got = client.post(f"/api/recipes/{r['id']}/translate", headers=admin_headers).json()
+    assert got["tags"] == ["breakfast", "quick"]

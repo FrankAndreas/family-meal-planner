@@ -78,7 +78,7 @@ def test_categories_backfill_survives_null_tags(tmp_path):
 
 
 SHOPPING_TABLES = {
-    "shopping_lists": {"id", "week_start", "created_by", "created_at", "updated_by", "updated_at"},
+    "shopping_lists": {"id", "week_start", "singleton", "created_by", "created_at", "updated_by", "updated_at"},
     "shopping_meals": {"list_id", "entry_id"},
     "shopping_choices": {"list_id", "key", "buy"},
     "shopping_extras": {"id", "list_id", "name", "amount", "position"},
@@ -110,4 +110,37 @@ def test_0008_from_0007(tmp_path):
     with engine.connect() as conn:
         assert conn.exec_driver_sql("SELECT title FROM recipes").scalar() == "Lasagne"
         assert conn.exec_driver_sql("SELECT recipe_id FROM plan_entries").scalar() == 1
-        assert conn.exec_driver_sql("SELECT version_num FROM alembic_version").scalar() == "0008"
+        assert conn.exec_driver_sql("SELECT version_num FROM alembic_version").scalar() == database_setup.HEAD
+
+
+def test_0009_keeps_one_list(tmp_path):
+    from alembic import command
+    from sqlalchemy.exc import IntegrityError
+
+    engine = create_engine(f"sqlite:///{tmp_path}/m.db")
+    database_setup.run(engine, command.upgrade, "0008")
+    with engine.begin() as conn:
+        for start in ("2026-10-31", "2026-11-07"):
+            conn.exec_driver_sql(
+                f"INSERT INTO shopping_lists (week_start, created_at, updated_at) VALUES ('{start}', '2026-11-01', '2026-11-01')"
+            )
+        for list_id in (1, 2):
+            conn.exec_driver_sql(f"INSERT INTO shopping_choices (list_id, key, buy) VALUES ({list_id}, 'salz', 1)")
+            conn.exec_driver_sql(
+                f"INSERT INTO shopping_extras (list_id, name, amount, position) VALUES ({list_id}, 'Milch', '', 0)"
+            )
+    database_setup.setup(engine)
+    with engine.connect() as conn:
+        assert [r[0] for r in conn.exec_driver_sql("SELECT week_start FROM shopping_lists")] == ["2026-10-31"]
+        # The removed list's rows go with it: nothing points at a list that isn't there
+        assert conn.exec_driver_sql("PRAGMA foreign_key_check").all() == []
+        assert conn.exec_driver_sql("SELECT list_id FROM shopping_choices").scalars().all() == [1]
+        assert conn.exec_driver_sql("SELECT list_id FROM shopping_extras").scalars().all() == [1]
+    try:
+        with engine.begin() as conn:
+            conn.exec_driver_sql(
+                "INSERT INTO shopping_lists (week_start, created_at, updated_at) VALUES ('2026-11-14', '2026-11-01', '2026-11-01')"
+            )
+        raise AssertionError("a second list was accepted")
+    except IntegrityError:
+        pass

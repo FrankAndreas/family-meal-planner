@@ -1,6 +1,9 @@
 import logging
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from . import (
@@ -38,6 +41,15 @@ logger.info("Family hub: %s (logins at %s, app key %s)", hub.hub_url(), hub.publ
 logger.info("AI: %s", "configured" if ai.Settings.from_env().enabled else "not configured (no token, product ID or calls)")
 
 app = FastAPI(title="Meal Planner API", version="0.1.0")
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_error(_request: Request, exc: RequestValidationError) -> JSONResponse:
+    """FastAPI's 422, without the values that were sent: a password that was too long must not come back."""
+    errors = [{k: v for k, v in error.items() if k != "input"} for error in exc.errors()]
+    return JSONResponse(status_code=422, content={"detail": jsonable_encoder(errors)})
+
+
 app.include_router(users_api.router, prefix="/api")
 app.include_router(settings_api.router, prefix="/api")
 # Before recipes_api: its /recipes/{recipe_id} would catch /recipes/categorize

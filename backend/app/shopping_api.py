@@ -9,6 +9,8 @@ import json
 from datetime import timedelta
 
 from fastapi import APIRouter, Depends, Response
+from sqlalchemy.dialects.sqlite import insert
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from . import auth, bring, models, scaling, schemas
@@ -165,7 +167,8 @@ def _out(db: Session, shopping: models.ShoppingList) -> schemas.ShoppingOut:
         }
         for line in combine(sources, [(e["name"], e["amount"]) for e in extras], settings.staples)
     ]
-    content = json.dumps({"meals": meals, "lines": lines, "extras": extras}, default=str, sort_keys=True)
+    # What would be sent: a meal planned meanwhile (unticked) or a note changes nothing in it
+    content = json.dumps(lines, default=str, sort_keys=True)
     return schemas.ShoppingOut(
         week_start=shopping.week_start,
         week_end=shopping.week_start + timedelta(days=6),
@@ -211,7 +214,18 @@ def start_shopping(body: schemas.ShoppingStartIn, me: models.User = Depends(auth
         models.ShoppingMeal(entry_id=e.id) for e in entries_in_week(db, body.week_start) if e.recipe_id is not None
     ]
     db.add(shopping)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as error:
+        db.rollback()
+        # The other parent started one at the same moment (one list at most: `singleton` is unique); any other
+        # failure is not that
+        if "shopping_lists.singleton" not in str(error.orig):
+            raise
+        shopping = db.query(models.ShoppingList).one_or_none()
+        if shopping is None or shopping.week_start != body.week_start:
+            raise api_error(409, "shopping_other_week")
+        return _out(db, shopping)
     db.refresh(shopping)
     return _out(db, shopping)
 
@@ -225,6 +239,14 @@ def discard_shopping(_parent: models.User = Depends(auth.require_parent), db: Se
     return Response(status_code=204)
 
 
+def _tick(db: Session, shopping: models.ShoppingList, entry_id: int, ticked: bool) -> None:
+    """Ticks or unticks a meal; the other parent doing the same at the same moment is no conflict."""
+    if ticked:
+        db.execute(insert(models.ShoppingMeal).values(list_id=shopping.id, entry_id=entry_id).on_conflict_do_nothing())
+    else:
+        db.query(models.ShoppingMeal).filter_by(list_id=shopping.id, entry_id=entry_id).delete()
+
+
 @router.put("/shopping/meals/{entry_id}", response_model=schemas.ShoppingOut)
 def tick_meal(
     entry_id: int, body: schemas.ShoppingTickIn, me: models.User = Depends(auth.require_parent), db: Session = Depends(get_db)
@@ -232,26 +254,27 @@ def tick_meal(
     shopping = _open_or_error(db)
     if entry_id not in {e.id for e in entries_in_week(db, shopping.week_start) if e.recipe_id is not None}:
         raise api_error(400, "shopping_not_in_week")
-    meal = db.get(models.ShoppingMeal, (shopping.id, entry_id))
-    if body.ticked and meal is None:
-        db.add(models.ShoppingMeal(list_id=shopping.id, entry_id=entry_id))
-    elif not body.ticked and meal is not None:
-        db.delete(meal)
+    _tick(db, shopping, entry_id, body.ticked)
     return _changed(db, shopping, me)
+
+
+def _choose(db: Session, shopping: models.ShoppingList, key: str, buy: bool) -> None:
+    """Sets a line's choice; the same choice made by the other parent at the same moment is no conflict."""
+    db.execute(
+        insert(models.ShoppingChoice)
+        .values(list_id=shopping.id, key=key, buy=buy)
+        .on_conflict_do_update(index_elements=["list_id", "key"], set_={"buy": buy})
+    )
 
 
 @router.put("/shopping/lines", response_model=schemas.ShoppingOut)
 def choose_line(body: schemas.ShoppingChoiceIn, me: models.User = Depends(auth.require_parent), db: Session = Depends(get_db)):
     """buy: False drops the line, True keeps it (also a staple), None goes back to the default."""
     shopping = _open_or_error(db)
-    choice = db.get(models.ShoppingChoice, (shopping.id, body.key))
     if body.buy is None:
-        if choice is not None:
-            db.delete(choice)
-    elif choice is None:
-        db.add(models.ShoppingChoice(list_id=shopping.id, key=body.key, buy=body.buy))
+        db.query(models.ShoppingChoice).filter_by(list_id=shopping.id, key=body.key).delete()
     else:
-        choice.buy = body.buy
+        _choose(db, shopping, body.key, body.buy)
     return _changed(db, shopping, me)
 
 
@@ -261,12 +284,7 @@ def add_extra(body: schemas.ShoppingExtraIn, me: models.User = Depends(auth.requ
     position = max((e.position for e in shopping.extras), default=-1) + 1
     db.add(models.ShoppingExtra(list_id=shopping.id, name=body.name, amount=body.amount, position=position))
     # Asked for by name: bought, even if the line of that name was dropped or is usually at home
-    key = line_key(body.name)
-    choice = db.get(models.ShoppingChoice, (shopping.id, key))
-    if choice is None:
-        db.add(models.ShoppingChoice(list_id=shopping.id, key=key, buy=True))
-    else:
-        choice.buy = True
+    _choose(db, shopping, line_key(body.name), True)
     return _changed(db, shopping, me)
 
 
@@ -290,6 +308,8 @@ def send_shopping(body: schemas.ShoppingSendIn, _parent: models.User = Depends(a
     if current.version != body.version:
         raise api_error(409, "shopping_changed")
     items = [(line.name, body.specs.get(line.key, "")) for line in current.lines if line.buy]
+    if not items:
+        raise api_error(400, "shopping_empty")
     client = bring.client()
     try:
         client.add(client.login(login.email, login.password), login.list_uuid, items)

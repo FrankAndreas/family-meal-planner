@@ -1,5 +1,6 @@
 """The Bring! client against a stubbed network (spec 2026-11-06)."""
 
+import http.client
 import io
 import json
 import urllib.error
@@ -113,3 +114,18 @@ def test_fake_used_when_asked(monkeypatch):
     assert isinstance(bring.client(), bring.FakeBring)
     monkeypatch.delenv("BRING_FAKE")
     assert isinstance(bring.client(), bring.HttpBring)
+
+
+def test_cut_off_answer_is_bring_failed(network):
+    network[1].append(http.client.IncompleteRead(b"{"))
+    with pytest.raises(bring.BringFailed) as failed:
+        bring.HttpBring().login("a@b.ch", "geheim")
+    assert failed.value.code == "bring_failed"
+
+
+def test_list_gone_is_its_own_failure(network):
+    network[1].extend([AUTH, _http_error(404)])
+    client = bring.HttpBring()
+    with pytest.raises(bring.BringFailed) as failed:
+        client.add(client.login("a@b.ch", "geheim"), "l-weg", [("Milch", "")])
+    assert failed.value.code == "bring_list_gone"

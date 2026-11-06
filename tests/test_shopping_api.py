@@ -324,12 +324,15 @@ def _more_people(client, headers, week):
     client.patch(f"/api/plan/entries/{week['entry']['id']}", json={"people": 8}, headers=headers)
 
 
-def _child_plans(client, headers, week):
-    create_user(client, headers, "Lena")
-    plan(client, login(client, "Lena"), WEEK + timedelta(days=2), recipe_id=week["recipe"]["id"])
+def _other_parent_unticks(client, headers, week):
+    client.put(f"/api/shopping/meals/{week['entry']['id']}", json={"ticked": False}, headers=headers)
 
 
-@pytest.mark.parametrize("change", [_drop_line, _more_people, _child_plans])
+def _extra_added(client, headers, week):
+    client.post("/api/shopping/extras", json={"name": "Milch", "amount": ""}, headers=headers)
+
+
+@pytest.mark.parametrize("change", [_drop_line, _more_people, _other_parent_unticks, _extra_added])
 def test_send_refused_when_changed(client, admin_headers, week, fake_bring, change):
     _setup_bring(client, admin_headers)
     seen = _start(client, admin_headers).json()
@@ -400,3 +403,111 @@ def test_send_without_change_deletes(client, admin_headers, week, fake_bring):
     _setup_bring(client, admin_headers)
     shopping = _start(client, admin_headers).json()
     assert _send(client, admin_headers, shopping).json() == {"sent": 1, "kept": False}
+
+
+def test_new_unticked_meal_does_not_block_send(client, admin_headers, week, fake_bring):
+    """A meal planned meanwhile arrives unticked: it changes nothing that is sent, so the send goes through."""
+    _setup_bring(client, admin_headers)
+    seen = _start(client, admin_headers).json()
+    create_user(client, admin_headers, "Lena")
+    plan(client, login(client, "Lena"), WEEK + timedelta(days=2), recipe_id=week["recipe"]["id"])
+    response = _send(client, admin_headers, seen)
+    assert response.status_code == 200, response.text
+    assert [name for name, _ in fake_bring[0][1]] == ["Hörnli"]
+
+
+def test_empty_send_refused(client, admin_headers, week, fake_bring):
+    _setup_bring(client, admin_headers)
+    _start(client, admin_headers)
+    shopping = client.put(f"/api/shopping/meals/{week['entry']['id']}", json={"ticked": False}, headers=admin_headers).json()
+    response = _send(client, admin_headers, shopping)
+    assert response.status_code == 400 and response.json()["detail"] == "shopping_empty"
+    assert fake_bring == [] and _get(client, admin_headers) is not None
+
+
+def test_same_tick_twice_before_commit(client, admin_headers, week, db):
+    """The other parent's identical tick lands first: writing it again is no conflict."""
+    from app import models, shopping_api
+
+    _start(client, admin_headers)
+    shopping = db.query(models.ShoppingList).one()
+    shopping_api._tick(db, shopping, week["entry"]["id"], True)
+    shopping_api._tick(db, shopping, week["entry"]["id"], True)
+    db.commit()
+    assert db.query(models.ShoppingMeal).count() == 1
+
+
+def test_same_choice_twice_before_commit(client, admin_headers, week, db):
+    from app import models, shopping_api
+
+    _start(client, admin_headers)
+    shopping = db.query(models.ShoppingList).one()
+    shopping_api._choose(db, shopping, "hornli", False)
+    shopping_api._choose(db, shopping, "hornli", True)
+    db.commit()
+    assert [(c.key, c.buy) for c in db.query(models.ShoppingChoice)] == [("hornli", True)]
+
+
+def test_two_parents_start_at_once(client, admin_headers, week, monkeypatch, db):
+    """Both see no list and both start one: there is still only one."""
+    from app import models, shopping_api
+
+    _start(client, admin_headers)
+    monkeypatch.setattr(shopping_api, "_open", lambda db: None)
+    same = _start(client, admin_headers)
+    assert same.status_code == 200, same.text
+    other = _start(client, admin_headers, WEEK + timedelta(days=7))
+    assert other.status_code == 409 and other.json()["detail"] == "shopping_other_week"
+    assert db.query(models.ShoppingList).count() == 1
+
+
+def test_extras_in_the_order_added(client, admin_headers, week, db):
+    from app import models
+
+    _start(client, admin_headers)
+    shopping_id = db.query(models.ShoppingList.id).scalar()
+    # Inserted in reverse id order, so the rows' own order can't pass for "by id"
+    for extra_id, name in ((20, "B"), (10, "A")):
+        db.add(models.ShoppingExtra(id=extra_id, list_id=shopping_id, name=name, amount="", position=0))
+        db.commit()
+    first = _get(client, admin_headers)
+    assert [e["name"] for e in first["extras"]] == ["A", "B"]
+    assert _get(client, admin_headers)["version"] == first["version"]
+
+
+def test_bring_login_422_does_not_echo_password(client, admin_headers):
+    password = "geheim-" + "x" * 200
+    response = client.post("/api/bring/login", json={"email": "a@b.ch", "password": password}, headers=admin_headers)
+    assert response.status_code == 422
+    assert "geheim" not in response.text
+
+
+def test_send_to_a_list_that_is_gone(client, admin_headers, week, monkeypatch):
+    def gone(self, session, list_uuid, items):
+        raise bring.BringFailed("bring_list_gone")
+
+    _setup_bring(client, admin_headers)
+    shopping = _start(client, admin_headers).json()
+    monkeypatch.setattr(bring.FakeBring, "add", gone)
+    response = _send(client, admin_headers, shopping)
+    assert response.status_code == 502 and response.json()["detail"] == "bring_list_gone"
+
+
+def test_start_only_takes_the_one_list_conflict(client, admin_headers, week, monkeypatch, db):
+    """Another failure while starting (here: a planned meal deleted meanwhile) is not taken for "a list exists"."""
+    from sqlalchemy.exc import IntegrityError
+
+    from app import models, plan_api, shopping_api
+
+    real = plan_api.entries_in_week
+
+    def deleted_meanwhile(db_, start):
+        entries = real(db_, start)
+        with type(db)(bind=db.get_bind()) as other:
+            other.delete(other.get(models.PlanEntry, week["entry"]["id"]))
+            other.commit()
+        return entries
+
+    monkeypatch.setattr(shopping_api, "entries_in_week", deleted_meanwhile)
+    with pytest.raises(IntegrityError):
+        _start(client, admin_headers)

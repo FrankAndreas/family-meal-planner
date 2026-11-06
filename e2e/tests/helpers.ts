@@ -125,6 +125,11 @@ export function ownWeek(): string {
     return day.toISOString().slice(0, 10);
 }
 
+// "2031-01-01" moved by a number of days
+export function addDays(day: string, days: number): string {
+    return new Date(Date.parse(`${day}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
+}
+
 export async function call<T = any>(
     request: APIRequestContext, person: Person, method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE', path: string, data?: unknown,
 ): Promise<T> {

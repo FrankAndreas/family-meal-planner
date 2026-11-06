@@ -12,6 +12,7 @@ import PlanPage from './pages/PlanPage';
 import RecipeEdit from './pages/RecipeEdit';
 import Recipes from './pages/Recipes';
 import RecipeView from './pages/RecipeView';
+import ShoppingPage from './pages/ShoppingPage';
 import SettingsPage from './pages/SettingsPage';
 
 // Not logged in: the API's 401 has already sent the browser to the family hub's login
@@ -43,6 +44,7 @@ export default function App() {
                         <Route path="rezepte/:id/bearbeiten" element={<RecipeEdit key="edit" />} />
                         <Route path="woche-abschliessen" element={<CloseWeek />} />
                         <Route path="verlauf" element={<History />} />
+                        <Route path="einkaufsliste" element={<ShoppingPage />} />
                         <Route path="posteingang" element={<Inbox />} />
                         <Route path="posteingang/:id" element={<InboxItemPage />} />
                         <Route path="einstellungen" element={<SettingsPage />} />

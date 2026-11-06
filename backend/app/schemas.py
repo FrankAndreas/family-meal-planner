@@ -385,3 +385,111 @@ class CategorizeLeft(BaseModel):
 
 class CategorizeOut(CategorizeLeft):
     categorized: int
+
+
+# Shopping list and Bring! (spec 2026-11-06)
+
+
+class BringOut(BaseModel):
+    email: str | None
+    list_uuid: str | None
+    list_name: str | None
+
+
+class BringLoginIn(BaseModel):
+    email: Annotated[str, StringConstraints(strip_whitespace=True, min_length=3, max_length=200)]
+    password: Annotated[str, StringConstraints(min_length=1, max_length=200)]
+
+
+class BringListOut(BaseModel):
+    uuid: str
+    name: str
+
+
+class BringListsOut(BaseModel):
+    lists: list[BringListOut]
+
+
+class BringListIn(BaseModel):
+    uuid: Annotated[str, StringConstraints(min_length=1, max_length=64)]
+
+
+class ShoppingStartIn(BaseModel):
+    week_start: dt.date
+    replace: bool = False
+
+
+class ShoppingTickIn(BaseModel):
+    ticked: bool
+
+
+class ShoppingChoiceIn(BaseModel):
+    key: Annotated[str, StringConstraints(min_length=1, max_length=200)]
+    buy: bool | None
+
+
+class ShoppingExtraIn(BaseModel):
+    name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
+    amount: Annotated[str, StringConstraints(strip_whitespace=True, max_length=50)] = ""
+
+
+class ShoppingSendIn(BaseModel):
+    version: Annotated[str, StringConstraints(max_length=100)]
+    specs: dict[Annotated[str, StringConstraints(max_length=200)], Annotated[str, StringConstraints(max_length=200)]]
+
+
+class ShoppingMealOut(BaseModel):
+    entry_id: int
+    date: dt.date
+    slot: Slot
+    title: str
+    people: float | None
+    ticked: bool
+
+
+class ShoppingNoteOut(BaseModel):
+    date: dt.date
+    slot: Slot
+    note: str
+
+
+class ShoppingAmountOut(BaseModel):
+    amount: float
+    unit: str | None
+
+
+class ShoppingLineOut(BaseModel):
+    key: str
+    name: str
+    amounts: list[ShoppingAmountOut]
+    extras: list[str]
+    meals: list[str]
+    staple: bool
+    buy: bool
+
+
+class ShoppingExtraOut(BaseModel):
+    id: int
+    name: str
+    amount: str
+
+
+class ShoppingOut(BaseModel):
+    week_start: dt.date
+    week_end: dt.date
+    started_by: str | None
+    changed_by: str | None
+    changed_at: dt.datetime
+    meals: list[ShoppingMealOut]
+    notes: list[ShoppingNoteOut]
+    lines: list[ShoppingLineOut]
+    extras: list[ShoppingExtraOut]
+    version: str
+
+
+class ShoppingStateOut(BaseModel):
+    list: ShoppingOut | None
+
+
+class ShoppingSentOut(BaseModel):
+    sent: int

@@ -67,6 +67,11 @@ hub person at the first login, and only then, so their stars and favourites stay
 with their originals (`data/inbox/`). Back up the whole folder: the update script's database backup does not include
 the files.
 
+**Bring! password:** a parent's Bring! login (Einstellungen → Bring!) is stored in `meals.db` as typed, so the planner
+can log in again for every send. Anyone with the database file or a backup of it (`data/`, `db-backups/`) can read
+it: keep those backups where only you can reach them, and change the Bring! password if one gets out. "Bei Bring!
+abmelden" removes it from the database.
+
 ### HTTPS at home (recommended)
 
 The DNS record and the `*.local.<domain>` wildcard certificate from family-budget-dashboard (its README_DOCKER.md,

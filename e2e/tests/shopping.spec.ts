@@ -129,6 +129,9 @@ test('changed meanwhile', async ({ page, request }) => {
     await page.getByRole('button', { name: 'Send to Bring! (2)' }).click();
     await expect(page.getByText('The list changed in the meantime. Please check it again.')).toBeVisible();
     await expect(items.getByRole('checkbox', { name: /Hörnli/ })).not.toBeChecked();
+    // What changed is marked, so checking means looking at the changes
+    await expect(items.getByRole('listitem').filter({ hasText: 'Hörnli' })).toContainText('changed');
+    await expect(items.getByRole('listitem').filter({ hasText: 'Rüebli' })).not.toContainText('changed');
     await page.getByRole('button', { name: 'Send to Bring! (1)' }).click();
     await expect(page.getByText('1 item in Bring!')).toBeVisible();
     expect(errors.filter((e) => !e.includes('409'))).toEqual([]);

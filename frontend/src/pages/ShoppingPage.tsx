@@ -36,6 +36,8 @@ export default function ShoppingPage() {
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
     const [message, setMessage] = useState('');
+    // After a refused send: the lines that changed meanwhile, and the names no longer on the list
+    const [changed, setChanged] = useState<{ keys: Set<string>; gone: string[] }>({ keys: new Set(), gone: [] });
     const requested = search.get('start');
 
     useEffect(() => {
@@ -63,6 +65,7 @@ export default function ShoppingPage() {
     const run = async (action: () => Promise<ShoppingList | null | void>) => {
         setError('');
         setMessage('');
+        setChanged({ keys: new Set(), gone: [] });
         setBusy(true);
         try {
             const result = await action();
@@ -78,9 +81,17 @@ export default function ShoppingPage() {
         }
     };
 
+    const differences = (before: ShoppingList, now: ShoppingList) => {
+        const was = new Map(before.lines.map((line) => [line.key, `${line.buy} ${spec(line)}`]));
+        const keys = new Set(now.lines.filter((line) => was.get(line.key) !== `${line.buy} ${spec(line)}`).map((l) => l.key));
+        const still = new Set(now.lines.map((line) => line.key));
+        return { keys, gone: before.lines.filter((line) => !still.has(line.key)).map((line) => line.name) };
+    };
+
     const send = async (shopping: ShoppingList) => {
         setError('');
         setMessage('');
+        setChanged({ keys: new Set(), gone: [] });
         setBusy(true);
         try {
             const specs = Object.fromEntries(shopping.lines.map((line) => [line.key, spec(line)]));
@@ -95,8 +106,12 @@ export default function ShoppingPage() {
             }
         } catch (err) {
             setError(errorMessage(err));
-            // Changed meanwhile: show the list as it is now, to check and send again
-            if (errorCode(err) === 'shopping_changed') setList(await fetchShopping().catch(() => shopping));
+            // Changed meanwhile: show the list as it is now, with what changed marked, to check and send again
+            if (errorCode(err) === 'shopping_changed') {
+                const now = await fetchShopping().catch(() => shopping);
+                setList(now);
+                if (now) setChanged(differences(shopping, now));
+            }
         } finally {
             setBusy(false);
         }
@@ -235,7 +250,7 @@ export default function ShoppingPage() {
                 {list.lines.length === 0 && <p className="text-sm text-slate-400">{t('shopping.noItems')}</p>}
                 <ul className="space-y-1">
                     {list.lines.map((line) => (
-                        <li key={line.key}>
+                        <li key={line.key} className={changed.keys.has(line.key) ? '-mx-2 rounded-lg bg-amber-400/15 px-2' : ''}>
                             <label className="flex items-start gap-2">
                                 <input
                                     type="checkbox"
@@ -256,10 +271,18 @@ export default function ShoppingPage() {
                                     {line.meals.length > 0 && t('shopping.from', { meals: line.meals.join(', ') })}
                                     {line.staple && !line.buy && ` ${t('shopping.usuallyAtHome')}`}
                                 </span>
+                                {changed.keys.has(line.key) && (
+                                    <span className="shrink-0 rounded-full bg-amber-400/20 px-2 text-xs text-amber-100">
+                                        {t('shopping.changed')}
+                                    </span>
+                                )}
                             </label>
                         </li>
                     ))}
                 </ul>
+                {changed.gone.length > 0 && (
+                    <p className="text-sm text-amber-100">{t('shopping.gone', { names: changed.gone.join(', ') })}</p>
+                )}
                 <form className="flex flex-wrap items-end gap-2" onSubmit={add}>
                     <label className="min-w-0 flex-1 space-y-1">
                         <span className="block text-sm text-slate-300">{t('shopping.addName')}</span>

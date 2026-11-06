@@ -3,6 +3,7 @@ lists. Bring! has no official API for this; the calls are the ones the Bring! ap
 library behind Home Assistant's integration (github.com/miaucl/bring-api). If Bring! changes them, sending fails
 with "bring_failed" and the list in the planner stays."""
 
+import http.client
 import json
 import logging
 import urllib.error
@@ -22,11 +23,13 @@ TIMEOUT_SECONDS = 20
 
 
 class BringFailed(Exception):
-    """code: "bring_login_failed" (email or password refused) or "bring_failed" (anything else)."""
+    """code: "bring_login_failed" (email or password refused), "bring_list_gone" (the chosen list isn't there any
+    more) or "bring_failed" (anything else)."""
 
-    def __init__(self, code: str, reason: str = ""):
+    def __init__(self, code: str, reason: str = "", status: int | None = None):
         super().__init__(reason or code)
         self.code = code
+        self.status = status
 
 
 @dataclass
@@ -71,8 +74,8 @@ class HttpBring:
             if session is None and error.code in (400, 401):
                 raise BringFailed("bring_login_failed", f"HTTP {error.code}") from error
             logger.warning("Bring! %s %s: HTTP %s", method, path.split("/")[0], error.code)
-            raise BringFailed("bring_failed", f"HTTP {error.code}") from error
-        except (urllib.error.URLError, TimeoutError, OSError) as error:
+            raise BringFailed("bring_failed", f"HTTP {error.code}", error.code) from error
+        except (urllib.error.URLError, TimeoutError, OSError, http.client.HTTPException) as error:
             logger.warning("Bring! unreachable: %s", error)
             raise BringFailed("bring_failed", str(error)) from error
 
@@ -109,7 +112,13 @@ class HttpBring:
         # No item uuid: Bring! then updates the item of that name if the list has it (as bring-api's save_item and
         # update_item do), so sending again never adds an item twice
         changes = [{**place, "itemId": name, "spec": spec, "operation": "TO_PURCHASE"} for name, spec in items]
-        self._call("PUT", f"v2/bringlists/{list_uuid}/items", session, body={"changes": changes, "sender": ""})
+        try:
+            self._call("PUT", f"v2/bringlists/{list_uuid}/items", session, body={"changes": changes, "sender": ""})
+        except BringFailed as failed:
+            # The chosen list was deleted, or the account lost access to it
+            if failed.status in (403, 404):
+                raise BringFailed("bring_list_gone", str(failed), failed.status) from failed
+            raise
 
 
 class FakeBring:

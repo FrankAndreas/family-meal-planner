@@ -230,6 +230,8 @@ class ShoppingList(Base):
     id = Column(Integer, primary_key=True)
     # Fixed when started: changing the first day of the week later doesn't move the list
     week_start = Column(Date, nullable=False)
+    # Always 1 and unique: two parents starting a list at the same moment still get one list
+    singleton = Column(Integer, nullable=False, default=1, unique=True)
     created_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"))
     created_at = Column(DateTime, default=utcnow, nullable=False)
     updated_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"))
@@ -237,7 +239,10 @@ class ShoppingList(Base):
 
     meals = relationship("ShoppingMeal", cascade="all, delete-orphan")
     choices = relationship("ShoppingChoice", cascade="all, delete-orphan")
-    extras = relationship("ShoppingExtra", cascade="all, delete-orphan", order_by="ShoppingExtra.position")
+    # By id too: two items added at the same moment can share a position, and the order must not flip between reads
+    extras = relationship(
+        "ShoppingExtra", cascade="all, delete-orphan", order_by="(ShoppingExtra.position, ShoppingExtra.id)"
+    )
 
 
 class ShoppingMeal(Base):

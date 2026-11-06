@@ -64,7 +64,7 @@ export default function IngredientEditor({ rows, units, onChange }: IngredientEd
                 const number = numbers[index];
                 const badAmount = parseAmount(row.amountText) === 'invalid';
                 return (
-                    <div key={row.key} className="grid grid-cols-[5rem_6rem_1fr] gap-2 sm:grid-cols-[5rem_7rem_1fr_1fr_auto]">
+                    <div key={row.key} className="grid grid-cols-[5rem_6rem_1fr] gap-2 sm:grid-cols-[5rem_7rem_1fr_1fr_auto] [&>*]:min-w-0">
                         <input
                             className={`${FIELD} ${badAmount ? 'border-red-400' : ''}`}
                             aria-label={t('recipes.amountN', { n: number })}

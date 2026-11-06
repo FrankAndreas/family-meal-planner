@@ -73,3 +73,25 @@ def test_extra_alone_is_its_own_line():
     assert (last.key, last.name, last.amounts, last.extras, last.meals) == (
         sort_key("WC-Papier"), "WC-Papier", [], [""], []
     )
+
+
+DEFAULT = ["Salz", "Pfeffer", "Öl", "Wasser", "Zucker", "Mehl", "Bouillon"]
+
+
+def _staples(names, staples=DEFAULT):
+    return {line.name: line.staple for line in combine([Source(n, None, None, "A") for n in names], [], staples)}
+
+
+def test_only_the_staple_itself_starts_dropped():
+    """On the shopping list a kind of a staple is still to buy: 500 g Zopfmehl for a Zopf isn't "usually at home"."""
+    kinds = ["Zopfmehl", "Olivenöl", "Puderzucker", "Gemüsebouillon", "Mineralwasser", "Meersalz"]
+    assert _staples(kinds) == {name: False for name in kinds}
+
+
+def test_staples_as_recipes_write_them():
+    names = ["Salz", "Mehl", "frisch gemahlener Pfeffer", "Salz und Pfeffer", "Öl zum Braten", "Pfeffer, aus der Mühle"]
+    assert _staples(names) == {name: True for name in names}
+
+
+def test_staple_added_in_settings_matches_itself_only():
+    assert _staples(["Reis", "Basmatireis"], ["Reis"]) == {"Reis": True, "Basmatireis": False}

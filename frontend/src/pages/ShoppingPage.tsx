@@ -262,13 +262,15 @@ export default function ShoppingPage() {
                                         run(() => chooseLine(line.key, buy));
                                     }}
                                 />
-                                <span className={`min-w-0 break-words ${line.buy ? '' : 'text-slate-500 line-through'}`}>
-                                    {spec(line) && <span>{spec(line)} </span>}
-                                    {line.name}
-                                </span>
-                                <span className="min-w-0 break-words text-sm text-slate-400">
-                                    {line.meals.length > 0 && t('shopping.from', { meals: line.meals.join(', ') })}
-                                    {line.staple && !line.buy && ` ${t('shopping.usuallyAtHome')}`}
+                                <span className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2">
+                                    <span className={line.buy ? '' : 'text-slate-500 line-through'}>
+                                        {spec(line) ? `${spec(line)} ${line.name}` : line.name}
+                                    </span>
+                                    {/* The meals go on the next line rather than squeeze the item */}
+                                    <span className="text-sm text-slate-400">
+                                        {line.meals.length > 0 && t('shopping.from', { meals: line.meals.join(', ') })}
+                                        {line.staple && !line.buy && ` ${t('shopping.usuallyAtHome')}`}
+                                    </span>
                                 </span>
                                 {changed.keys.has(line.key) && (
                                     <span className="shrink-0 rounded-full bg-amber-400/20 px-2 text-xs text-amber-100">

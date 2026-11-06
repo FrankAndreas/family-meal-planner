@@ -85,7 +85,7 @@ def combine(sources: list[Source], extras: list[tuple[str, str]], staples: list[
             line.meals.append(source.meal)
     for key, line in lines.items():
         line.amounts = add_up(parts[key])
-        line.staple = covered(line.name, staples)
+        line.staple = covered(line.name, staples, kinds=False)
     for name, amount in extras:
         key = line_key(name)
         if key not in lines:

@@ -493,3 +493,5 @@ class ShoppingStateOut(BaseModel):
 
 class ShoppingSentOut(BaseModel):
     sent: int
+    # The list changed while it was being sent: it stays, to check and send what's missing
+    kept: bool

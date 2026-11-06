@@ -76,6 +76,8 @@ const de = {
         send_other: 'In Bring! schicken ({{count}})',
         sent_one: '{{count}} Sache in Bring!',
         sent_other: '{{count}} Sachen in Bring!',
+        sentKept_one: '{{count}} Sache in Bring!. Inzwischen hat jemand die Liste geändert: Sie bleibt hier, prüfe sie und schicke, was noch fehlt.',
+        sentKept_other: '{{count}} Sachen in Bring!. Inzwischen hat jemand die Liste geändert: Sie bleibt hier, prüfe sie und schicke, was noch fehlt.',
         setUpBring: 'Richte Bring! in den Einstellungen ein, um die Liste zu schicken.',
         discard: 'Liste wegwerfen',
         confirmDiscard: 'Die Einkaufsliste wegwerfen?',

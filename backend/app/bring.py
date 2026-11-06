@@ -8,7 +8,6 @@ import logging
 import urllib.error
 import urllib.parse
 import urllib.request
-import uuid
 from dataclasses import dataclass
 from typing import ClassVar, Protocol
 
@@ -107,10 +106,9 @@ class HttpBring:
 
     def add(self, session: Session, list_uuid: str, items: list[tuple[str, str]]) -> None:
         place = {"accuracy": "0.0", "altitude": "0.0", "latitude": "0.0", "longitude": "0.0"}
-        changes = [
-            {**place, "itemId": name, "spec": spec, "uuid": str(uuid.uuid4()), "operation": "TO_PURCHASE"}
-            for name, spec in items
-        ]
+        # No item uuid: Bring! then updates the item of that name if the list has it (as bring-api's save_item and
+        # update_item do), so sending again never adds an item twice
+        changes = [{**place, "itemId": name, "spec": spec, "operation": "TO_PURCHASE"} for name, spec in items]
         self._call("PUT", f"v2/bringlists/{list_uuid}/items", session, body={"changes": changes, "sender": ""})
 
 

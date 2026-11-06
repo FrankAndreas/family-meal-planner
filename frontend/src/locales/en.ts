@@ -77,6 +77,8 @@ const en: typeof de = {
         send_other: 'Send to Bring! ({{count}})',
         sent_one: '{{count}} item in Bring!',
         sent_other: '{{count}} items in Bring!',
+        sentKept_one: '{{count}} item in Bring!. Someone changed the list meanwhile: it stays here, check it and send what’s missing.',
+        sentKept_other: '{{count}} items in Bring!. Someone changed the list meanwhile: it stays here, check it and send what’s missing.',
         setUpBring: 'Set up Bring! in the settings to send the list.',
         discard: 'Discard the list',
         confirmDiscard: 'Throw the shopping list away?',

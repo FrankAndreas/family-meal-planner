@@ -84,9 +84,15 @@ export default function ShoppingPage() {
         setBusy(true);
         try {
             const specs = Object.fromEntries(shopping.lines.map((line) => [line.key, spec(line)]));
-            const count = await sendShopping(shopping.version, specs);
-            setList(null);
-            setMessage(t('shopping.sent', { count }));
+            const { sent, kept } = await sendShopping(shopping.version, specs);
+            if (kept) {
+                // Changed while it was being sent: it stays, to check and send what's missing
+                setList(await fetchShopping());
+                setMessage(t('shopping.sentKept', { count: sent }));
+            } else {
+                setList(null);
+                setMessage(t('shopping.sent', { count: sent }));
+            }
         } catch (err) {
             setError(errorMessage(err));
             // Changed meanwhile: show the list as it is now, to check and send again
@@ -139,7 +145,8 @@ export default function ShoppingPage() {
         );
     }
 
-    if (list.week_start !== weekStart) {
+    // The list keeps its week even if the first day of the week changed since: asked for by its date, it opens
+    if (list.week_start !== weekStart && list.week_start !== requested) {
         const replace = () => {
             if (!confirm(t('shopping.confirmReplace', { week: range(list.week_start, list.week_end) }))) return;
             run(() => startShopping(weekStart, true));

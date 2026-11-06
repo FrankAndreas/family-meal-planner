@@ -16,7 +16,7 @@ from .database import get_db
 from .errors import api_error
 from .plan_api import entries_in_week
 from .settings_store import get_settings
-from .shopping import Source, combine
+from .shopping import Source, combine, line_key
 from .timeutil import utcnow
 from .weeks import week_start_of
 
@@ -260,6 +260,13 @@ def add_extra(body: schemas.ShoppingExtraIn, me: models.User = Depends(auth.requ
     shopping = _open_or_error(db)
     position = max((e.position for e in shopping.extras), default=-1) + 1
     db.add(models.ShoppingExtra(list_id=shopping.id, name=body.name, amount=body.amount, position=position))
+    # Asked for by name: bought, even if the line of that name was dropped or is usually at home
+    key = line_key(body.name)
+    choice = db.get(models.ShoppingChoice, (shopping.id, key))
+    if choice is None:
+        db.add(models.ShoppingChoice(list_id=shopping.id, key=key, buy=True))
+    else:
+        choice.buy = True
     return _changed(db, shopping, me)
 
 
@@ -288,6 +295,12 @@ def send_shopping(body: schemas.ShoppingSendIn, _parent: models.User = Depends(a
         client.add(client.login(login.email, login.password), login.list_uuid, items)
     except bring.BringFailed as failed:
         raise api_error(502, failed.code)
-    db.delete(shopping)
-    db.commit()
-    return {"sent": len(items)}
+    # Someone changed the list while Bring! was called: keep it, so that change isn't thrown away unseen
+    db.expire_all()
+    shopping = _open(db)
+    if shopping is not None and _out(db, shopping).version != body.version:
+        return {"sent": len(items), "kept": True}
+    if shopping is not None:
+        db.delete(shopping)
+        db.commit()
+    return {"sent": len(items), "kept": False}

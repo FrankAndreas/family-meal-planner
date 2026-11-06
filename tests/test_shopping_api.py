@@ -310,7 +310,7 @@ def test_send_sends_ticked_lines_with_specs_and_deletes(client, admin_headers, w
     hoernli = _line(shopping, "Hörnli")["key"]
     response = _send(client, admin_headers, shopping, {hoernli: "300 g", _line(shopping, "Salz")["key"]: "1 TL"})
     assert response.status_code == 200, response.text
-    assert response.json() == {"sent": 2}
+    assert response.json() == {"sent": 2, "kept": False}
     assert fake_bring == [("fake-home", [("Hörnli", "300 g"), ("WC-Papier", "")])]
     assert _get(client, admin_headers) is None
 
@@ -362,3 +362,41 @@ def test_send_with_wrong_password_keeps_list(client, admin_headers, week, db):
     response = _send(client, admin_headers, shopping)
     assert response.status_code == 502 and response.json()["detail"] == "bring_login_failed"
     assert _get(client, admin_headers) is not None
+
+
+def test_extra_with_name_of_dropped_line_is_bought(client, admin_headers, week, fake_bring):
+    """Out of salt: adding "Salz" buys it, although Salz is usually at home (dropped by default)."""
+    _setup_bring(client, admin_headers)
+    _start(client, admin_headers)
+    shopping = client.post("/api/shopping/extras", json={"name": "Salz", "amount": "1 Pack"}, headers=admin_headers).json()
+    assert _line(shopping, "Salz")["buy"] is True
+    assert _send(client, admin_headers, shopping).status_code == 200
+    assert [name for name, _ in fake_bring[0][1]] == ["Hörnli", "Salz"]
+
+
+def test_change_during_send_keeps_list(client, admin_headers, week, fake_bring, monkeypatch, db):
+    """The other parent adds something while Bring! is being called: the list stays, so it isn't lost."""
+    from app import models
+
+    _setup_bring(client, admin_headers)
+    shopping = _start(client, admin_headers).json()
+    real = bring.FakeBring.add
+
+    def meanwhile(self, session, list_uuid, items):
+        real(self, session, list_uuid, items)
+        with type(db)(bind=db.get_bind()) as other:
+            shopping_id = other.query(models.ShoppingList.id).scalar()
+            other.add(models.ShoppingExtra(list_id=shopping_id, name="WC-Papier", amount="", position=0))
+            other.commit()
+
+    monkeypatch.setattr(bring.FakeBring, "add", meanwhile)
+    response = _send(client, admin_headers, shopping)
+    assert response.status_code == 200 and response.json() == {"sent": 1, "kept": True}
+    kept = _get(client, admin_headers)
+    assert kept is not None and _line(kept, "WC-Papier")["buy"] is True
+
+
+def test_send_without_change_deletes(client, admin_headers, week, fake_bring):
+    _setup_bring(client, admin_headers)
+    shopping = _start(client, admin_headers).json()
+    assert _send(client, admin_headers, shopping).json() == {"sent": 1, "kept": False}

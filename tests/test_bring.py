@@ -86,7 +86,8 @@ def test_add_sends_changes(network):
         ("Hörnli", "500 g", "TO_PURCHASE"),
         ("WC-Papier", "", "TO_PURCHASE"),
     ]
-    assert all(c["uuid"] for c in body["changes"])
+    # No item uuid: Bring! then updates the item of that name instead of adding a second one (bring-api update_item)
+    assert all("uuid" not in c for c in body["changes"])
 
 
 @pytest.mark.parametrize(

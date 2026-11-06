@@ -178,3 +178,21 @@ test('children don’t see the shopping list', async ({ page, request }) => {
     await expect(page.getByTestId('week-range')).toBeVisible();
     await expect(page.getByRole('link', { name: '🛒 Shopping list' })).toHaveCount(0);
 });
+
+// The list keeps its week when the first day of the week changes (spec 2026-11-06)
+test('the open list after the first day of the week changed', async ({ page, request }) => {
+    const parent = await newPerson(request);
+    const start = await week(request, parent);
+    await call(request, parent, 'POST', '/shopping', { week_start: start });
+    await call(request, parent, 'PATCH', '/settings', { week_start: 0 });
+    try {
+        await login(page, parent.name);
+        await page.goto(`/?woche=${start}`);
+        await page.getByRole('link', { name: '🛒 Shopping list' }).click();
+        await expect(page.getByText(/There’s a list for/)).toBeVisible();
+        await page.getByRole('button', { name: 'Open it' }).click();
+        await expect(page.getByRole('region', { name: /Which meals/ }).getByRole('checkbox', { name: /Älplermagronen/ })).toBeChecked();
+    } finally {
+        await call(request, parent, 'PATCH', '/settings', { week_start: 5 });
+    }
+});

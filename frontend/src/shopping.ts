@@ -62,4 +62,4 @@ export const addExtra = async (name: string, amount: string) =>
 export const removeExtra = async (id: number) => (await api.delete<ShoppingList>(`/api/shopping/extras/${id}`)).data;
 
 export const sendShopping = async (version: string, specs: Record<string, string>) =>
-    (await api.post<{ sent: number }>('/api/shopping/send', { version, specs })).data.sent;
+    (await api.post<{ sent: number; kept: boolean }>('/api/shopping/send', { version, specs })).data;

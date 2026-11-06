@@ -118,3 +118,16 @@ def test_tags_that_dont_fit_stay(client, admin_headers, translator):
     translator.append(lambda data: {**data, "tags": ["Frühstück"]})
     got = client.post(f"/api/recipes/{r['id']}/translate", headers=admin_headers).json()
     assert got["tags"] == ["breakfast", "quick"]
+
+
+def test_translation_keeps_categories(client, admin_headers, translator):
+    received = []
+
+    def keep(data):
+        received.append(data)
+        return {"title": "Pfannkuchen", "ingredients": [{"name": "Mehl", "note": ""}, {"name": "Milch", "note": ""}], "steps": ["Mixen."], "notes": ""}
+
+    translator.append(keep)
+    r = create_recipe(client, admin_headers, "Pancakes", language="en", categories=["main"], ingredients=[{"amount": 1, "name": "flour"}, {"amount": 1, "name": "milk"}])
+    got = client.post(f"/api/recipes/{r['id']}/translate", headers=admin_headers).json()
+    assert got["categories"] == ["main"] and "categories" not in received[0]

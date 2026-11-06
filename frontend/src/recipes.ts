@@ -1,4 +1,5 @@
 import api from './api';
+import type { Category } from './categories';
 import type { Language } from './i18n';
 
 // Mirrors backend/app/schemas.py (RecipeSummary, RecipeOut)
@@ -7,6 +8,7 @@ export interface RecipeSummary {
     title: string;
     photo_url: string | null;
     tags: string[];
+    categories: Category[];
     servings: number;
     servings_unit: string | null;
     total_minutes: number | null;
@@ -67,6 +69,7 @@ export interface RecipeInput {
     ingredients: { group: string | null; amount: number | null; unit: string | null; name: string; note: string }[];
     steps: string[];
     tags: string[];
+    categories: Category[];
     notes: string;
     source_kind?: Recipe['source_kind'];
     source_url?: string | null;
@@ -77,6 +80,7 @@ export interface RecipeInput {
 export interface RecipeFilter {
     q?: string;
     tag?: string;
+    category?: Category | 'none' | '';
     favorites?: '' | 'mine' | 'any';
 }
 
@@ -92,3 +96,15 @@ export async function fetchRecipe(id: number | string, people?: number | null): 
 // How many people a recipe is for when nobody said otherwise: its own yield, or the family for "1 Blech"
 export const defaultPeople = (recipe: RecipeSummary, familySize: number) =>
     recipe.servings_unit === null ? recipe.servings : familySize;
+
+// Whether the AI can be used at all (a token is set); a parent's AI buttons stay hidden without it
+export const fetchAiEnabled = async () => (await api.get<{ enabled: boolean }>('/api/ai/status')).data.enabled;
+
+// How many recipes without categories the AI hasn't sorted yet (parents)
+export const fetchUncategorized = async () =>
+    (await api.get<{ remaining: number }>('/api/recipes/categorize')).data.remaining;
+
+// The AI sorts one recipe, or the next batch of recipes without categories (parents)
+export const categorize = async (recipeId?: number) =>
+    (await api.post<{ categorized: number; remaining: number }>('/api/recipes/categorize', { recipe_id: recipeId ?? null }))
+        .data;

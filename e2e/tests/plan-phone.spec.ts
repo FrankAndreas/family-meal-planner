@@ -66,3 +66,18 @@ test('plan a recipe from its page on the phone, with day and meal buttons', asyn
     await expect(dialog.getByTestId('plan-dialog-taken')).toContainText(recipe.title);
     expect(errors).toEqual([]);
 });
+
+test('the sheet opens for the tapped slot and leaves the remembered choice alone', async ({ page, request }) => {
+    const parent = await newPerson(request);
+    const errors = await login(page, parent.name);
+    await page.goto(`/?woche=${ownWeek()}`);
+    await page.evaluate(() => localStorage.setItem('meals.suggestionSlot', 'dinner'));
+    await page.getByRole('tab', { name: 'Sunday' }).click();
+    await page.getByRole('button', { name: 'Add to Sunday, Breakfast' }).click();
+    const forRow = page.getByRole('dialog', { name: 'Sunday, Breakfast' }).getByRole('group', { name: 'For' });
+    await expect(forRow.getByRole('button', { name: 'Breakfast' })).toHaveAttribute('aria-pressed', 'true');
+    await forRow.getByRole('button', { name: 'Lunch' }).click();
+    await expect(forRow.getByRole('button', { name: 'Lunch' })).toHaveAttribute('aria-pressed', 'true');
+    expect(await page.evaluate(() => localStorage.getItem('meals.suggestionSlot'))).toBe('dinner');
+    expect(errors).toEqual([]);
+});

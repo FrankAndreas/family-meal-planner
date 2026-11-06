@@ -75,3 +75,33 @@ test('a recipe link is pasted on the recipes page and lands in the inbox', async
     await expect(page).toHaveURL(/\/posteingang$/);
     await expect(page.getByRole('article').filter({ hasText: 'www.fooby.ch' }).getByText('Waiting for a parent')).toBeVisible();
 });
+
+test('an imported draft comes with its categories; an older draft without any still opens', async ({ page, request }) => {
+    const parent = await newPerson(request);
+    const address = `${uniqueName('p')}@example.ch`;
+    await call(request, parent, 'POST', '/emails', { address });
+    const subject = uniqueName('Risotto ');
+    await sendMail(request, address, subject);
+    const errors = await login(page, parent.name);
+    await page.goto('/posteingang');
+    const card = page.getByRole('article').filter({ hasText: subject });
+    await card.getByRole('button', { name: 'Process' }).click();
+    await expect(card.getByText('Draft ready')).toBeVisible({ timeout: 15_000 });
+    await card.getByRole('link', { name: 'Review draft' }).click();
+    const form = page.getByRole('group', { name: 'Categories' });
+    await expect(form.getByRole('button', { name: 'Main dish' })).toHaveAttribute('aria-pressed', 'true');
+    await expect(form.getByRole('button', { name: 'Dessert' })).toHaveAttribute('aria-pressed', 'false');
+
+    // A draft made before categories existed has no such field
+    const draftUrl = page.url();
+    await page.route('**/api/inbox/*', async (route) => {
+        const response = await route.fetch();
+        const item = await response.json();
+        if (item.draft) delete item.draft.categories;
+        await route.fulfill({ response, json: item });
+    });
+    await page.goto(draftUrl);
+    await expect(page.getByLabel('Title')).toHaveValue('EN Fake-Risotto');
+    await expect(form.getByRole('button', { name: 'Main dish' })).toHaveAttribute('aria-pressed', 'false');
+    expect(errors).toEqual([]);
+});

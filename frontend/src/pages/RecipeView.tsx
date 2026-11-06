@@ -18,7 +18,9 @@ import type { Language } from "../i18n";
 import { isWebLink, siteName } from "../links";
 import { type PlanEntry, type Slot, weekdayKey } from "../plan";
 import {
+  categorize,
   defaultPeople,
+  fetchAiEnabled,
   fetchRecipe,
   type Ingredient,
   type Recipe,
@@ -66,6 +68,8 @@ export default function RecipeView() {
   const [eatenOn, setEatenOn] = useState<string[]>([]);
   const [showOriginal, setShowOriginal] = useState(false);
   const [translating, setTranslating] = useState(false);
+  const [aiOn, setAiOn] = useState(false);
+  const [categorizing, setCategorizing] = useState(false);
   const [planning, setPlanning] = useState(false);
   const [justPlanned, setJustPlanned] = useState<PlanEntry | null>(null);
   // Where it's planned from today on, so nobody plans it twice by accident; asked again after planning
@@ -153,6 +157,26 @@ export default function RecipeView() {
     }
   };
 
+  useEffect(() => {
+    if (user?.role !== "PARENT") return;
+    fetchAiEnabled()
+      .then(setAiOn)
+      .catch(() => {});
+  }, [user?.role]);
+
+  const suggestCategories = async () => {
+    setCategorizing(true);
+    setError("");
+    try {
+      await categorize(recipe!.id);
+      setRecipe(await fetchRecipe(recipe!.id, people));
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setCategorizing(false);
+    }
+  };
+
   const translate = async () => {
     setTranslating(true);
     setError("");
@@ -191,6 +215,7 @@ export default function RecipeView() {
   // Not in the family's language (or unknown, from outside; the backend knows DEFAULT_LANGUAGE): parents can have
   // it translated
   const canTranslate = user?.role === "PARENT" && !recipe.deleted && recipe.translate_into !== null;
+  const canCategorize = user?.role === "PARENT" && aiOn && !recipe.deleted && recipe.categories.length === 0;
 
   const place = (day: string, slot: Slot) =>
     t("plan.place", {
@@ -283,6 +308,21 @@ export default function RecipeView() {
                 places: planned.map((p) => place(p.date, p.slot)).join(" · "),
               })}
             </p>
+          )}
+          {recipe.categories.length > 0 && (
+            <ul
+              aria-label={t("recipes.categories")}
+              className="flex flex-wrap gap-2"
+            >
+              {recipe.categories.map((category) => (
+                <li
+                  key={category}
+                  className="rounded-full border border-amber-300/40 px-2 py-0.5 text-xs text-amber-100"
+                >
+                  {t(`recipes.category.${category}`)}
+                </li>
+              ))}
+            </ul>
           )}
           {recipe.tags.length > 0 && (
             <div className="flex flex-wrap gap-2">
@@ -381,6 +421,16 @@ export default function RecipeView() {
                   {translating
                     ? t("recipes.translating")
                     : t(`recipes.translateInto.${recipe.translate_into ?? "de"}`)}
+                </button>
+              )}
+              {canCategorize && (
+                <button
+                  type="button"
+                  className={BUTTON_SECONDARY}
+                  onClick={suggestCategories}
+                  disabled={categorizing}
+                >
+                  {categorizing ? t("recipes.categorizing") : t("recipes.categorizeOne")}
                 </button>
               )}
               {user?.role === "PARENT" && (

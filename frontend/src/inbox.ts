@@ -1,4 +1,5 @@
 import api from './api';
+import type { Category } from './categories';
 import type { RecipeInput } from './recipes';
 
 // Mirrors backend/app/schemas.py (InboxItemOut, InboxItemDetail)
@@ -25,7 +26,9 @@ export interface InboxItem {
     recipe_id: number | null;
 }
 
-export type Draft = Omit<RecipeInput, 'ingredients'> & {
+export type Draft = Omit<RecipeInput, 'ingredients' | 'categories'> & {
+    // Missing in drafts made before there were categories
+    categories?: Category[];
     ingredients: { amount: number | null; unit: string | null; name: string; note: string }[];
     uncertain: string[];
     photo?: string | null;

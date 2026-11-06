@@ -150,3 +150,49 @@ def test_search_ignores_accents(client, admin_headers):
             "Älplermagronen"
         ], q
     assert len(client.get("/api/recipes?tag=kase", headers=admin_headers).json()) == 1
+
+
+def test_categories_saved_in_order(client, admin_headers):
+    r = create_recipe(client, admin_headers, categories=["snack", "main", "main"])
+    assert r["categories"] == ["main", "snack"]
+    assert client.get(f"/api/recipes/{r['id']}", headers=admin_headers).json()["categories"] == ["main", "snack"]
+
+
+def test_no_categories_by_default(client, admin_headers):
+    assert create_recipe(client, admin_headers)["categories"] == []
+
+
+def test_unknown_category_rejected(client, admin_headers):
+    response = client.post("/api/recipes", json=recipe_body(categories=["pizza"]), headers=admin_headers)
+    assert response.status_code == 422
+
+
+def test_filter_by_category(client, admin_headers):
+    create_recipe(client, admin_headers, "Lasagne", categories=["main"])
+    create_recipe(client, admin_headers, "Mousse", categories=["dessert"])
+    create_recipe(client, admin_headers, "Ohne")
+
+    def titles(category):
+        response = client.get(f"/api/recipes?category={category}", headers=admin_headers)
+        assert response.status_code == 200, response.text
+        return [r["title"] for r in response.json()]
+
+    assert titles("main") == ["Lasagne"]
+    assert titles("none") == ["Ohne"]
+    assert titles("") == ["Lasagne", "Mousse", "Ohne"]
+    assert client.get("/api/recipes?category=pizza", headers=admin_headers).status_code == 422
+
+
+def test_unknown_stored_key_is_dropped(client, admin_headers, db):
+    from app import models
+
+    r = create_recipe(client, admin_headers, categories=["main"])
+    db.get(models.Recipe, r["id"]).categories = ["gone", "main"]
+    db.commit()
+    got = client.get(f"/api/recipes/{r['id']}", headers=admin_headers).json()
+    assert got["categories"] == ["main"]
+    assert client.put(f"/api/recipes/{r['id']}", json=recipe_body(categories=got["categories"]), headers=admin_headers).status_code == 200
+    only_gone = create_recipe(client, admin_headers, "Nur weg")
+    db.get(models.Recipe, only_gone["id"]).categories = ["gone"]
+    db.commit()
+    assert "Nur weg" in [r["title"] for r in client.get("/api/recipes?category=none", headers=admin_headers).json()]

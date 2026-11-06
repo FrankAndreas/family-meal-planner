@@ -92,3 +92,43 @@ def test_summary_has_stats(client, admin_headers, today):
 
 def test_unknown_tab(client, admin_headers):
     assert client.get("/api/suggestions?tab=random", headers=admin_headers).status_code == 422
+
+
+def test_slot_ranks_fitting_first(client, admin_headers, today):
+    for title, categories in [
+        ("Kuchen", ["baking"]),
+        ("Ohne", []),
+        ("Beilage", ["side"]),
+        ("Lasagne", ["main"]),
+        ("Suppe", ["soup"]),
+    ]:
+        create_recipe(client, admin_headers, title, categories=categories)
+    assert _titles(client, admin_headers, "new") == ["Suppe", "Lasagne", "Beilage", "Ohne", "Kuchen"]
+    assert _titles(client, admin_headers, "new", "&slot=snack") == ["Kuchen", "Beilage", "Ohne", "Suppe", "Lasagne"]
+
+
+def test_slot_keeps_tab_order_inside_groups(client, admin_headers, today):
+    for title, categories, stars in [("Main5", ["main"], 5), ("Main3", ["main"], 3), ("Baking4", ["baking"], 4)]:
+        recipe = create_recipe(client, admin_headers, title, categories=categories)
+        _fav(client, admin_headers, recipe["id"])
+        _rate(client, admin_headers, recipe["id"], stars)
+    assert _titles(client, admin_headers, "favorites") == ["Main5", "Baking4", "Main3"]
+    assert _titles(client, admin_headers, "favorites", "&slot=dinner") == ["Main5", "Main3", "Baking4"]
+
+
+def test_limit_after_grouping(client, admin_headers, today):
+    create_recipe(client, admin_headers, "Lasagne", categories=["main"])
+    for n in range(3):
+        create_recipe(client, admin_headers, f"Kuchen {n}", categories=["baking"])
+    assert _titles(client, admin_headers, "new", "&slot=dinner&limit=1") == ["Lasagne"]
+
+
+def test_slot_never_hides(client, admin_headers, today):
+    create_recipe(client, admin_headers, "Lasagne", categories=["main"])
+    create_recipe(client, admin_headers, "Zopf", categories=["breakfast"])
+    create_recipe(client, admin_headers, "Ohne")
+    assert sorted(_titles(client, admin_headers, "new", "&slot=breakfast")) == sorted(_titles(client, admin_headers, "new"))
+
+
+def test_bad_slot(client, admin_headers):
+    assert client.get("/api/suggestions?tab=new&slot=brunch", headers=admin_headers).status_code == 422

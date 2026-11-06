@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { errorMessage } from '../../api';
-import { fetchSuggestions, type SuggestionTab } from '../../plan';
+import { fetchSuggestions, loadSuggestionSlot, saveSuggestionSlot, SLOTS, type Slot, type SuggestionTab } from '../../plan';
 import type { RecipeSummary } from '../../recipes';
 import { ERROR, INPUT } from '../../ui';
 import RecipeCard from '../recipes/RecipeCard';
@@ -14,11 +14,18 @@ interface SuggestionPanelProps {
     onPick: (recipe: RecipeSummary) => void;
     // Changes whenever the plan changed, so "Lange her" and "Neu" stay true
     version: number;
+    // The phone's sheet: opened for this slot (preselected, not remembered). Without it the choice is kept on the device
+    slot?: Slot;
 }
 
-export default function SuggestionPanel({ selectedId, onPick, version }: SuggestionPanelProps) {
+export default function SuggestionPanel({ selectedId, onPick, version, slot: openedFor }: SuggestionPanelProps) {
     const { t } = useTranslation();
     const [tab, setTab] = useState<SuggestionTab>('favorites');
+    const [slot, setSlot] = useState<Slot | null>(() => openedFor ?? loadSuggestionSlot());
+    const chooseSlot = (next: Slot | null) => {
+        setSlot(next);
+        if (!openedFor) saveSuggestionSlot(next);
+    };
     const [q, setQ] = useState('');
     const [recipes, setRecipes] = useState<RecipeSummary[] | null>(null);
     const [error, setError] = useState('');
@@ -26,7 +33,7 @@ export default function SuggestionPanel({ selectedId, onPick, version }: Suggest
     useEffect(() => {
         let current = true;
         const timer = setTimeout(() => {
-            fetchSuggestions(tab, q)
+            fetchSuggestions(tab, q, slot)
                 .then((found) => {
                     if (!current) return;
                     setRecipes(found);
@@ -38,10 +45,28 @@ export default function SuggestionPanel({ selectedId, onPick, version }: Suggest
             current = false;
             clearTimeout(timer);
         };
-    }, [tab, q, version]);
+    }, [tab, q, slot, version]);
 
     return (
         <aside className="glass-card flex max-h-[calc(100vh-8rem)] flex-col gap-3 p-3">
+            <div role="group" aria-labelledby="suggest-for" className="flex flex-wrap items-center gap-1">
+                <span id="suggest-for" className="mr-1 text-xs text-slate-400">
+                    {t('plan.suggestFor')}
+                </span>
+                {[null, ...SLOTS].map((key) => (
+                    <button
+                        key={key ?? 'all'}
+                        type="button"
+                        aria-pressed={slot === key}
+                        onClick={() => chooseSlot(key)}
+                        className={`rounded-full px-2 py-0.5 text-xs ${
+                            slot === key ? 'bg-cyan-400/20 text-cyan-100' : 'text-slate-400 hover:bg-white/5'
+                        }`}
+                    >
+                        {key ? t(`plan.slots.${key}`) : t('plan.allSlots')}
+                    </button>
+                ))}
+            </div>
             <div role="tablist" className="grid grid-cols-2 gap-1">
                 {TABS.map((key) => (
                     <button

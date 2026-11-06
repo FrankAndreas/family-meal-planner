@@ -46,8 +46,31 @@ export const addEntry = async (body: NewEntry) => (await api.post<PlanEntry>('/a
 export const updateEntry = async (id: number, patch: Partial<Omit<PlanEntry, 'id' | 'recipe'>>) =>
     (await api.patch<PlanEntry>(`/api/plan/entries/${id}`, patch)).data;
 export const removeEntry = (id: number) => api.delete(`/api/plan/entries/${id}`);
-export const fetchSuggestions = async (tab: SuggestionTab, q: string) =>
-    (await api.get<RecipeSummary[]>('/api/suggestions', { params: { tab, ...(q ? { q } : {}) } })).data;
+// slot: the slot being planned, so what fits it comes first (null: the usual order)
+export const fetchSuggestions = async (tab: SuggestionTab, q: string, slot: Slot | null) =>
+    (await api.get<RecipeSummary[]>('/api/suggestions', { params: { tab, ...(q ? { q } : {}), ...(slot ? { slot } : {}) } }))
+        .data;
+
+// The planning screen's "Für" choice, kept on this device (a Friday session is many dinners in a row)
+const SLOT_KEY = 'meals.suggestionSlot';
+
+export function loadSuggestionSlot(): Slot | null {
+    try {
+        const stored = localStorage.getItem(SLOT_KEY);
+        return SLOTS.find((slot) => slot === stored) ?? null;
+    } catch {
+        return null;
+    }
+}
+
+export function saveSuggestionSlot(slot: Slot | null): void {
+    try {
+        if (slot) localStorage.setItem(SLOT_KEY, slot);
+        else localStorage.removeItem(SLOT_KEY);
+    } catch {
+        // Private mode or blocked storage: it just forgets
+    }
+}
 
 // "2026-10-31" → its locale key under weekdays.* (Python numbering, 0 = Monday)
 export const weekdayKey = (day: string) => WEEKDAYS[(parseISO(day).getDay() + 6) % 7];

@@ -91,3 +91,85 @@ test('search finds recipes by ingredient', async ({ page, request }) => {
     await page.getByLabel('Search recipes').fill(special.toLowerCase());
     await expect(page.getByRole('link', { name: recipe.title })).toBeVisible();
 });
+
+test('categories are ticked in the form, shown on the recipe and filter the list', async ({ page, request }) => {
+    const child = await newPerson(request, 'CHILD');
+    const errors = await login(page, child.name);
+    const title = uniqueName('Wähe ');
+    await page.goto('/rezepte/neu');
+    await page.getByLabel('Title').fill(title);
+    await page.getByLabel('Ingredient 1').fill('Teig');
+    const form = page.getByRole('group', { name: 'Categories' });
+    await form.getByRole('button', { name: 'Apéro' }).click();
+    await form.getByRole('button', { name: 'Main dish' }).click();
+    await expect(form.getByRole('button', { name: 'Main dish' })).toHaveAttribute('aria-pressed', 'true');
+    await page.getByRole('button', { name: 'Save recipe' }).click();
+    await expect(page.getByRole('heading', { name: title })).toBeVisible();
+    await expect(page.getByRole('list', { name: 'Categories' })).toHaveText(/Apéro\s*Main dish/);
+
+    await page.goto('/rezepte');
+    const filter = page.getByRole('group', { name: 'Filter by category' });
+    await filter.getByRole('button', { name: 'Main dish' }).click();
+    await expect(page.getByRole('link', { name: title })).toBeVisible();
+    await filter.getByRole('button', { name: 'Dessert' }).click();
+    await expect(page.getByRole('link', { name: title })).toHaveCount(0);
+    await filter.getByRole('button', { name: 'No category' }).click();
+    await expect(page.getByRole('link', { name: title })).toHaveCount(0);
+
+    await filter.getByRole('button', { name: 'All categories' }).click();
+    await page.getByRole('link', { name: title }).click();
+    await page.getByRole('link', { name: 'Edit' }).click();
+    await form.getByRole('button', { name: 'Apéro' }).click();
+    await form.getByRole('button', { name: 'Main dish' }).click();
+    await page.getByRole('button', { name: 'Save recipe' }).click();
+    await expect(page.getByRole('heading', { name: title })).toBeVisible();
+    await expect(page.getByRole('list', { name: 'Categories' })).toHaveCount(0);
+    await page.goto('/rezepte');
+    await filter.getByRole('button', { name: 'No category' }).click();
+    await expect(page.getByRole('link', { name: title })).toBeVisible();
+    expect(errors).toEqual([]);
+});
+
+test('a parent has the AI sort the recipes without a category', async ({ page, request }) => {
+    const parent = await newPerson(request);
+    const first = await createRecipe(request, parent);
+    const second = await createRecipe(request, parent);
+    const errors = await login(page, parent.name);
+    await page.goto('/rezepte');
+    const filter = page.getByRole('group', { name: 'Filter by category' });
+    await filter.getByRole('button', { name: 'No category' }).click();
+    await expect(page.getByRole('link', { name: first.title })).toBeVisible();
+    await page.getByRole('button', { name: /^Sort with AI \(\d+\)$/ }).click();
+    await expect(page.getByRole('link', { name: first.title })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: second.title })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /^Sort with AI/ })).toHaveCount(0);
+    await filter.getByRole('button', { name: 'Main dish' }).click();
+    await expect(page.getByRole('link', { name: first.title })).toBeVisible();
+    await expect(page.getByRole('link', { name: second.title })).toBeVisible();
+    expect(errors).toEqual([]);
+});
+
+test('a parent asks the AI for one recipe\'s categories', async ({ page, request }) => {
+    const parent = await newPerson(request);
+    const recipe = await createRecipe(request, parent);
+    const errors = await login(page, parent.name);
+    await page.goto(`/rezepte/${recipe.id}`);
+    await page.getByRole('button', { name: 'Suggest categories' }).click();
+    await expect(page.getByRole('list', { name: 'Categories' })).toHaveText('Main dish');
+    await expect(page.getByRole('button', { name: 'Suggest categories' })).toHaveCount(0);
+    expect(errors).toEqual([]);
+});
+
+test('children see no AI sorting', async ({ page, request }) => {
+    const parent = await newPerson(request);
+    const child = await newPerson(request, 'CHILD');
+    const recipe = await createRecipe(request, parent);
+    await login(page, child.name);
+    await page.goto('/rezepte');
+    await page.getByRole('group', { name: 'Filter by category' }).getByRole('button', { name: 'No category' }).click();
+    await expect(page.getByRole('link', { name: recipe.title })).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Sort with AI/ })).toHaveCount(0);
+    await page.goto(`/rezepte/${recipe.id}`);
+    await expect(page.getByRole('heading', { name: recipe.title })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Suggest categories' })).toHaveCount(0);
+});

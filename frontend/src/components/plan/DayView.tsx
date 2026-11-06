@@ -91,6 +91,7 @@ export default function DayView({ week, familySize, version, onPlan, onNote, onO
                         </div>
                         <div className="min-h-0 flex-1">
                             <SuggestionPanel
+                                slot={adding}
                                 selectedId={null}
                                 version={version}
                                 onPick={(recipe) => {

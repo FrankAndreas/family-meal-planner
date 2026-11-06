@@ -21,7 +21,7 @@ from PIL import Image, ImageOps
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from . import auth, config, models, photos  # noqa: F401  (photos: HEIC opener)
+from . import auth, categories, config, models, photos  # noqa: F401  (photos: HEIC opener)
 from .database import get_db
 from .errors import api_error
 from .timeutil import utcnow
@@ -110,6 +110,7 @@ class InfomaniakClient:
 
 
 TRANSLATE_MARKER = "TRANSLATE:"
+CATEGORIZE_MARKER = "RECIPES:"
 
 
 class FakeClient:
@@ -121,6 +122,10 @@ class FakeClient:
             data = json.loads(question.split(TRANSLATE_MARKER, 1)[1])
             data["title"] = ("EN " if INTO["en"] in question else "DE ") + data["title"]
             return Answer(json.dumps(data), 50)
+        if CATEGORIZE_MARKER in question:
+            recipes = json.loads(question.split(CATEGORIZE_MARKER, 1)[1])
+            # "main" for each, and what a careless answer adds: an unknown key and a recipe that wasn't asked about
+            return Answer(json.dumps({"999999": ["main"], **{str(r["id"]): ["main", "pizza"] for r in recipes}}), 20)
         return Answer(
             json.dumps(
                 {
@@ -135,6 +140,7 @@ class FakeClient:
                     ],
                     "steps": ["Reis andünsten.", "Bouillon nach und nach beigeben."],
                     "tags": ["vegi"],
+                    "categories": ["main", "pizza"],
                     "uncertain": ["1 l oder 1,2 l Bouillon?"],
                     "image_index": 0,
                     "language": "de",
@@ -175,18 +181,33 @@ def take_call(db: Session, user: models.User, purpose: str, item_id: int | None 
     return call
 
 
+# The categories for the AI to choose from (spec 2026-11-05), shared by the import and the sorting of old recipes
+CATEGORY_GLOSSES = """- breakfast: Frühstück, Zmorge
+- apero: Apéro, Fingerfood, Häppchen
+- starter: Vorspeise
+- soup: Suppe
+- salad: Salat (als Gericht oder Beilage)
+- main: Hauptgericht
+- side: Beilage
+- dessert: Dessert, Nachspeise
+- baking: Kuchen, Gebäck, Brot, Guetzli
+- snack: Snack, Znüni, Zvieri"""
+
 RECIPE_PROMPT = """Du liest ein Kochrezept aus einer Mail, einem Bildschirmfoto (z. B. Facebook) oder einer Webseite.
 Antworte NUR mit einem JSON-Objekt, ohne Text davor oder danach:
 {{"title": str, "servings": Zahl, "servings_unit": null oder Wort (z. B. "Blech", "Stück"; null heisst Personen),
  "prep_minutes": Zahl oder null, "cook_minutes": Zahl oder null,
  "ingredients": [{{"amount": Zahl oder null, "unit": eine von {units} oder null, "name": str, "note": str}}],
- "steps": [str], "tags": [str], "uncertain": [str], "image_index": Zahl oder null, "language": "de" oder "en"}}
+ "steps": [str], "tags": [str], "categories": [str], "uncertain": [str], "image_index": Zahl oder null,
+ "language": "de" oder "en"}}
 Regeln:
 - Übernimm das Rezept in seiner Sprache, übersetze nichts.
 - Der Titel ist der des Rezepts, nicht der Betreff der Mail.
 - Unbekannte Mengen: null. Einheiten nur aus der Liste, sonst null und das Wort in "note".
 - Schreibe in "uncertain" kurz (auf Deutsch) jede Angabe, die du nicht sicher lesen konntest, z. B. "200 g oder 250 g Mehl?".
 - image_index: welches der Bilder (ab 0) das fertige Gericht zeigt, sonst null.
+- categories: alle passenden aus dieser Liste (nur die Wörter vor dem Doppelpunkt), [] wenn unsicher:
+{glosses}
 - Wenn kein Rezept darin ist: {{"title": ""}}.
 
 Inhalt:
@@ -271,6 +292,7 @@ def validate_draft(answer: str) -> dict:
         "ingredients": ingredients,
         "steps": [s for s in (_str(step, 2000) for step in _list(data.get("steps"))[:MAX_STEPS]) if s],
         "tags": [t for t in (_str(tag, 40) for tag in _list(data.get("tags"))[:5]) if t],
+        "categories": categories.clean(_list(data.get("categories"))),
         "notes": _str(data.get("notes"), 2000),
         "uncertain": [u for u in (_str(x, 200) for x in _list(data.get("uncertain"))[:20]) if u],
         "image_index": image_index if isinstance(image_index, int) and not isinstance(image_index, bool) else None,
@@ -283,7 +305,8 @@ def recipe_from_ai(
 ) -> tuple[dict, str, int | None, list[int]]:
     """The draft, the raw answer (kept as part of the original), the tokens the service reported, and which of the
     given images were sent (positions): the AI's image_index counts only those."""
-    content = [{"type": "text", "text": RECIPE_PROMPT.format(units=", ".join(UNITS)) + text[:MAX_TEXT]}]
+    prompt = RECIPE_PROMPT.format(units=", ".join(UNITS), glosses=CATEGORY_GLOSSES)
+    content = [{"type": "text", "text": prompt + text[:MAX_TEXT]}]
     sent: list[int] = []
     for position, data in enumerate(images):
         part = _image_part(data)
@@ -364,3 +387,35 @@ def translate(client: AiClient, text: dict, target: str = "de") -> tuple[dict, i
         },
         answer.tokens,
     )
+
+
+CATEGORIZE_PROMPT = """Ordne jedes dieser Kochrezepte in Kategorien ein.
+Antworte NUR mit einem JSON-Objekt, ohne Text davor oder danach: {{"<id>": [Kategorien], ...}}, für jede id.
+Kategorien: alle passenden aus dieser Liste (nur die Wörter vor dem Doppelpunkt), [] wenn unsicher:
+{glosses}
+"""
+
+
+def categorize(client: AiClient, recipes: list[dict]) -> tuple[dict[int, list[str]], int | None]:
+    """Categories for recipes given as [{id, title, tags, ingredients: [names]}]: only for the ids given, only known
+    keys; and the tokens the service reported."""
+    prompt = CATEGORIZE_PROMPT.format(glosses=CATEGORY_GLOSSES)
+    answer = client.complete(
+        [{"type": "text", "text": prompt + CATEGORIZE_MARKER + json.dumps(recipes, ensure_ascii=False)}]
+    )
+    data = _json(answer.text)
+    if not isinstance(data, dict):
+        raise AiFailed("no categories")
+    asked = {r["id"] for r in recipes}
+    found: dict[int, list[str]] = {}
+    for key, value in data.items():
+        try:
+            recipe_id = int(key)
+        except (TypeError, ValueError):
+            continue
+        if recipe_id in asked:
+            found[recipe_id] = categories.clean(_list(value))
+    # An answer about none of the recipes (another shape, other ids) failed: else the whole batch would count as tried
+    if not found:
+        raise AiFailed("no recipe answered")
+    return found, answer.tokens

@@ -61,6 +61,8 @@ export default defineConfig({
                 // Recipe mails as the Cloudflare Email Worker delivers them, and a fake AI (never the real service)
                 INBOUND_SECRET: 'e2e-inbound',
                 AI_FAKE: '1',
+                // A fake Bring! (never the real service): password "wrong" is refused, an item "FAIL" fails
+                BRING_FAKE: '1',
                 INFOMANIAK_AI_TOKEN: 'fake',
                 INFOMANIAK_AI_PRODUCT_ID: 'fake',
             },

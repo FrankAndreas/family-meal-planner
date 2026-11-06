@@ -38,6 +38,18 @@ const en: typeof de = {
         hubDown: 'The family hub or the meal planner doesn’t answer right now (perhaps the NAS is restarting).',
         retry: 'Try again',
     },
+    bring: {
+        title: 'Bring!',
+        hint: 'The shopping list goes to this Bring! list. The password stays on the NAS and is never shown again.',
+        email: 'Email',
+        password: 'Password',
+        signIn: 'Sign in',
+        list: 'List',
+        chooseList: 'Choose a list',
+        signedIn: 'Signed in as {{email}} · list {{list}}',
+        signedInNoList: 'Signed in as {{email}}: choose the list for the shopping.',
+        signOut: 'Sign out of Bring!',
+    },
     settings: {
         mailAddresses: 'Mail addresses for recipes',
         mailAddressesHint: 'Recipes mailed to rezepte@… are only accepted from these addresses.',

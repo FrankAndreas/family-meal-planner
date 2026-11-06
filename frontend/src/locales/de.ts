@@ -37,6 +37,18 @@ const de = {
         hubDown: 'Der Familien-Hub oder der Menüplaner antwortet gerade nicht (vielleicht startet das NAS neu).',
         retry: 'Nochmals versuchen',
     },
+    bring: {
+        title: 'Bring!',
+        hint: 'Die Einkaufsliste geht in diese Bring!-Liste. Das Passwort bleibt auf dem NAS und wird nie mehr angezeigt.',
+        email: 'E-Mail',
+        password: 'Passwort',
+        signIn: 'Anmelden',
+        list: 'Liste',
+        chooseList: 'Liste wählen',
+        signedIn: 'Angemeldet als {{email}} · Liste {{list}}',
+        signedInNoList: 'Angemeldet als {{email}}: wähle die Liste für die Einkäufe.',
+        signOut: 'Bei Bring! abmelden',
+    },
     settings: {
         mailAddresses: 'Mail-Adressen für Rezepte',
         mailAddressesHint: 'Rezepte an rezepte@… werden nur von diesen Adressen angenommen.',

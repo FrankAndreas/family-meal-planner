@@ -219,3 +219,67 @@ class AiCall(Base):
     tokens = Column(Integer)
 
     user = relationship("User")
+
+
+class ShoppingList(Base):
+    """The open shopping list (spec 2026-11-06): at most one, shared by the parents, deleted once sent to Bring!.
+    It stores the parents' decisions; the lines are worked out from the plan on every read."""
+
+    __tablename__ = "shopping_lists"
+
+    id = Column(Integer, primary_key=True)
+    # Fixed when started: changing the first day of the week later doesn't move the list
+    week_start = Column(Date, nullable=False)
+    created_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"))
+    created_at = Column(DateTime, default=utcnow, nullable=False)
+    updated_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"))
+    updated_at = Column(DateTime, default=utcnow, nullable=False)
+
+    meals = relationship("ShoppingMeal", cascade="all, delete-orphan")
+    choices = relationship("ShoppingChoice", cascade="all, delete-orphan")
+    extras = relationship("ShoppingExtra", cascade="all, delete-orphan", order_by="ShoppingExtra.position")
+
+
+class ShoppingMeal(Base):
+    """A plan entry ticked for the list; entries without a row are unticked."""
+
+    __tablename__ = "shopping_meals"
+
+    list_id = Column(Integer, ForeignKey("shopping_lists.id", ondelete="CASCADE"), primary_key=True)
+    entry_id = Column(Integer, ForeignKey("plan_entries.id", ondelete="CASCADE"), primary_key=True)
+
+
+class ShoppingChoice(Base):
+    """A parent's decision on a line (keyed by its name): False dropped, True kept. Without one, staples start
+    dropped and everything else is bought."""
+
+    __tablename__ = "shopping_choices"
+
+    list_id = Column(Integer, ForeignKey("shopping_lists.id", ondelete="CASCADE"), primary_key=True)
+    key = Column(String(200), primary_key=True)
+    buy = Column(Boolean, nullable=False)
+
+
+class ShoppingExtra(Base):
+    """Something to buy that isn't in any recipe ("WC-Papier")."""
+
+    __tablename__ = "shopping_extras"
+
+    id = Column(Integer, primary_key=True)
+    list_id = Column(Integer, ForeignKey("shopping_lists.id", ondelete="CASCADE"), nullable=False, index=True)
+    name = Column(String(100), nullable=False)
+    amount = Column(String(50), nullable=False, default="")
+    position = Column(Integer, nullable=False, default=0)
+
+
+class BringLogin(Base):
+    """The Bring! account the planner logs in with (single row, id 1). The password stays on the NAS: it is never
+    sent back to a browser."""
+
+    __tablename__ = "bring_login"
+
+    id = Column(Integer, primary_key=True)
+    email = Column(String(200), nullable=False)
+    password = Column(String(200), nullable=False)
+    list_uuid = Column(String(64))
+    list_name = Column(String(100))

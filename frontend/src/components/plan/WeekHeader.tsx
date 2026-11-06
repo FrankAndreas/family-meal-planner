@@ -2,6 +2,7 @@ import { format, parseISO } from 'date-fns';
 import { de, enUS } from 'date-fns/locale';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../../AuthContext';
 import { addDays, type Week } from '../../plan';
 
 interface WeekHeaderProps {
@@ -11,6 +12,7 @@ interface WeekHeaderProps {
 
 export default function WeekHeader({ week, onWeek }: WeekHeaderProps) {
     const { t, i18n } = useTranslation();
+    const { user } = useAuth();
     const locale = i18n.language === 'de' ? de : enUS;
     const label = (day: string) => format(parseISO(day), 'EEEEEE d.M.', { locale });
     const arrow = 'h-10 w-10 rounded-full border border-white/15 text-lg hover:bg-white/10';
@@ -34,7 +36,12 @@ export default function WeekHeader({ week, onWeek }: WeekHeaderProps) {
                 <button type="button" className={arrow} aria-label={t('plan.nextWeek')} onClick={() => onWeek(addDays(week.start, 7))}>
                     ›
                 </button>
-                <span className="ml-auto rounded-full bg-emerald-400/15 px-3 py-1 text-sm text-emerald-200">
+                {user?.role === 'PARENT' && (
+                    <Link to={`/einkaufsliste?start=${week.start}`} className="ml-auto rounded-full border border-white/15 px-3 py-1 text-sm hover:bg-white/10">
+                        {t('shopping.link')}
+                    </Link>
+                )}
+                <span className={`${user?.role === 'PARENT' ? '' : 'ml-auto '}rounded-full bg-emerald-400/15 px-3 py-1 text-sm text-emerald-200`}>
                     {t('plan.counter', { planned: week.planned_slots, total: week.total_slots })}
                 </span>
             </div>

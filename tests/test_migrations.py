@@ -75,3 +75,39 @@ def test_categories_backfill_survives_null_tags(tmp_path):
     database_setup.setup(engine)
     with engine.connect() as conn:
         assert json.loads(conn.exec_driver_sql("SELECT categories FROM recipes").scalar()) == []
+
+
+SHOPPING_TABLES = {
+    "shopping_lists": {"id", "week_start", "created_by", "created_at", "updated_by", "updated_at"},
+    "shopping_meals": {"list_id", "entry_id"},
+    "shopping_choices": {"list_id", "key", "buy"},
+    "shopping_extras": {"id", "list_id", "name", "amount", "position"},
+    "bring_login": {"id", "email", "password", "list_uuid", "list_name"},
+}
+
+
+def test_0008_tables(tmp_path):
+    inspector = inspect(_migrated(tmp_path))
+    for table, columns in SHOPPING_TABLES.items():
+        assert {c["name"] for c in inspector.get_columns(table)} == columns, table
+
+
+def test_0008_from_0007(tmp_path):
+    from alembic import command
+
+    engine = create_engine(f"sqlite:///{tmp_path}/m.db")
+    database_setup.run(engine, command.upgrade, "0007")
+    with engine.begin() as conn:
+        conn.exec_driver_sql(
+            "INSERT INTO recipes (title, servings, steps, tags, categories, notes, source_kind, created_at, updated_at) "
+            "VALUES ('Lasagne', 4, '[]', '[]', '[]', '', 'manual', '2026-01-01', '2026-01-01')"
+        )
+        conn.exec_driver_sql(
+            "INSERT INTO plan_entries (date, slot, position, recipe_id, eaten, created_at) "
+            "VALUES ('2026-11-07', 'dinner', 0, 1, 1, '2026-11-01')"
+        )
+    database_setup.setup(engine)
+    with engine.connect() as conn:
+        assert conn.exec_driver_sql("SELECT title FROM recipes").scalar() == "Lasagne"
+        assert conn.exec_driver_sql("SELECT recipe_id FROM plan_entries").scalar() == 1
+        assert conn.exec_driver_sql("SELECT version_num FROM alembic_version").scalar() == "0008"

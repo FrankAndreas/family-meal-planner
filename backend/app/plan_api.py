@@ -27,6 +27,18 @@ def _entries(db: Session, first: date, last: date) -> list[models.PlanEntry]:
     return entries
 
 
+def entries_in_week(db: Session, start: date) -> list[models.PlanEntry]:
+    """The entries of the week starting on `start`, in plan order."""
+    return _entries(db, start, start + timedelta(days=6))
+
+
+def _leave_shopping_list(db: Session, entry: models.PlanEntry) -> None:
+    """An entry moved out of the open shopping list's week loses its tick, so it comes back unticked (spec 2026-11-06)."""
+    for shopping in db.query(models.ShoppingList):
+        if not shopping.week_start <= entry.date <= shopping.week_start + timedelta(days=6):
+            db.query(models.ShoppingMeal).filter_by(list_id=shopping.id, entry_id=entry.id).delete()
+
+
 def entries_out(db: Session, entries: list[models.PlanEntry], me: models.User) -> list[schemas.EntryOut]:
     votes = Votes(db, sorted({e.recipe_id for e in entries if e.recipe_id is not None}))
     return [
@@ -156,6 +168,8 @@ def update_entry(
         entry.note = body.note
     if body.eaten is not None:
         entry.eaten = body.eaten
+    if moved:
+        _leave_shopping_list(db, entry)
     db.commit()
     return _one_entry(db, entry, me)
 

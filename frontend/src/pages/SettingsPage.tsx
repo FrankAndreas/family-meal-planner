@@ -1,5 +1,6 @@
 import { useAuth } from '../AuthContext';
 import AiUsage from '../components/settings/AiUsage';
+import BringSettings from '../components/settings/BringSettings';
 import FamilyMembers from '../components/settings/FamilyMembers';
 import FamilySettings from '../components/settings/FamilySettings';
 import MailAddresses from '../components/settings/MailAddresses';
@@ -16,6 +17,7 @@ export default function SettingsPage() {
                 <>
                     <FamilySettings />
                     <FamilyMembers />
+                    <BringSettings />
                     <AiUsage />
                 </>
             )}

@@ -132,6 +132,10 @@ test('changed meanwhile', async ({ page, request }) => {
     // What changed is marked, so checking means looking at the changes
     await expect(items.getByRole('listitem').filter({ hasText: 'Hörnli' })).toContainText('changed');
     await expect(items.getByRole('listitem').filter({ hasText: 'Rüebli' })).not.toContainText('changed');
+    // Working through the list doesn't wipe the marks
+    await items.getByRole('checkbox', { name: /Rüebli/ }).uncheck();
+    await items.getByRole('checkbox', { name: /Rüebli/ }).check();
+    await expect(items.getByRole('listitem').filter({ hasText: 'Hörnli' })).toContainText('changed');
     await page.getByRole('button', { name: 'Send to Bring! (1)' }).click();
     await expect(page.getByText('1 item in Bring!')).toBeVisible();
     expect(errors.filter((e) => !e.includes('409'))).toEqual([]);

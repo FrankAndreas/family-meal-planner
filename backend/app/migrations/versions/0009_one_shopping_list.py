@@ -10,7 +10,10 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # A second list from such a race before this migration: keep the oldest
+    # A second list from such a race before this migration: keep the oldest. Migrations run with foreign keys off,
+    # so the removed lists' rows are deleted here rather than by the cascade.
+    for table in ("shopping_meals", "shopping_choices", "shopping_extras"):
+        op.execute(f"DELETE FROM {table} WHERE list_id > (SELECT MIN(id) FROM shopping_lists)")
     op.execute("DELETE FROM shopping_lists WHERE id > (SELECT MIN(id) FROM shopping_lists)")
     with op.batch_alter_table("shopping_lists") as batch:
         batch.add_column(sa.Column("singleton", sa.Integer(), nullable=False, server_default="1"))

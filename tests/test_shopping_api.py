@@ -425,42 +425,27 @@ def test_empty_send_refused(client, admin_headers, week, fake_bring):
     assert fake_bring == [] and _get(client, admin_headers) is not None
 
 
-@pytest.fixture
-def lost_race(monkeypatch):
-    """The other parent's request wins between our look and our write: lookups of `model` see nothing."""
-    from sqlalchemy.orm import Session
-
-    real = Session.get
-
-    def blind(model):
-        def get(self, entity, ident, *args, **kwargs):
-            return None if entity is model else real(self, entity, ident, *args, **kwargs)
-
-        monkeypatch.setattr(Session, "get", get)
-
-    return blind
-
-
-def test_same_tick_at_once(client, admin_headers, week, lost_race):
-    from app import models
-
-    _start(client, admin_headers)  # the entry is ticked already, as if the other parent just ticked it
-    lost_race(models.ShoppingMeal)
-    response = client.put(f"/api/shopping/meals/{week['entry']['id']}", json={"ticked": True}, headers=admin_headers)
-    assert response.status_code == 200, response.text
-    assert response.json()["meals"][0]["ticked"] is True
-
-
-def test_same_choice_at_once(client, admin_headers, week, lost_race):
-    from app import models
+def test_same_tick_twice_before_commit(client, admin_headers, week, db):
+    """The other parent's identical tick lands first: writing it again is no conflict."""
+    from app import models, shopping_api
 
     _start(client, admin_headers)
-    key = _line(_get(client, admin_headers), "Hörnli")["key"]
-    client.put("/api/shopping/lines", json={"key": key, "buy": False}, headers=admin_headers)
-    lost_race(models.ShoppingChoice)
-    response = client.put("/api/shopping/lines", json={"key": key, "buy": True}, headers=admin_headers)
-    assert response.status_code == 200, response.text
-    assert _line(response.json(), "Hörnli")["buy"] is True
+    shopping = db.query(models.ShoppingList).one()
+    shopping_api._tick(db, shopping, week["entry"]["id"], True)
+    shopping_api._tick(db, shopping, week["entry"]["id"], True)
+    db.commit()
+    assert db.query(models.ShoppingMeal).count() == 1
+
+
+def test_same_choice_twice_before_commit(client, admin_headers, week, db):
+    from app import models, shopping_api
+
+    _start(client, admin_headers)
+    shopping = db.query(models.ShoppingList).one()
+    shopping_api._choose(db, shopping, "hornli", False)
+    shopping_api._choose(db, shopping, "hornli", True)
+    db.commit()
+    assert [(c.key, c.buy) for c in db.query(models.ShoppingChoice)] == [("hornli", True)]
 
 
 def test_two_parents_start_at_once(client, admin_headers, week, monkeypatch, db):
@@ -481,11 +466,12 @@ def test_extras_in_the_order_added(client, admin_headers, week, db):
 
     _start(client, admin_headers)
     shopping_id = db.query(models.ShoppingList.id).scalar()
-    for name in ("B", "A"):
-        db.add(models.ShoppingExtra(list_id=shopping_id, name=name, amount="", position=0))
+    # Inserted in reverse id order, so the rows' own order can't pass for "by id"
+    for extra_id, name in ((20, "B"), (10, "A")):
+        db.add(models.ShoppingExtra(id=extra_id, list_id=shopping_id, name=name, amount="", position=0))
         db.commit()
     first = _get(client, admin_headers)
-    assert [e["name"] for e in first["extras"]] == ["B", "A"]
+    assert [e["name"] for e in first["extras"]] == ["A", "B"]
     assert _get(client, admin_headers)["version"] == first["version"]
 
 
@@ -505,3 +491,23 @@ def test_send_to_a_list_that_is_gone(client, admin_headers, week, monkeypatch):
     monkeypatch.setattr(bring.FakeBring, "add", gone)
     response = _send(client, admin_headers, shopping)
     assert response.status_code == 502 and response.json()["detail"] == "bring_list_gone"
+
+
+def test_start_only_takes_the_one_list_conflict(client, admin_headers, week, monkeypatch, db):
+    """Another failure while starting (here: a planned meal deleted meanwhile) is not taken for "a list exists"."""
+    from sqlalchemy.exc import IntegrityError
+
+    from app import models, plan_api, shopping_api
+
+    real = plan_api.entries_in_week
+
+    def deleted_meanwhile(db_, start):
+        entries = real(db_, start)
+        with type(db)(bind=db.get_bind()) as other:
+            other.delete(other.get(models.PlanEntry, week["entry"]["id"]))
+            other.commit()
+        return entries
+
+    monkeypatch.setattr(shopping_api, "entries_in_week", deleted_meanwhile)
+    with pytest.raises(IntegrityError):
+        _start(client, admin_headers)

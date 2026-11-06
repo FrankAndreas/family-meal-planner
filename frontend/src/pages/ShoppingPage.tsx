@@ -65,7 +65,6 @@ export default function ShoppingPage() {
     const run = async (action: () => Promise<ShoppingList | null | void>) => {
         setError('');
         setMessage('');
-        setChanged({ keys: new Set(), gone: [] });
         setBusy(true);
         try {
             const result = await action();

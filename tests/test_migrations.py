@@ -124,9 +124,18 @@ def test_0009_keeps_one_list(tmp_path):
             conn.exec_driver_sql(
                 f"INSERT INTO shopping_lists (week_start, created_at, updated_at) VALUES ('{start}', '2026-11-01', '2026-11-01')"
             )
+        for list_id in (1, 2):
+            conn.exec_driver_sql(f"INSERT INTO shopping_choices (list_id, key, buy) VALUES ({list_id}, 'salz', 1)")
+            conn.exec_driver_sql(
+                f"INSERT INTO shopping_extras (list_id, name, amount, position) VALUES ({list_id}, 'Milch', '', 0)"
+            )
     database_setup.setup(engine)
     with engine.connect() as conn:
         assert [r[0] for r in conn.exec_driver_sql("SELECT week_start FROM shopping_lists")] == ["2026-10-31"]
+        # The removed list's rows go with it: nothing points at a list that isn't there
+        assert conn.exec_driver_sql("PRAGMA foreign_key_check").all() == []
+        assert conn.exec_driver_sql("SELECT list_id FROM shopping_choices").scalars().all() == [1]
+        assert conn.exec_driver_sql("SELECT list_id FROM shopping_extras").scalars().all() == [1]
     try:
         with engine.begin() as conn:
             conn.exec_driver_sql(

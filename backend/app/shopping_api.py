@@ -216,11 +216,14 @@ def start_shopping(body: schemas.ShoppingStartIn, me: models.User = Depends(auth
     db.add(shopping)
     try:
         db.commit()
-    except IntegrityError:
-        # The other parent started one at the same moment (one list at most: `singleton` is unique)
+    except IntegrityError as error:
         db.rollback()
-        shopping = db.query(models.ShoppingList).one()
-        if shopping.week_start != body.week_start:
+        # The other parent started one at the same moment (one list at most: `singleton` is unique); any other
+        # failure is not that
+        if "shopping_lists.singleton" not in str(error.orig):
+            raise
+        shopping = db.query(models.ShoppingList).one_or_none()
+        if shopping is None or shopping.week_start != body.week_start:
             raise api_error(409, "shopping_other_week")
         return _out(db, shopping)
     db.refresh(shopping)
@@ -236,6 +239,14 @@ def discard_shopping(_parent: models.User = Depends(auth.require_parent), db: Se
     return Response(status_code=204)
 
 
+def _tick(db: Session, shopping: models.ShoppingList, entry_id: int, ticked: bool) -> None:
+    """Ticks or unticks a meal; the other parent doing the same at the same moment is no conflict."""
+    if ticked:
+        db.execute(insert(models.ShoppingMeal).values(list_id=shopping.id, entry_id=entry_id).on_conflict_do_nothing())
+    else:
+        db.query(models.ShoppingMeal).filter_by(list_id=shopping.id, entry_id=entry_id).delete()
+
+
 @router.put("/shopping/meals/{entry_id}", response_model=schemas.ShoppingOut)
 def tick_meal(
     entry_id: int, body: schemas.ShoppingTickIn, me: models.User = Depends(auth.require_parent), db: Session = Depends(get_db)
@@ -243,11 +254,7 @@ def tick_meal(
     shopping = _open_or_error(db)
     if entry_id not in {e.id for e in entries_in_week(db, shopping.week_start) if e.recipe_id is not None}:
         raise api_error(400, "shopping_not_in_week")
-    # Written so that the other parent doing the same at the same moment is no conflict
-    if body.ticked:
-        db.execute(insert(models.ShoppingMeal).values(list_id=shopping.id, entry_id=entry_id).on_conflict_do_nothing())
-    else:
-        db.query(models.ShoppingMeal).filter_by(list_id=shopping.id, entry_id=entry_id).delete()
+    _tick(db, shopping, entry_id, body.ticked)
     return _changed(db, shopping, me)
 
 

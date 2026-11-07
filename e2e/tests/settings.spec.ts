@@ -101,3 +101,73 @@ test('a change whose save failed is saved with the next one', async ({ page, req
         await call(request, parent, 'PATCH', '/settings', { family_size: before.family_size, week_start: before.week_start });
     }
 });
+
+// What the server keeps is what the page shows: it finds the same word twice where the page doesn't (ß and SS)
+test('a staple the server keeps once disappears from the page right away', async ({ page, request }) => {
+    const parent = await newPerson(request);
+    const before = await call(request, parent, 'GET', '/settings');
+    const errors = await login(page, parent.name);
+    try {
+        await page.goto('/einstellungen');
+        const staples = page.getByLabel('Always at home');
+        await staples.fill('Straße');
+        await staples.press('Enter');
+        await expect(page.getByText('Saved')).toBeVisible();
+        await staples.fill('STRASSE');
+        await staples.press('Enter');
+        await expect(page.getByText('Saved')).toBeVisible();
+        await expect(page.getByRole('button', { name: 'Remove STRASSE', exact: true })).toHaveCount(0);
+        await expect(page.getByRole('button', { name: 'Remove Straße', exact: true })).toBeVisible();
+        expect(errors).toEqual([]);
+    } finally {
+        await call(request, parent, 'PATCH', '/settings', { staples: before.staples });
+    }
+});
+
+test('a size typed just before leaving the page is still saved', async ({ page, request }) => {
+    const parent = await newPerson(request);
+    const before = await call(request, parent, 'GET', '/settings');
+    const next = before.family_size === 7 ? 8 : 7;
+    await login(page, parent.name);
+    try {
+        await page.goto('/einstellungen');
+        await page.getByLabel('People at the table').fill(String(next));
+        await page.reload();
+        await expect.poll(async () => (await call(request, parent, 'GET', '/settings')).family_size).toBe(next);
+    } finally {
+        await call(request, parent, 'PATCH', '/settings', { family_size: before.family_size });
+    }
+});
+
+// A slow answer for older staples doesn't take back a newer chip, even when the newer save fails
+test('a slow save of older staples keeps the chip added after it', async ({ page, request }) => {
+    const parent = await newPerson(request);
+    const before = await call(request, parent, 'GET', '/settings');
+    await login(page, parent.name);
+    let patches = 0;
+    try {
+        await page.goto('/einstellungen');
+        await page.route('**/api/settings', async (route) => {
+            if (route.request().method() !== 'PATCH') return route.continue();
+            patches += 1;
+            if (patches === 1) {
+                await new Promise((done) => setTimeout(done, 1500));
+                return route.continue();
+            }
+            if (patches === 2) return route.fulfill({ status: 500, json: { detail: 'Kaputt' } });
+            return route.continue();
+        });
+        const staples = page.getByLabel('Always at home');
+        await staples.fill('Zimt');
+        await staples.press('Enter');
+        // Zimt is on its way (slow) before Nelken is added
+        await expect.poll(() => patches).toBe(1);
+        await staples.fill('Nelken');
+        await staples.press('Enter');
+        await expect(page.getByRole('alert')).toBeVisible();
+        await expect(page.getByRole('button', { name: 'Remove Nelken', exact: true })).toBeVisible();
+        await expect(page.getByRole('button', { name: 'Remove Zimt', exact: true })).toBeVisible();
+    } finally {
+        await call(request, parent, 'PATCH', '/settings', { staples: before.staples });
+    }
+});

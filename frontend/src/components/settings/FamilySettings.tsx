@@ -16,6 +16,8 @@ export default function FamilySettings() {
     const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const queue = useRef<Promise<void>>(Promise.resolve());
     const sending = useRef(0);
+    // Counts staples changes: the server's cleaned staples are shown only for the newest one
+    const staplesVersion = useRef(0);
     // The family size last saved: a size that isn't one yet (an empty field) goes back to it
     const savedSize = useRef(0);
 
@@ -39,16 +41,25 @@ export default function FamilySettings() {
         [],
     );
 
-    // Uses only refs and state setters, so the same function for the page's whole life
-    const send = useCallback(() => {
+    // What's waiting leaves pending; the answer is applied here, whichever way it was sent.
+    // Uses only refs and state setters, so the same functions for the page's whole life
+    const take = useCallback(() => {
+        if (timer.current) clearTimeout(timer.current);
         timer.current = null;
         const fields = pending.current;
         pending.current = {};
         sending.current += 1;
-        queue.current = queue.current.then(async () => {
+        return { fields, version: staplesVersion.current };
+    }, []);
+
+    const settle = useCallback(
+        async (fields: Partial<Settings>, version: number, request: () => Promise<Settings>) => {
             try {
-                const saved = (await api.patch<Settings>('/api/settings', fields)).data;
+                const saved = await request();
                 savedSize.current = saved.family_size;
+                // The server's staples, cleaned (it keeps "Straße" and "STRASSE" once), unless they changed since
+                if (fields.staples && version === staplesVersion.current)
+                    setSettings((shown) => (shown ? { ...shown, staples: saved.staples } : shown));
                 sending.current -= 1;
                 setError('');
                 // Only "saved" once nothing else waits
@@ -60,13 +71,22 @@ export default function FamilySettings() {
                 setError(errorMessage(err));
                 setStatus('idle');
             }
-        });
-    }, [waiting]);
+        },
+        [waiting],
+    );
+
+    const send = useCallback(() => {
+        const { fields, version } = take();
+        queue.current = queue.current.then(() =>
+            settle(fields, version, async () => (await api.patch<Settings>('/api/settings', fields)).data),
+        );
+    }, [take, settle]);
 
     // Typing a number waits a moment, so "12" isn't saved as 1 first; everything else goes at once
     const change = (fields: Partial<Settings>, wait = 0) => {
         setSettings((shown) => (shown ? { ...shown, ...fields } : shown));
         pending.current = { ...pending.current, ...fields };
+        if (fields.staples) staplesVersion.current += 1;
         setStatus('saving');
         if (timer.current) clearTimeout(timer.current);
         timer.current = setTimeout(send, wait);
@@ -75,13 +95,38 @@ export default function FamilySettings() {
     // Leaving the page doesn't lose a change that is still waiting
     useEffect(
         () => () => {
-            if (timer.current) {
-                clearTimeout(timer.current);
-                send();
-            }
+            if (Object.keys(pending.current).length) send();
         },
         [send],
     );
+
+    // Closing, reloading or hiding the tab doesn't wait for the size's pause or the next change: a request that
+    // outlives the page takes what's waiting. If the page comes back (back button, tab shown again), its answer counts
+    useEffect(() => {
+        const leave = () => {
+            if (!Object.keys(pending.current).length) return;
+            const { fields, version } = take();
+            const request = fetch('/api/settings', {
+                method: 'PATCH',
+                keepalive: true,
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'meals' },
+                body: JSON.stringify(fields),
+            });
+            void settle(fields, version, async () => {
+                const response = await request;
+                if (!response.ok) throw new Error(`${response.status}`);
+                return (await response.json()) as Settings;
+            });
+        };
+        const hidden = () => document.visibilityState === 'hidden' && leave();
+        window.addEventListener('pagehide', leave);
+        document.addEventListener('visibilitychange', hidden);
+        return () => {
+            window.removeEventListener('pagehide', leave);
+            document.removeEventListener('visibilitychange', hidden);
+        };
+    }, [take, settle]);
 
     const changeSize = (text: string) => {
         const size = Number(text);

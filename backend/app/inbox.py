@@ -1,7 +1,8 @@
 """An inbox item's life, the moves in one place:
 - add: a child's item waits for a parent; a parent's is released at once;
-- release (a parent): waiting or failed → processing;
-- fail / finish (the importer): processing → failed / draft;
+- release (a parent): anything not processing or done → processing (the inbox offers it for waiting and failed; a
+  draft released again is read anew);
+- fail / finish (the importer): → failed / draft, whatever the status meanwhile (not checked);
 - saved_as (saving the draft as a recipe): draft → done.
 Processing that never ended (the backend restarted meanwhile) counts as failed after STUCK_AFTER (unstick)."""
 

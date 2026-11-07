@@ -46,6 +46,11 @@ export const addEntry = async (body: NewEntry) => (await api.post<PlanEntry>('/a
 export const updateEntry = async (id: number, patch: Partial<Omit<PlanEntry, 'id' | 'recipe'>>) =>
     (await api.patch<PlanEntry>(`/api/plan/entries/${id}`, patch)).data;
 export const removeEntry = (id: number) => api.delete(`/api/plan/entries/${id}`);
+// The week is over: what wasn't eaten is kept as skipped
+export const closeWeek = (start: string) => api.post('/api/plan/close', { start });
+// Closed weeks, newest first; `before`: older than that week
+export const fetchHistory = async (weeks: number, before?: string) =>
+    (await api.get<Week[]>('/api/plan/history', { params: { weeks, ...(before ? { before } : {}) } })).data;
 // slot: the slot being planned, so what fits it comes first (null: the usual order)
 export const fetchSuggestions = async (tab: SuggestionTab, q: string, slot: Slot | null) =>
     (await api.get<RecipeSummary[]>('/api/suggestions', { params: { tab, ...(q ? { q } : {}), ...(slot ? { slot } : {}) } }))

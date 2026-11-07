@@ -1,16 +1,10 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import api, { errorMessage } from '../../api';
+import { errorMessage } from '../../api';
 import { useAuth } from '../../AuthContext';
 import type { User } from '../../types';
+import { addMailAddress, deleteMailAddress, fetchMailAddresses, fetchUsers, type MailAddress } from '../../users';
 import { BUTTON, CARD, ERROR, FIELD, INPUT } from '../../ui';
-
-interface MailAddress {
-    id: number;
-    user_id: number;
-    user_name: string;
-    address: string;
-}
 
 // The addresses recipes may be mailed from: everyone their own, parents everybody's
 export default function MailAddresses() {
@@ -24,17 +18,17 @@ export default function MailAddresses() {
     const [error, setError] = useState('');
 
     const load = useCallback(async () => {
-        setAddresses((await api.get<MailAddress[]>('/api/emails', { params: parent ? { all: 1 } : {} })).data);
+        setAddresses(await fetchMailAddresses(parent));
     }, [parent]);
 
     useEffect(() => {
         let current = true;
-        api.get<MailAddress[]>('/api/emails', { params: parent ? { all: 1 } : {} })
-            .then((r) => current && setAddresses(r.data))
+        fetchMailAddresses(parent)
+            .then((found) => current && setAddresses(found))
             .catch((err) => current && setError(errorMessage(err)));
         if (parent) {
-            api.get<User[]>('/api/users')
-                .then((r) => current && setPeople(r.data))
+            fetchUsers()
+                .then((found) => current && setPeople(found))
                 .catch(() => {});
         }
         return () => {
@@ -56,8 +50,7 @@ export default function MailAddresses() {
 
     const add = async (e: FormEvent) => {
         e.preventDefault();
-        const body = { address, ...(owner ? { user_id: owner } : {}) };
-        if (await run(() => api.post('/api/emails', body))) setAddress('');
+        if (await run(() => addMailAddress(address, owner || undefined))) setAddress('');
     };
 
     return (
@@ -78,7 +71,7 @@ export default function MailAddresses() {
                         <button
                             type="button"
                             className="text-sm text-red-300 hover:text-red-200"
-                            onClick={() => run(() => api.delete(`/api/emails/${entry.id}`))}
+                            onClick={() => run(() => deleteMailAddress(entry.id))}
                         >
                             {t('common.delete')}
                         </button>

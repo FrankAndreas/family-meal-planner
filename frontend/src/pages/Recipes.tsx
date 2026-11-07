@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
-import api, { errorMessage } from '../api';
+import { fetchAiEnabled } from '../ai';
+import { errorMessage } from '../api';
 import PasteText from '../components/inbox/PasteText';
 import ScanRecipe from '../components/inbox/ScanRecipe';
 import UrlPaste from '../components/inbox/UrlPaste';
@@ -9,7 +10,7 @@ import RecipeCard from '../components/recipes/RecipeCard';
 import UseUp from '../components/recipes/UseUp';
 import { CATEGORIES, type Category } from '../categories';
 import { useAuth } from '../AuthContext';
-import { categorize, fetchAiEnabled, fetchRecipes, fetchUncategorized, type RecipeSummary } from '../recipes';
+import { categorize, fetchRecipes, fetchTags, fetchUncategorized, type RecipeSummary } from '../recipes';
 import { BUTTON, BUTTON_SECONDARY, ERROR, INPUT } from '../ui';
 import { loadUseUp, saveUseUp, type UseUpState } from '../useUp';
 
@@ -75,8 +76,8 @@ export default function Recipes() {
     };
 
     useEffect(() => {
-        api.get<{ name: string; count: number }[]>('/api/tags')
-            .then((response) => setTags(response.data))
+        fetchTags()
+            .then(setTags)
             .catch(() => {});
     }, []);
 

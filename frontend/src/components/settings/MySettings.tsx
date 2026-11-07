@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import api from '../../api';
+import { hubLinks } from '../../api';
 import { CARD } from '../../ui';
 
 // Language, PIN and logging out everywhere live in the family hub now (spec 2026-10-30)
@@ -9,8 +9,8 @@ export default function MySettings() {
     const [hub, setHub] = useState<string | null>(null);
 
     useEffect(() => {
-        api.get<{ login_url: string }>('/api/hub')
-            .then((response) => setHub(response.data.login_url))
+        hubLinks()
+            .then((links) => setHub(links.login_url))
             .catch(() => setHub(null));
     }, []);
 

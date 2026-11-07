@@ -1,9 +1,9 @@
-import axios from 'axios';
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
-import api, { errorCode, goToHubLogout } from './api';
+import { errorCode, errorStatus, goToHubLogout } from './api';
 import { applyLanguage } from './i18n';
 import { guestLanguage } from './language';
 import type { User } from './types';
+import { fetchMe } from './users';
 
 // in: logged in; no_access: logged in at the hub, but not ticked for the planner; hub_unavailable: the hub doesn't
 // answer; away: on the way to the hub's login (the API's 401 sends the browser there)
@@ -27,7 +27,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     // The person's language follows them (from the hub): applied whenever their data is loaded
     const loadUser = useCallback(async () => {
-        const me = (await api.get<User>('/api/me')).data;
+        const me = await fetchMe();
         applyLanguage(me.language);
         setUser(me);
         return me;
@@ -45,7 +45,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 // 401: the API has sent the browser to the hub's login. Anything else but "no access" (the hub down, a
                 // NAS restarting) says so and offers to try again
                 const code = errorCode(error);
-                const away = axios.isAxiosError(error) && error.response?.status === 401;
+                const away = errorStatus(error) === 401;
                 setState(code === 'no_access' ? 'no_access' : away ? 'away' : 'hub_unavailable');
                 applyLanguage(await guestLanguage());
             }

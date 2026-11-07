@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import api, { errorMessage } from '../../api';
+import { errorMessage } from '../../api';
+import { addUrl } from '../../inbox';
 import { fetchSwissmilk, SWISSMILK_GAP_MS, type SwissmilkResult, type UseUpMode } from '../../useUp';
 import { BUTTON_SECONDARY, ERROR } from '../../ui';
 import AuthImage from '../AuthImage';
@@ -60,7 +61,7 @@ export default function SwissmilkResults({ have, mode }: SwissmilkResultsProps) 
         setError('');
         setSending((before) => [...before, url]);
         try {
-            await api.post('/api/inbox/urls', { url });
+            await addUrl(url);
             setTaken((before) => [...before, url]);
         } catch (err) {
             setError(errorMessage(err));

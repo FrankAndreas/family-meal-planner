@@ -3,8 +3,8 @@ import { de, enUS } from 'date-fns/locale';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import api, { errorMessage } from '../api';
-import { type PlanEntry, type Week, weekdayKey } from '../plan';
+import { errorMessage } from '../api';
+import { fetchHistory, type PlanEntry, type Week, weekdayKey } from '../plan';
 import { BUTTON_SECONDARY, CARD, ERROR, PAGE } from '../ui';
 
 const WEEKS_PER_LOAD = 8;
@@ -31,8 +31,7 @@ export default function History() {
 
     const load = async (before?: string) => {
         try {
-            const older = (await api.get<Week[]>('/api/plan/history', { params: { weeks: WEEKS_PER_LOAD, ...(before ? { before } : {}) } }))
-                .data;
+            const older = await fetchHistory(WEEKS_PER_LOAD, before);
             setWeeks((shown) => [...shown, ...older]);
             setMore(older.length === WEEKS_PER_LOAD);
         } catch (err) {
@@ -42,11 +41,11 @@ export default function History() {
 
     useEffect(() => {
         let current = true;
-        api.get<Week[]>('/api/plan/history', { params: { weeks: WEEKS_PER_LOAD } })
-            .then((r) => {
+        fetchHistory(WEEKS_PER_LOAD)
+            .then((found) => {
                 if (!current) return;
-                setWeeks(r.data);
-                setMore(r.data.length === WEEKS_PER_LOAD);
+                setWeeks(found);
+                setMore(found.length === WEEKS_PER_LOAD);
                 setLoaded(true);
             })
             .catch((err) => current && setError(errorMessage(err)));

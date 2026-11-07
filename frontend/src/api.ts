@@ -10,6 +10,9 @@ const api = axios.create({ withCredentials: true, headers: { 'X-Requested-With':
 // A backend path for <img src> and links, which don't go through axios (photos are served without login)
 export const apiUrl = (path: string) => path;
 
+// A file only logged-in people may see (an image, a mail): <img src> and links can't send the login's header
+export const fetchBlob = async (path: string) => (await api.get<Blob>(path, { responseType: 'blob' })).data;
+
 // The login ended (logged out in the hub, a new PIN): log in at the hub, which sends the browser back here
 api.interceptors.response.use(
     (response) => response,
@@ -22,7 +25,7 @@ api.interceptors.response.use(
 );
 
 // Where the family hub is (HUB_PUBLIC_URL), and where "Log out" goes (at home the hub, outside Cloudflare Access)
-async function hubLinks(): Promise<HubLinks> {
+export async function hubLinks(): Promise<HubLinks> {
     return (await api.get<HubLinks>('/api/hub')).data;
 }
 
@@ -42,6 +45,10 @@ export async function goToHubLogout(): Promise<void> {
         ? logout_url
         : `${logout_url}?next=${encodeURIComponent(window.location.origin)}`;
 }
+
+// The answer's HTTP status, if the backend answered at all
+export const errorStatus = (error: unknown): number | undefined =>
+    axios.isAxiosError(error) ? error.response?.status : undefined;
 
 // The code of an error the app acts on (no_access, hub_unavailable)
 export function errorCode(error: unknown): string | undefined {

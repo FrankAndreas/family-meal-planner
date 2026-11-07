@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import api, { errorMessage } from '../../api';
+import { errorMessage } from '../../api';
 import type { User } from '../../types';
+import { deleteUser, fetchRemovedUsers, fetchUsers } from '../../users';
 import { BUTTON_DANGER, CARD, ERROR } from '../../ui';
 
 // The planner's people come from the family hub (spec 2026-10-30): added, renamed and given access there. Someone the
@@ -13,19 +14,16 @@ export default function FamilyMembers() {
     const [error, setError] = useState('');
 
     const load = useCallback(async () => {
-        const [active, hidden] = await Promise.all([
-            api.get<User[]>('/api/users'),
-            api.get<User[]>('/api/users/removed'),
-        ]);
-        setUsers(active.data);
-        setRemoved(hidden.data);
+        const [active, hidden] = await Promise.all([fetchUsers(), fetchRemovedUsers()]);
+        setUsers(active);
+        setRemoved(hidden);
     }, []);
 
     useEffect(() => {
-        Promise.all([api.get<User[]>('/api/users'), api.get<User[]>('/api/users/removed')])
+        Promise.all([fetchUsers(), fetchRemovedUsers()])
             .then(([active, hidden]) => {
-                setUsers(active.data);
-                setRemoved(hidden.data);
+                setUsers(active);
+                setRemoved(hidden);
             })
             .catch((err) => setError(errorMessage(err)));
     }, []);
@@ -34,7 +32,7 @@ export default function FamilyMembers() {
         if (!confirm(t('settings.confirmDelete', { name: person.name }))) return;
         setError('');
         try {
-            await api.delete(`/api/users/${person.id}`);
+            await deleteUser(person.id);
             await load();
         } catch (err) {
             setError(errorMessage(err));

@@ -2,10 +2,10 @@ import { format, parseISO } from 'date-fns';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router-dom';
-import api, { errorMessage } from '../api';
+import { errorMessage } from '../api';
 import { useAuth } from '../AuthContext';
 import AuthImage from '../components/AuthImage';
-import { fetchItem, type InboxItemDetail, isImage } from '../inbox';
+import { attachmentPath, fetchItem, fetchRawMail, type InboxItemDetail, isImage } from '../inbox';
 import { BUTTON_SECONDARY, CARD, ERROR, PAGE } from '../ui';
 
 // The original of an import: what arrived, as it arrived
@@ -28,8 +28,7 @@ export default function InboxItemPage() {
 
     const download = async () => {
         try {
-            const response = await api.get<Blob>(`/api/inbox/${id}/raw`, { responseType: 'blob' });
-            const href = URL.createObjectURL(response.data);
+            const href = URL.createObjectURL(await fetchRawMail(id!));
             const link = document.createElement('a');
             link.href = href;
             link.download = `rezept-${id}.eml`;
@@ -74,7 +73,7 @@ export default function InboxItemPage() {
                 </section>
             )}
             {item.attachments.filter(isImage).map((a) => (
-                <AuthImage key={a.index} src={`/api/inbox/${item.id}/attachments/${a.index}`} alt={a.name} className="w-full rounded-2xl" />
+                <AuthImage key={a.index} src={attachmentPath(item.id, a.index)} alt={a.name} className="w-full rounded-2xl" />
             ))}
             {item.ai_raw && (
                 <details className={CARD}>

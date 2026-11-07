@@ -1,4 +1,4 @@
-import api from './api';
+import api, { fetchBlob } from './api';
 import type { Category } from './categories';
 import type { RecipeInput } from './recipes';
 
@@ -56,4 +56,9 @@ export const addScan = (photos: Blob[]) => {
     photos.forEach((photo, n) => body.append('files', photo, `scan-${n + 1}.jpg`));
     return api.post<InboxItem>('/api/inbox/scans', body);
 };
+// The mail as it arrived, to download (parents)
+export const fetchRawMail = (id: number | string) => fetchBlob(`/api/inbox/${id}/raw`);
+// A picture of a mail or scan, or its small preview; for AuthImage (only logged-in people may see them)
+export const attachmentPath = (id: number, index: number, thumb = false) =>
+    `/api/inbox/${id}/attachments/${index}${thumb ? '/thumb' : ''}`;
 export const isImage = (a: Attachment) => a.type.startsWith('image/');

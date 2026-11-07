@@ -13,6 +13,27 @@ class UserRole(str, enum.Enum):
     CHILD = "CHILD"
 
 
+class InboxKind(enum.StrEnum):
+    """How an inbox item came in. Stored as the word itself (a plain string column)."""
+
+    MAIL = "mail"
+    URL = "url"
+    # Photos taken in the app, kept as a mail with them attached
+    SCAN = "scan"
+    # A pasted text, kept as a mail with only that text
+    TEXT = "text"
+
+
+class InboxStatus(enum.StrEnum):
+    """Where an inbox item is in its life; the moves between them are in app/inbox.py."""
+
+    WAITING = "waiting"
+    PROCESSING = "processing"
+    DRAFT = "draft"
+    FAILED = "failed"
+    DONE = "done"
+
+
 class User(Base):
     __tablename__ = "users"
     # Never reuse ids: login tokens name the user by id, so a deleted user's token must not match a new user
@@ -31,6 +52,14 @@ class User(Base):
     # False: the hub no longer lists the person for the planner; hidden with their data until a parent deletes it
     is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime, default=utcnow, nullable=False)
+
+    @property
+    def is_parent(self) -> bool:
+        return self.role == UserRole.PARENT
+
+    def may_see(self, owner_id: int | None) -> bool:
+        """What belongs to someone (an inbox item, a mail address): parents see everything, a child only their own."""
+        return self.is_parent or owner_id == self.id
 
 
 class Settings(Base):
@@ -178,10 +207,10 @@ class InboxItem(Base):
     __tablename__ = "inbox_items"
 
     id = Column(Integer, primary_key=True)
-    # mail, url, scan (photos taken in the app) or text (a pasted text)
+    # An InboxKind
     kind = Column(String(10), nullable=False)
-    # waiting, processing, draft, failed, done
-    status = Column(String(12), nullable=False, default="waiting")
+    # An InboxStatus
+    status = Column(String(12), nullable=False, default=InboxStatus.WAITING)
     # Who sent the mail or pasted the link
     user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"))
     from_addr = Column(String(200), nullable=False, default="")

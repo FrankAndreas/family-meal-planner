@@ -1,10 +1,13 @@
 import logging
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.engine import Engine
+from sqlalchemy.orm import Session
 
 from . import (
     ai,
@@ -26,24 +29,31 @@ from . import (
     users_api,
 )
 from .errors import Refused, detail
-from .settings_store import get_settings
+from .settings_store import ensure_settings
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
 
-# Create or upgrade the schema (Alembic migrations in app/migrations)
-database_setup.setup(database.engine)
+def start(engine: Engine) -> None:
+    """On start, not on import: the database's folder, its schema (Alembic migrations in app/migrations) and, in a
+    fresh one, the settings row; the people come from the family hub."""
+    database.ensure_sqlite_folder(engine.url)
+    database_setup.setup(engine)
+    with Session(engine) as db:
+        ensure_settings(db)
+    # Both integrations are optional; say which ones are on, but never refuse to start
+    logger.info("Recipe mails: %s", "configured" if config.env("INBOUND_SECRET") else "not configured (INBOUND_SECRET empty)")
+    logger.info("Family hub: %s (logins at %s, app key %s)", hub.hub_url(), hub.public_url(), hub.app_key())
+    logger.info("AI: %s", "configured" if ai.Settings.from_env().enabled else "not configured (no token, product ID or calls)")
 
-# A fresh database gets the settings row; the people come from the family hub
-with database.SessionLocal() as _db:
-    get_settings(_db)
 
-# Both integrations are optional; say which ones are on, but never refuse to start
-logger.info("Recipe mails: %s", "configured" if config.env("INBOUND_SECRET") else "not configured (INBOUND_SECRET empty)")
-logger.info("Family hub: %s (logins at %s, app key %s)", hub.hub_url(), hub.public_url(), hub.app_key())
-logger.info("AI: %s", "configured" if ai.Settings.from_env().enabled else "not configured (no token, product ID or calls)")
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    start(database.engine)
+    yield
 
-app = FastAPI(title="Meal Planner API", version="0.1.0")
+
+app = FastAPI(title="Meal Planner API", version="0.1.0", lifespan=lifespan)
 
 
 @app.exception_handler(RequestValidationError)

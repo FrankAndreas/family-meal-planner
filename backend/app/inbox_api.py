@@ -26,24 +26,20 @@ RASTER_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp", "image/hei
 
 
 def item_out(item: models.InboxItem) -> schemas.InboxItemOut:
+    status, error = inbox.shown(item)
     return schemas.InboxItemOut(
         id=item.id,
         kind=item.kind,
-        status=item.status,
+        status=status,
         user_name=item.user.name if item.user else None,
         from_addr=item.from_addr,
         subject=item.subject,
         url=item.url,
         received_at=item.received_at,
         attachments=item.attachments,
-        error=item.error,
+        error=error,
         recipe_id=item.recipe_id,
     )
-
-
-def visible_item(db: Session, item_id: int, user: models.User) -> models.InboxItem:
-    inbox.unstick(db)
-    return inbox.visible(db, item_id, user)
 
 
 def _add(db: Session, user: models.User, item: models.InboxItem, raw: bytes | None = None) -> schemas.InboxItemOut:
@@ -101,23 +97,27 @@ async def receive_mail(request: Request, db: Session = Depends(get_db)):
     return {"status": "stored", "id": item.id}
 
 
-@router.get("/inbox", response_model=list[schemas.InboxItemOut])
-def list_items(user: models.User = Depends(auth.get_current_user), db: Session = Depends(get_db)):
-    inbox.unstick(db)
+def _unfinished(db: Session, user: models.User) -> list[models.InboxItem]:
+    """Not yet a recipe: all for a parent, a child's own for a child; newest first."""
     query = db.query(models.InboxItem).filter(models.InboxItem.status != InboxStatus.DONE)
     if not user.is_parent:
         query = query.filter(models.InboxItem.user_id == user.id)
-    return [item_out(i) for i in query.order_by(models.InboxItem.received_at.desc(), models.InboxItem.id.desc())]
+    return query.order_by(models.InboxItem.received_at.desc(), models.InboxItem.id.desc()).all()
+
+
+@router.get("/inbox", response_model=list[schemas.InboxItemOut])
+def list_items(user: models.User = Depends(auth.get_current_user), db: Session = Depends(get_db)):
+    return [item_out(i) for i in _unfinished(db, user)]
 
 
 @router.get("/inbox/count")
 def count_items(user: models.User = Depends(auth.get_current_user), db: Session = Depends(get_db)):
-    return {"waiting": len(list_items(user, db))}
+    return {"waiting": len(_unfinished(db, user))}
 
 
 @router.delete("/inbox/{item_id}", status_code=204)
 def discard_item(item_id: int, parent: models.User = Depends(auth.require_parent), db: Session = Depends(get_db)):
-    item = visible_item(db, item_id, parent)
+    item = inbox.visible(db, item_id, parent)
     path = raw_path(item)
     db.delete(item)
     db.commit()
@@ -133,7 +133,7 @@ def add_url(body: schemas.UrlIn, user: models.User = Depends(auth.get_current_us
     number = swissmilk.recipe_id(body.url)
     if number:
         for open_item in db.query(models.InboxItem).filter(
-            models.InboxItem.kind == InboxKind.URL, models.InboxItem.status.in_(inbox.OPEN)
+            models.InboxItem.kind == InboxKind.URL, inbox.is_open()
         ):
             if swissmilk.recipe_id(open_item.url or "") == number:
                 return item_out(open_item)
@@ -196,7 +196,7 @@ def add_text(body: schemas.TextIn, user: models.User = Depends(auth.get_current_
 
 @router.get("/inbox/{item_id}", response_model=schemas.InboxItemDetail)
 def read_item(item_id: int, user: models.User = Depends(auth.get_current_user), db: Session = Depends(get_db)):
-    item = visible_item(db, item_id, user)
+    item = inbox.visible(db, item_id, user)
     text = None
     if item.kind == InboxKind.TEXT:
         # Its file gone (a database restored without the inbox folder): the item and its draft still open
@@ -210,7 +210,7 @@ def read_item(item_id: int, user: models.User = Depends(auth.get_current_user), 
 @router.post("/inbox/{item_id}/process", response_model=schemas.InboxItemOut, status_code=202)
 def process_item(item_id: int, parent: models.User = Depends(auth.require_parent), db: Session = Depends(get_db)):
     """The release: only now is the mail read, are links fetched and may the AI see it."""
-    item = visible_item(db, item_id, parent)
+    item = inbox.visible(db, item_id, parent)
     inbox.release(db, item)
     importer.start(item.id, parent.id)
     db.refresh(item)
@@ -229,7 +229,7 @@ def read_attachment(
     item_id: int, index: int, user: models.User = Depends(auth.get_current_user), db: Session = Depends(get_db)
 ):
     """One image of a mail, decoded because a person opened it (no AI, nothing leaves the NAS)."""
-    kind, data = _image_attachment(visible_item(db, item_id, user), index)
+    kind, data = _image_attachment(inbox.visible(db, item_id, user), index)
     return Response(data, media_type=kind)
 
 
@@ -237,7 +237,7 @@ def read_attachment(
 def read_thumbnail(
     item_id: int, index: int, user: models.User = Depends(auth.get_current_user), db: Session = Depends(get_db)
 ):
-    item = visible_item(db, item_id, user)
+    item = inbox.visible(db, item_id, user)
     cached = inbox_dir() / "thumbs" / f"{item.id}-{index}.jpg"
     if not cached.is_file():
         _, data = _image_attachment(item, index)
@@ -253,7 +253,7 @@ def read_thumbnail(
 @router.get("/inbox/{item_id}/raw")
 def read_raw(item_id: int, parent: models.User = Depends(auth.require_parent), db: Session = Depends(get_db)):
     """The mail as it arrived (part of the original of an imported recipe)."""
-    item = visible_item(db, item_id, parent)
+    item = inbox.visible(db, item_id, parent)
     if item.kind != InboxKind.MAIL:
         raise api_error(404, "attachment_not_found")
     return FileResponse(raw_path(item), media_type="message/rfc822", filename=f"rezept-{item.id}.eml")

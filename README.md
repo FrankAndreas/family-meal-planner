@@ -46,6 +46,8 @@ German by default, English per person.
 **Family and costs**
 - One login for the family through the family hub (FrankAndreas/family-hub), with parent and child roles. Children
   plan, add and rate recipes; only parents process imports, use the AI, delete recipes and change settings.
+  Asking the hub comes from family-hub's client package (`family-hub-client`, pinned to a commit in
+  `backend/requirements.txt`); a login in its last week is renewed by one trip through the hub.
 - AI calls are limited per person and hour, at most 10 pictures per call, and parents see each person's calls per
   month. Set a spending limit at Infomaniak as the outer limit.
 

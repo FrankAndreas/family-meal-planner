@@ -67,7 +67,8 @@ def test_a_cloudflare_token_at_home_is_no_login(client):
 def test_the_family_list_from_outside_asks_the_hub_with_cloudflares_login(client, family_hub, monkeypatch):
     family_hub.add("Mia", "CHILD")
     asked = []
-    monkeypatch.setattr(hub, "fetch_people", lambda login: asked.append(login) or family_hub.fetch_people(login))
+    ask = hub.client.fetch_people
+    monkeypatch.setattr(hub.client, "fetch_people", lambda login: asked.append(login) or ask(login))
     found = client.get("/api/users", headers=outside(**bearer(fake_hub.token("Mia"))))
     assert found.status_code == 200 and "Mia" in [u["name"] for u in found.json()]
     assert asked and all(a.token == fake_hub.cloudflare_token(ADMIN) and a.outside_ip for a in asked)
@@ -91,27 +92,3 @@ def test_changes_from_outside_need_the_header_for_uploads_and_deletes_too(client
     assert upload.status_code == 403 and upload.json()["detail"] == "csrf"
     deleted = client.delete(f"/api/recipes/{made['id']}", headers=outside())
     assert deleted.status_code == 403 and deleted.json()["detail"] == "csrf"
-
-
-def test_the_hub_gets_the_login_with_the_right_headers(monkeypatch):
-    sent = []
-
-    class Answer:
-        status = 200
-
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *_):
-            return False
-
-        def read(self):
-            return b'{"valid": false}'
-
-    monkeypatch.setattr(hub.urllib.request, "urlopen", lambda request, timeout: sent.append(request) or Answer())
-    hub._get("/api/session", hub.Login("cloudflares-token", outside_ip="203.0.113.7"))
-    hub._get("/api/session", hub.Login("hub-token"))
-    outside_call, home_call = (dict(r.header_items()) for r in sent)
-    # From outside the hub also gets Cf-Connecting-Ip, so it ignores any hub token as well (family-hub "For apps")
-    assert outside_call == {"Cf-access-jwt-assertion": "cloudflares-token", "Cf-connecting-ip": "203.0.113.7"}
-    assert home_call == {"Authorization": "Bearer hub-token"}

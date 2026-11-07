@@ -12,3 +12,25 @@ export function loginAddress(links: HubLinks, next: string | null): string | nul
     if (links.logout_url.startsWith('/')) return null;
     return next ? `${links.login_url}/?next=${encodeURIComponent(next)}` : links.login_url;
 }
+
+// The hub login is in its last week (the backend's X-Hub-Renew, on loading the page): once through the hub, which
+// renews it and sends the browser straight back. At most once a day, in case the renewal doesn't take; without storage
+// not at all, so it can never loop (app integration review 2026-11-07)
+export const RENEWED_AT = 'hubRenewedAt';
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+export function renewNow(
+    headers: Record<string, unknown>,
+    storage: Pick<Storage, 'getItem' | 'setItem'> | null,
+    now: number = Date.now(),
+): boolean {
+    if (headers['x-hub-renew'] !== '1' || !storage) return false;
+    try {
+        const last = Number(storage.getItem(RENEWED_AT));
+        if (last && now - last < DAY_MS) return false;
+        storage.setItem(RENEWED_AT, String(now));
+        return true;
+    } catch {
+        return false;
+    }
+}

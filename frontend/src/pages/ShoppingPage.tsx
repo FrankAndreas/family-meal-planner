@@ -1,26 +1,24 @@
 import { format, parseISO } from 'date-fns';
 import { de, enUS } from 'date-fns/locale';
-import { useEffect, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router-dom';
-import { errorCode, errorMessage } from '../api';
-import { bringReady, fetchBring, type BringLogin } from '../bring';
+import { bringReady } from '../bring';
+import ShoppingLines from '../components/shopping/ShoppingLines';
+import ShoppingMeals from '../components/shopping/ShoppingMeals';
+import { useShoppingList } from '../hooks/useShoppingList';
 import type { Language } from '../i18n';
-import { fetchWeek } from '../plan';
 import {
     addExtra,
     chooseLine,
     discardShopping,
-    fetchShopping,
     formatSpec,
     removeExtra,
-    sendShopping,
     startShopping,
     tickMeal,
     type ShoppingLine,
-    type ShoppingList,
+    type ShoppingMeal,
 } from '../shopping';
-import { BUTTON, BUTTON_SECONDARY, CARD, ERROR, FIELD, PAGE } from '../ui';
+import { BUTTON, BUTTON_SECONDARY, CARD, ERROR, PAGE } from '../ui';
 
 // The shared shopping list (spec 2026-11-06): pick the week's meals, drop or add items, send them to Bring!
 export default function ShoppingPage() {
@@ -28,114 +26,15 @@ export default function ShoppingPage() {
     const lang = (i18n.language === 'en' ? 'en' : 'de') as Language;
     const locale = lang === 'de' ? de : enUS;
     const [search, setSearch] = useSearchParams();
-    // undefined: still loading; null: no list open
-    const [list, setList] = useState<ShoppingList | null | undefined>(undefined);
-    const [weekStart, setWeekStart] = useState<string | null>(null);
-    const [bring, setBring] = useState<BringLogin | null>(null);
-    const [name, setName] = useState('');
-    const [amount, setAmount] = useState('');
-    const [busy, setBusy] = useState(false);
-    const [error, setError] = useState('');
-    const [message, setMessage] = useState('');
-    // After a refused send: the lines that changed meanwhile, and the names no longer on the list
-    const [changed, setChanged] = useState<{ keys: Set<string>; gone: string[] }>({ keys: new Set(), gone: [] });
     const requested = search.get('start');
-    // Where a line goes is decided when it first shows on this page: to buy at the top, the rest (what's usually at
-    // home, or dropped before) at the end. Ticking it on or off later leaves it in its place, so nothing jumps away
-    // under the finger (UX review). A new list (sent, thrown away, another week) starts afresh.
-    const [placed, setPlaced] = useState<{ list: string | null; top: Map<string, boolean> }>({ list: null, top: new Map() });
-    const listKey = list ? list.week_start : null;
-    if (placed.list !== listKey) setPlaced({ list: listKey, top: new Map() });
-    const unplaced = list && placed.list === listKey ? list.lines.filter((line) => !placed.top.has(line.key)) : [];
-    if (unplaced.length > 0) {
-        setPlaced({ list: listKey, top: new Map([...placed.top, ...unplaced.map((line) => [line.key, line.buy] as const)]) });
-    }
-
-    useEffect(() => {
-        let current = true;
-        Promise.all([fetchWeek(requested), fetchShopping(), fetchBring()])
-            .then(([week, open, login]) => {
-                if (!current) return;
-                setWeekStart(week.start);
-                setList(open);
-                setBring(login);
-            })
-            .catch((err) => current && setError(errorMessage(err)));
-        return () => {
-            current = false;
-        };
-    }, [requested]);
+    const { list, setList, weekStart, bring, busy, error, message, changed, placed, run, send } =
+        useShoppingList(requested);
 
     const day = (iso: string) => format(parseISO(iso), 'EEEEEE d.M.', { locale });
-    const weekday = (iso: string) => format(parseISO(iso), 'EEEEEE', { locale });
     const range = (start: string, end: string) => `${day(start)} – ${day(end)}`;
     const end = (start: string) => format(new Date(parseISO(start).getTime() + 6 * 86_400_000), 'yyyy-MM-dd');
     const time = (utc: string) => format(new Date(`${utc}Z`), 'HH:mm', { locale });
-    const spec = (line: ShoppingList['lines'][number]) => formatSpec(line, (unit) => t(`units.${unit}` as 'units.g'), lang);
-
-    const run = async (action: () => Promise<ShoppingList | null | void>) => {
-        setError('');
-        setMessage('');
-        setBusy(true);
-        try {
-            const result = await action();
-            if (result !== undefined) setList(result);
-        } catch (err) {
-            setError(errorMessage(err));
-            // A tick shown before the answer: back to what the list really is
-            fetchShopping()
-                .then(setList)
-                .catch(() => {});
-        } finally {
-            setBusy(false);
-        }
-    };
-
-    const differences = (before: ShoppingList, now: ShoppingList) => {
-        const was = new Map(before.lines.map((line) => [line.key, `${line.buy} ${spec(line)}`]));
-        const keys = new Set(now.lines.filter((line) => was.get(line.key) !== `${line.buy} ${spec(line)}`).map((l) => l.key));
-        const still = new Set(now.lines.map((line) => line.key));
-        return { keys, gone: before.lines.filter((line) => !still.has(line.key)).map((line) => line.name) };
-    };
-
-    const send = async (shopping: ShoppingList) => {
-        setError('');
-        setMessage('');
-        setChanged({ keys: new Set(), gone: [] });
-        setBusy(true);
-        try {
-            const specs = Object.fromEntries(shopping.lines.map((line) => [line.key, spec(line)]));
-            const { sent, kept } = await sendShopping(shopping.version, specs);
-            if (kept) {
-                // Changed while it was being sent: it stays, to check and send what's missing
-                setList(await fetchShopping());
-                setMessage(t('shopping.sentKept', { count: sent }));
-            } else {
-                setList(null);
-                setMessage(t('shopping.sent', { count: sent }));
-            }
-        } catch (err) {
-            setError(errorMessage(err));
-            // Changed meanwhile: show the list as it is now, with what changed marked, to check and send again
-            if (errorCode(err) === 'shopping_changed') {
-                const now = await fetchShopping().catch(() => shopping);
-                setList(now);
-                if (now) setChanged(differences(shopping, now));
-            }
-        } finally {
-            setBusy(false);
-        }
-    };
-
-    const add = (e: FormEvent) => {
-        e.preventDefault();
-        run(async () => {
-            const changed = await addExtra(name.trim(), amount.trim());
-            setName('');
-            setAmount('');
-            return changed;
-        });
-    };
+    const spec = (line: ShoppingLine) => formatSpec(line, (unit) => t(`units.${unit}` as 'units.g'), lang);
 
     const feedback = (
         <>
@@ -196,41 +95,15 @@ export default function ShoppingPage() {
     }
 
     const toBuy = list.lines.filter((line) => line.buy).length;
-    const top = (line: ShoppingLine) => placed.top.get(line.key) ?? line.buy;
-    const toBuyFirst = list.lines.filter(top);
-    const atTheEnd = list.lines.filter((line) => !top(line));
-    const lineItem = (line: ShoppingLine) => (
-        <li key={line.key} className={changed.keys.has(line.key) ? '-mx-2 rounded-lg bg-amber-400/15 px-2' : ''}>
-            <label className="flex items-start gap-2">
-                <input
-                    type="checkbox"
-                    className="mt-1"
-                    checked={line.buy}
-                    disabled={busy}
-                    onChange={(e) => {
-                        const buy = e.target.checked;
-                        setList({ ...list, lines: list.lines.map((l) => (l === line ? { ...l, buy } : l)) });
-                        run(() => chooseLine(line.key, buy));
-                    }}
-                />
-                <span className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2">
-                    <span className={line.buy ? '' : 'text-slate-500 line-through'}>
-                        {spec(line) ? `${spec(line)} ${line.name}` : line.name}
-                    </span>
-                    {/* The meals go on the next line rather than squeeze the item */}
-                    <span className="text-sm text-slate-400">
-                        {line.meals.length > 0 && t('shopping.from', { meals: line.meals.join(', ') })}
-                        {line.staple && !line.buy && ` ${t('shopping.usuallyAtHome')}`}
-                    </span>
-                </span>
-                {changed.keys.has(line.key) && (
-                    <span className="shrink-0 rounded-full bg-amber-400/20 px-2 text-xs text-amber-100">
-                        {t('shopping.changed')}
-                    </span>
-                )}
-            </label>
-        </li>
-    );
+    // Shown at once; the answer brings the lines that follow from it
+    const tick = (meal: ShoppingMeal, ticked: boolean) => {
+        setList({ ...list, meals: list.meals.map((m) => (m === meal ? { ...m, ticked } : m)) });
+        run(() => tickMeal(meal.entry_id, ticked));
+    };
+    const choose = (line: ShoppingLine, buy: boolean) => {
+        setList({ ...list, lines: list.lines.map((l) => (l === line ? { ...l, buy } : l)) });
+        run(() => chooseLine(line.key, buy));
+    };
     const discard = () => {
         if (confirm(t('shopping.confirmDiscard'))) run(async () => {
             await discardShopping();
@@ -251,107 +124,23 @@ export default function ShoppingPage() {
             </div>
             {feedback}
 
-            <section className={`${CARD} space-y-2`} aria-labelledby="shopping-meals">
-                <h2 id="shopping-meals" className="text-lg">
-                    {t('shopping.meals')}
-                </h2>
-                <ul className="space-y-1">
-                    {list.meals.map((meal) => (
-                        <li key={meal.entry_id}>
-                            <label className="flex items-start gap-2">
-                                <input
-                                    type="checkbox"
-                                    className="mt-1"
-                                    checked={meal.ticked}
-                                    disabled={busy}
-                                    onChange={(e) => {
-                                        const ticked = e.target.checked;
-                                        // Shown at once; the answer brings the lines that follow from it
-                                        setList({ ...list, meals: list.meals.map((m) => (m === meal ? { ...m, ticked } : m)) });
-                                        run(() => tickMeal(meal.entry_id, ticked));
-                                    }}
-                                />
-                                <span className="min-w-0 break-words">
-                                    {weekday(meal.date)} · {t(`plan.slots.${meal.slot}`)} · <b>{meal.title}</b>
-                                    {meal.people !== null && (
-                                        <span className="text-slate-400"> ({t('shopping.people', { count: meal.people })})</span>
-                                    )}
-                                </span>
-                            </label>
-                        </li>
-                    ))}
-                    {list.notes.map((note) => (
-                        <li key={`${note.date}-${note.slot}-${note.note}`} className="pl-6 text-slate-500">
-                            {weekday(note.date)} · {t(`plan.slots.${note.slot}`)} · {note.note}
-                        </li>
-                    ))}
-                </ul>
-            </section>
+            <ShoppingMeals list={list} busy={busy} onTick={tick} />
 
-            <section className={`${CARD} space-y-3`} aria-labelledby="shopping-items">
-                <h2 id="shopping-items" className="text-lg">
-                    {t('shopping.items')}
-                </h2>
-                {list.lines.length === 0 && <p className="text-sm text-slate-400">{t('shopping.noItems')}</p>}
-                <ul className="space-y-1">{toBuyFirst.map(lineItem)}</ul>
-                {atTheEnd.length > 0 && (
-                    <>
-                        <h3 className="pt-2 text-sm font-semibold text-slate-400">{t('shopping.notBuying')}</h3>
-                        <ul className="space-y-1">{atTheEnd.map(lineItem)}</ul>
-                    </>
-                )}
-                {changed.gone.length > 0 && (
-                    <p className="text-sm text-amber-100">{t('shopping.gone', { names: changed.gone.join(', ') })}</p>
-                )}
-                <form className="flex flex-wrap items-end gap-2" onSubmit={add}>
-                    <label className="min-w-0 flex-1 space-y-1">
-                        <span className="block text-sm text-slate-300">{t('shopping.addName')}</span>
-                        <input
-                            className={`${FIELD} w-full`}
-                            maxLength={100}
-                            required
-                            placeholder={t('shopping.addNamePlaceholder')}
-                            value={name}
-                            onChange={(e) => setName(e.target.value)}
-                        />
-                    </label>
-                    <label className="w-32 space-y-1">
-                        <span className="block text-sm text-slate-300">{t('shopping.addAmount')}</span>
-                        <input
-                            className={`${FIELD} w-full`}
-                            maxLength={50}
-                            placeholder={t('shopping.addAmountPlaceholder')}
-                            value={amount}
-                            onChange={(e) => setAmount(e.target.value)}
-                        />
-                    </label>
-                    <button type="submit" className={BUTTON_SECONDARY} disabled={busy || !name.trim()}>
-                        {t('shopping.add')}
-                    </button>
-                </form>
-                {list.extras.length > 0 && (
-                    <ul className="flex flex-wrap gap-2">
-                        {list.extras.map((extra) => (
-                            <li key={extra.id}>
-                                <button
-                                    type="button"
-                                    className="rounded-full border border-white/15 px-3 py-1 text-sm hover:bg-white/10"
-                                    aria-label={t('shopping.removeExtra', { name: extra.name })}
-                                    disabled={busy}
-                                    onClick={() => run(() => removeExtra(extra.id))}
-                                >
-                                    {extra.amount ? `${extra.amount} ${extra.name}` : extra.name} ✕
-                                </button>
-                            </li>
-                        ))}
-                    </ul>
-                )}
-            </section>
+            <ShoppingLines
+                list={list}
+                placed={placed}
+                changed={changed}
+                busy={busy}
+                spec={spec}
+                onChoose={choose}
+                onAdd={(name, amount) => run(() => addExtra(name, amount))}
+                onRemoveExtra={(id) => run(() => removeExtra(id))}
+            />
 
             {/* Sending stays in reach on a long list: above the phone's bottom bar, at the bottom of the screen elsewhere */}
             {bringReady(bring) && (
                 <div className="sticky bottom-[4.25rem] z-10 -mx-3 rounded-2xl border border-white/10 bg-slate-900/90 p-3 backdrop-blur-md sm:bottom-2">
-                    <button type="button" className={`${BUTTON} w-full sm:w-auto`} disabled={busy || toBuy === 0} onClick={() => send(list)}>
+                    <button type="button" className={`${BUTTON} w-full sm:w-auto`} disabled={busy || toBuy === 0} onClick={() => send(list, spec)}>
                         {t('shopping.send', { count: toBuy })}
                     </button>
                 </div>

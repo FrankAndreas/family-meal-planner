@@ -1,26 +1,29 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { errorMessage } from '../../api';
+import { useAutoSave } from '../../hooks/useAutoSave';
 import { fetchSettings, saveSettings, saveSettingsOnLeave } from '../../settings';
 import { WEEKDAYS, type FamilySettings as Settings } from '../../types';
 import { CARD, ERROR, FIELD } from '../../ui';
 import IngredientChips from '../recipes/IngredientChips';
 
+const validSize = (size: number) => Number.isInteger(size) && size >= 1 && size <= 20;
+
 export default function FamilySettings() {
     const { t } = useTranslation();
     const [settings, setSettings] = useState<Settings | null>(null);
-    const [status, setStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
-    const [error, setError] = useState('');
-    // Saved as soon as something changes, like the mail addresses and Bring! (UX review 2026-11-06).
-    // What's still to send, one request after the other, so an older answer never wins over a newer change
-    const pending = useRef<Partial<Settings>>({});
-    const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const queue = useRef<Promise<void>>(Promise.resolve());
-    const sending = useRef(0);
-    // Counts staples changes: the server's cleaned staples are shown only for the newest one
-    const staplesVersion = useRef(0);
     // The family size last saved: a size that isn't one yet (an empty field) goes back to it
     const savedSize = useRef(0);
+    const { status, error, setError, change: save, drop } = useAutoSave<Settings>({
+        save: saveSettings,
+        saveOnLeave: saveSettingsOnLeave,
+        onSaved: (saved, fields, changedSince) => {
+            savedSize.current = saved.family_size;
+            // The server's staples, cleaned (it keeps "Straße" and "STRASSE" once), unless they changed since
+            if (fields.staples && !changedSince('staples'))
+                setSettings((shown) => (shown ? { ...shown, staples: saved.staples } : shown));
+        },
+    });
 
     useEffect(() => {
         // A late answer must not overwrite what someone already typed
@@ -35,105 +38,23 @@ export default function FamilySettings() {
         return () => {
             current = false;
         };
-    }, []);
+    }, [setError]);
 
-    const waiting = useCallback(
-        () => timer.current !== null || Object.keys(pending.current).length > 0 || sending.current > 0,
-        [],
-    );
-
-    // What's waiting leaves pending; the answer is applied here, whichever way it was sent.
-    // Uses only refs and state setters, so the same functions for the page's whole life
-    const take = useCallback(() => {
-        if (timer.current) clearTimeout(timer.current);
-        timer.current = null;
-        const fields = pending.current;
-        pending.current = {};
-        sending.current += 1;
-        return { fields, version: staplesVersion.current };
-    }, []);
-
-    const settle = useCallback(
-        async (fields: Partial<Settings>, version: number, request: () => Promise<Settings>) => {
-            try {
-                const saved = await request();
-                savedSize.current = saved.family_size;
-                // The server's staples, cleaned (it keeps "Straße" and "STRASSE" once), unless they changed since
-                if (fields.staples && version === staplesVersion.current)
-                    setSettings((shown) => (shown ? { ...shown, staples: saved.staples } : shown));
-                sending.current -= 1;
-                setError('');
-                // Only "saved" once nothing else waits
-                if (!waiting()) setStatus('saved');
-            } catch (err) {
-                sending.current -= 1;
-                // Not lost: sent again with the next change, unless that change replaced it
-                pending.current = { ...fields, ...pending.current };
-                setError(errorMessage(err));
-                setStatus('idle');
-            }
-        },
-        [waiting],
-    );
-
-    const send = useCallback(() => {
-        const { fields, version } = take();
-        queue.current = queue.current.then(() =>
-            settle(fields, version, () => saveSettings(fields)),
-        );
-    }, [take, settle]);
-
-    // Typing a number waits a moment, so "12" isn't saved as 1 first; everything else goes at once
+    // Shown at once, saved right away; typing a number waits a moment, so "12" isn't saved as 1 first
     const change = (fields: Partial<Settings>, wait = 0) => {
         setSettings((shown) => (shown ? { ...shown, ...fields } : shown));
-        pending.current = { ...pending.current, ...fields };
-        if (fields.staples) staplesVersion.current += 1;
-        setStatus('saving');
-        if (timer.current) clearTimeout(timer.current);
-        timer.current = setTimeout(send, wait);
+        save(fields, wait);
     };
-
-    // Leaving the page doesn't lose a change that is still waiting
-    useEffect(
-        () => () => {
-            if (Object.keys(pending.current).length) send();
-        },
-        [send],
-    );
-
-    // Closing, reloading or hiding the tab doesn't wait for the size's pause or the next change: a request that
-    // outlives the page takes what's waiting. If the page comes back (back button, tab shown again), its answer counts
-    useEffect(() => {
-        const leave = () => {
-            if (!Object.keys(pending.current).length) return;
-            const { fields, version } = take();
-            // Sent now, while the page still exists; settle only waits for its answer
-            const request = saveSettingsOnLeave(fields);
-            void settle(fields, version, () => request);
-        };
-        const hidden = () => document.visibilityState === 'hidden' && leave();
-        window.addEventListener('pagehide', leave);
-        document.addEventListener('visibilitychange', hidden);
-        return () => {
-            window.removeEventListener('pagehide', leave);
-            document.removeEventListener('visibilitychange', hidden);
-        };
-    }, [take, settle]);
 
     const changeSize = (text: string) => {
         const size = Number(text);
-        if (text !== '' && Number.isInteger(size) && size >= 1 && size <= 20) {
+        if (text !== '' && validSize(size)) {
             change({ family_size: size }, 600);
             return;
         }
         setSettings((shown) => (shown ? { ...shown, family_size: text === '' ? NaN : size } : shown));
         // A half-typed size before it ("2" of "25") isn't saved either
-        delete pending.current.family_size;
-        if (timer.current && !Object.keys(pending.current).length) {
-            clearTimeout(timer.current);
-            timer.current = null;
-        }
-        if (!waiting()) setStatus('idle');
+        drop('family_size');
     };
 
     return (
@@ -156,7 +77,7 @@ export default function FamilySettings() {
                                 onChange={(e) => changeSize(e.target.value)}
                                 onBlur={() => {
                                     const size = settings.family_size;
-                                    if (!(Number.isInteger(size) && size >= 1 && size <= 20))
+                                    if (!validSize(size))
                                         setSettings({ ...settings, family_size: savedSize.current });
                                 }}
                             />

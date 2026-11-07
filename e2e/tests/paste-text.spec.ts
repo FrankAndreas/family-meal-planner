@@ -31,6 +31,7 @@ test('a child pastes a text from the recipes page; it waits for a parent', async
     await login(page, child.name);
     const title = uniqueName('Pancakes ');
     await page.goto('/rezepte');
+    await page.getByRole('button', { name: 'Add recipe' }).click();
     await page.getByRole('button', { name: 'Paste recipe text' }).click();
     // Too long: said so, not silently cut off
     await page.getByLabel('Recipe text').fill('x'.repeat(20_001));

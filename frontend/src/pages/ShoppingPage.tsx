@@ -17,6 +17,7 @@ import {
     sendShopping,
     startShopping,
     tickMeal,
+    type ShoppingLine,
     type ShoppingList,
 } from '../shopping';
 import { BUTTON, BUTTON_SECONDARY, CARD, ERROR, FIELD } from '../ui';
@@ -39,6 +40,16 @@ export default function ShoppingPage() {
     // After a refused send: the lines that changed meanwhile, and the names no longer on the list
     const [changed, setChanged] = useState<{ keys: Set<string>; gone: string[] }>({ keys: new Set(), gone: [] });
     const requested = search.get('start');
+    // Where a line goes is decided when it first shows on this page: to buy at the top, the rest (what's usually at
+    // home, or dropped before) at the end. Ticking it on or off later leaves it in its place, so nothing jumps away
+    // under the finger (UX review). A new list (sent, thrown away, another week) starts afresh.
+    const [placed, setPlaced] = useState<{ list: string | null; top: Map<string, boolean> }>({ list: null, top: new Map() });
+    const listKey = list ? list.week_start : null;
+    if (placed.list !== listKey) setPlaced({ list: listKey, top: new Map() });
+    const unplaced = list && placed.list === listKey ? list.lines.filter((line) => !placed.top.has(line.key)) : [];
+    if (unplaced.length > 0) {
+        setPlaced({ list: listKey, top: new Map([...placed.top, ...unplaced.map((line) => [line.key, line.buy] as const)]) });
+    }
 
     useEffect(() => {
         let current = true;
@@ -185,6 +196,41 @@ export default function ShoppingPage() {
     }
 
     const toBuy = list.lines.filter((line) => line.buy).length;
+    const top = (line: ShoppingLine) => placed.top.get(line.key) ?? line.buy;
+    const toBuyFirst = list.lines.filter(top);
+    const atTheEnd = list.lines.filter((line) => !top(line));
+    const lineItem = (line: ShoppingLine) => (
+        <li key={line.key} className={changed.keys.has(line.key) ? '-mx-2 rounded-lg bg-amber-400/15 px-2' : ''}>
+            <label className="flex items-start gap-2">
+                <input
+                    type="checkbox"
+                    className="mt-1"
+                    checked={line.buy}
+                    disabled={busy}
+                    onChange={(e) => {
+                        const buy = e.target.checked;
+                        setList({ ...list, lines: list.lines.map((l) => (l === line ? { ...l, buy } : l)) });
+                        run(() => chooseLine(line.key, buy));
+                    }}
+                />
+                <span className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2">
+                    <span className={line.buy ? '' : 'text-slate-500 line-through'}>
+                        {spec(line) ? `${spec(line)} ${line.name}` : line.name}
+                    </span>
+                    {/* The meals go on the next line rather than squeeze the item */}
+                    <span className="text-sm text-slate-400">
+                        {line.meals.length > 0 && t('shopping.from', { meals: line.meals.join(', ') })}
+                        {line.staple && !line.buy && ` ${t('shopping.usuallyAtHome')}`}
+                    </span>
+                </span>
+                {changed.keys.has(line.key) && (
+                    <span className="shrink-0 rounded-full bg-amber-400/20 px-2 text-xs text-amber-100">
+                        {t('shopping.changed')}
+                    </span>
+                )}
+            </label>
+        </li>
+    );
     const discard = () => {
         if (confirm(t('shopping.confirmDiscard'))) run(async () => {
             await discardShopping();
@@ -247,40 +293,13 @@ export default function ShoppingPage() {
                     {t('shopping.items')}
                 </h2>
                 {list.lines.length === 0 && <p className="text-sm text-slate-400">{t('shopping.noItems')}</p>}
-                <ul className="space-y-1">
-                    {list.lines.map((line) => (
-                        <li key={line.key} className={changed.keys.has(line.key) ? '-mx-2 rounded-lg bg-amber-400/15 px-2' : ''}>
-                            <label className="flex items-start gap-2">
-                                <input
-                                    type="checkbox"
-                                    className="mt-1"
-                                    checked={line.buy}
-                                    disabled={busy}
-                                    onChange={(e) => {
-                                        const buy = e.target.checked;
-                                        setList({ ...list, lines: list.lines.map((l) => (l === line ? { ...l, buy } : l)) });
-                                        run(() => chooseLine(line.key, buy));
-                                    }}
-                                />
-                                <span className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2">
-                                    <span className={line.buy ? '' : 'text-slate-500 line-through'}>
-                                        {spec(line) ? `${spec(line)} ${line.name}` : line.name}
-                                    </span>
-                                    {/* The meals go on the next line rather than squeeze the item */}
-                                    <span className="text-sm text-slate-400">
-                                        {line.meals.length > 0 && t('shopping.from', { meals: line.meals.join(', ') })}
-                                        {line.staple && !line.buy && ` ${t('shopping.usuallyAtHome')}`}
-                                    </span>
-                                </span>
-                                {changed.keys.has(line.key) && (
-                                    <span className="shrink-0 rounded-full bg-amber-400/20 px-2 text-xs text-amber-100">
-                                        {t('shopping.changed')}
-                                    </span>
-                                )}
-                            </label>
-                        </li>
-                    ))}
-                </ul>
+                <ul className="space-y-1">{toBuyFirst.map(lineItem)}</ul>
+                {atTheEnd.length > 0 && (
+                    <>
+                        <h3 className="pt-2 text-sm font-semibold text-slate-400">{t('shopping.notBuying')}</h3>
+                        <ul className="space-y-1">{atTheEnd.map(lineItem)}</ul>
+                    </>
+                )}
                 {changed.gone.length > 0 && (
                     <p className="text-sm text-amber-100">{t('shopping.gone', { names: changed.gone.join(', ') })}</p>
                 )}
@@ -329,12 +348,16 @@ export default function ShoppingPage() {
                 )}
             </section>
 
-            <div className="flex flex-wrap items-center gap-3">
-                {bringReady(bring) ? (
-                    <button type="button" className={BUTTON} disabled={busy || toBuy === 0} onClick={() => send(list)}>
+            {/* Sending stays in reach on a long list: above the phone's bottom bar, at the bottom of the screen elsewhere */}
+            {bringReady(bring) && (
+                <div className="sticky bottom-[4.25rem] z-10 -mx-3 rounded-2xl border border-white/10 bg-slate-900/90 p-3 backdrop-blur-md sm:bottom-2">
+                    <button type="button" className={`${BUTTON} w-full sm:w-auto`} disabled={busy || toBuy === 0} onClick={() => send(list)}>
                         {t('shopping.send', { count: toBuy })}
                     </button>
-                ) : (
+                </div>
+            )}
+            <div className="flex flex-wrap items-center gap-3">
+                {!bringReady(bring) && (
                     <Link to="/einstellungen" className="text-cyan-300 underline">
                         {t('shopping.setUpBring')}
                     </Link>

@@ -22,7 +22,7 @@ export default function EntryChip({ entry, familySize, onOpen }: EntryChipProps)
                 e.stopPropagation();
                 onOpen();
             }}
-            className={`block w-full hyphens-auto rounded-md border px-1.5 py-1 text-left text-xs leading-tight [overflow-wrap:anywhere] ${style} ${
+            className={`block w-full hyphens-auto rounded-md border px-1 py-1 text-left text-xs leading-tight [overflow-wrap:anywhere] ${style} ${
                 entry.eaten ? '' : 'line-through opacity-60'
             }`}
         >

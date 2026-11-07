@@ -15,9 +15,14 @@ interface WeekGridProps {
 export default function WeekGrid({ week, mode, familySize, onCell, onOpenEntry }: WeekGridProps) {
     const { t, i18n } = useTranslation();
     const locale = i18n.language === 'de' ? de : enUS;
+    // With the suggestions beside the grid (lg), the rows share the screen's height, less the banner to close the
+    // previous week when it shows (UX review: the grid stopped halfway down)
+    const fill = week.previous_needs_closing
+        ? 'lg:min-h-[max(5rem,calc((100dvh-22rem)/4))]'
+        : 'lg:min-h-[max(5rem,calc((100dvh-17rem)/4))]';
     return (
-        <div className="glass-card overflow-x-auto p-3">
-            <div className="grid min-w-[44rem] grid-cols-[5.5rem_repeat(7,minmax(0,1fr))] gap-1.5">
+        <div data-testid="week-grid" className="glass-card overflow-x-auto p-3">
+            <div className="grid min-w-[44rem] grid-cols-[4rem_repeat(7,minmax(0,1fr))] gap-1">
                 <div />
                 {week.days.map((day) => (
                     <div
@@ -29,7 +34,7 @@ export default function WeekGrid({ week, mode, familySize, onCell, onOpenEntry }
                     </div>
                 ))}
                 {SLOTS.map((slot) => [
-                    <div key={slot} className="flex items-center text-xs font-medium text-slate-400">
+                    <div key={slot} className="flex items-center pr-1 text-xs font-medium text-slate-400">
                         {t(`plan.slots.${slot}`)}
                     </div>,
                     ...week.days.map((day) => (
@@ -41,6 +46,7 @@ export default function WeekGrid({ week, mode, familySize, onCell, onOpenEntry }
                             mode={mode}
                             past={day < week.today}
                             familySize={familySize}
+                            fill={fill}
                             onTap={() => onCell(day, slot)}
                             onOpenEntry={onOpenEntry}
                         />

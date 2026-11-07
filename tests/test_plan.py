@@ -4,7 +4,7 @@ from helpers import create_recipe, create_user, login, plan
 def test_default_week_is_the_one_of_tomorrow(client, admin_headers, today):
     week = client.get("/api/plan", headers=admin_headers).json()
     assert week["start"] == "2026-10-31" and len(week["days"]) == 7 and week["days"][-1] == "2026-11-06"
-    assert week["total_slots"] == 28 and week["planned_slots"] == 0 and week["today"] == "2026-10-30"
+    assert week["total_slots"] == 14 and week["planned_slots"] == 0 and week["today"] == "2026-10-30"
 
 
 def test_any_date_gives_its_week(client, admin_headers, today):
@@ -43,7 +43,7 @@ def test_slot_order_and_positions(client, admin_headers, today):
     plan(client, admin_headers, "2026-10-31", "breakfast", note="Zopf")
     week = client.get("/api/plan", headers=admin_headers).json()
     assert [(e["slot"], e["position"]) for e in week["entries"]] == [("breakfast", 0), ("dinner", 0), ("dinner", 1)]
-    assert week["planned_slots"] == 2
+    assert week["planned_slots"] == 1  # breakfast is not counted without a history of it
 
 
 def test_move_entry(client, admin_headers, today):
@@ -107,3 +107,39 @@ def test_errors(client, admin_headers, today):
     assert client.post("/api/plan/entries", json={**bad, "slot": "brunch"}, headers=admin_headers).status_code == 422
     unknown = client.post("/api/plan/entries", json={**bad, "recipe_id": 999}, headers=admin_headers)
     assert unknown.status_code == 404 and unknown.json()["detail"] == "recipe_not_found"
+
+
+def test_counter_without_history_counts_lunch_and_dinner(client, admin_headers, today):
+    """A new planner counts Zmittag and Znacht: nobody fills every Zmorge and Znüni (UX review)."""
+    plan(client, admin_headers, "2026-10-31", "breakfast", note="Zopf")
+    plan(client, admin_headers, "2026-10-31", "dinner", note="Pizza")
+    week = client.get("/api/plan?start=2026-10-31", headers=admin_headers).json()
+    assert (week["planned_slots"], week["total_slots"]) == (1, 14)
+
+
+def test_counter_counts_the_slots_the_family_plans(client, admin_headers, today):
+    """A slot counts once it was planned on at least half the days of the four weeks before."""
+    for n in range(14):
+        day = f"2026-10-{3 + n:02d}"
+        plan(client, admin_headers, day, "breakfast", note="Müesli")
+        plan(client, admin_headers, day, "dinner", note="Znacht")
+    plan(client, admin_headers, "2026-10-04", "snack", note="Apfel")  # once: not regular
+    week = client.get("/api/plan?start=2026-10-31", headers=admin_headers).json()
+    assert week["total_slots"] == 14  # breakfast and dinner; lunch never planned
+    plan(client, admin_headers, "2026-10-31", "breakfast", note="Zopf")
+    plan(client, admin_headers, "2026-10-31", "snack", note="Kuchen")
+    assert client.get("/api/plan?start=2026-10-31", headers=admin_headers).json()["planned_slots"] == 1
+
+
+def test_counter_for_a_week_far_ahead_uses_the_history_up_to_today(client, admin_headers, today):
+    """Weeks planned ahead count the same slots as next week: the four weeks before today, not before that week."""
+    for n in range(14):
+        plan(client, admin_headers, f"2026-10-{3 + n:02d}", "breakfast", note="Müesli")
+    for start in ("2026-10-31", "2026-11-21", "2026-12-26"):
+        assert client.get(f"/api/plan?start={start}", headers=admin_headers).json()["total_slots"] == 7, start
+
+
+def test_counter_thirteen_days_is_not_regular(client, admin_headers, today):
+    for n in range(13):
+        plan(client, admin_headers, f"2026-10-{3 + n:02d}", "breakfast", note="Müesli")
+    assert client.get("/api/plan?start=2026-10-31", headers=admin_headers).json()["total_slots"] == 14

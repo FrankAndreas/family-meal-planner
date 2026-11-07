@@ -1,4 +1,4 @@
-import { useEffect, useState, type KeyboardEvent } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
 import api, { errorMessage } from '../api';
@@ -14,13 +14,38 @@ import { BUTTON, BUTTON_SECONDARY, ERROR, INPUT } from '../ui';
 import { loadUseUp, saveUseUp, type UseUpState } from '../useUp';
 
 const TABS = ['search', 'use_up'] as const;
+const ADD_LABELS = {
+    scan: 'recipes.scan',
+    link: 'recipes.importFromLink',
+    text: 'recipes.pasteText',
+} as const;
+// On the phone the filters are one row each that scrolls sideways; wider screens show them all
+const CHIP_ROW = 'flex gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0';
 
 export default function Recipes() {
     const { t } = useTranslation();
     const navigate = useNavigate();
     // Getting a recipe in other than typing it: from a link, photographed, or a pasted text
     const [panel, setPanel] = useState<'link' | 'scan' | 'text' | null>(null);
-    const toggle = (which: 'link' | 'scan' | 'text') => setPanel(panel === which ? null : which);
+    const [adding, setAdding] = useState(false);
+    const addMenu = useRef<HTMLDivElement>(null);
+    // The menu closes on Escape or a tap anywhere else, as menus do
+    useEffect(() => {
+        if (!adding) return;
+        const close = (e: Event) => {
+            if (e instanceof globalThis.KeyboardEvent ? e.key === 'Escape' : !addMenu.current?.contains(e.target as Node)) setAdding(false);
+        };
+        document.addEventListener('pointerdown', close);
+        document.addEventListener('keydown', close);
+        return () => {
+            document.removeEventListener('pointerdown', close);
+            document.removeEventListener('keydown', close);
+        };
+    }, [adding]);
+    const open = (which: 'link' | 'scan' | 'text') => {
+        setPanel(which);
+        setAdding(false);
+    };
     const [recipes, setRecipes] = useState<RecipeSummary[] | null>(null);
     const [tags, setTags] = useState<{ name: string; count: number }[]>([]);
     const [q, setQ] = useState('');
@@ -110,27 +135,46 @@ export default function Recipes() {
     }, [q, tag, category, onlyMine, reloads]);
 
     const chip = (active: boolean) =>
-        `rounded-full border px-3 py-1 text-sm ${
+        `shrink-0 whitespace-nowrap rounded-full border px-3 py-1 text-sm ${
             active ? 'border-cyan-400 bg-cyan-400/15 text-white' : 'border-white/10 text-slate-300 hover:bg-white/5'
         }`;
 
     return (
         <div className="space-y-5">
-            <div className="flex flex-wrap items-center gap-3">
+            {/* One button for the ways of adding a recipe, so the phone starts with recipes (UX review) */}
+            <div className="flex items-center gap-3">
                 <h1 className="mr-auto text-2xl">{t('nav.recipes')}</h1>
-                <button type="button" className={BUTTON_SECONDARY} aria-expanded={panel === 'scan'} onClick={() => toggle('scan')}>
-                    {t('recipes.scan')}
-                </button>
-                <button type="button" className={BUTTON_SECONDARY} aria-expanded={panel === 'link'} onClick={() => toggle('link')}>
-                    {t('recipes.importFromLink')}
-                </button>
-                <button type="button" className={BUTTON_SECONDARY} aria-expanded={panel === 'text'} onClick={() => toggle('text')}>
-                    {t('recipes.pasteText')}
-                </button>
-                <Link to="/rezepte/neu" className={BUTTON}>
-                    {t('recipes.new')}
-                </Link>
+                <div ref={addMenu} className="relative">
+                    <button
+                        type="button"
+                        className={BUTTON}
+                        aria-expanded={adding}
+                        aria-controls={adding ? 'add-recipe' : undefined}
+                        onClick={() => setAdding(!adding)}
+                    >
+                        {t('recipes.add')}
+                    </button>
+                    {adding && (
+                        <div id="add-recipe" className="glass-card absolute right-0 top-full z-20 mt-2 flex w-64 flex-col gap-2 p-3">
+                            <Link to="/rezepte/neu" className={BUTTON}>
+                                {t('recipes.new')}
+                            </Link>
+                            {(['scan', 'link', 'text'] as const).map((which) => (
+                                <button key={which} type="button" className={BUTTON_SECONDARY} onClick={() => open(which)}>
+                                    {t(ADD_LABELS[which])}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
             </div>
+            {panel && (
+                <div className="flex justify-end">
+                    <button type="button" className="text-sm text-slate-400 hover:text-white" onClick={() => setPanel(null)}>
+                        {t('recipes.closePanel')}
+                    </button>
+                </div>
+            )}
             {/* Same as in the inbox: the draft shows up there (a parent's link is read at once) */}
             {panel === 'link' && <UrlPaste onAdded={() => navigate('/posteingang')} />}
             {panel === 'scan' && <ScanRecipe onDone={() => navigate('/posteingang')} />}
@@ -173,8 +217,13 @@ export default function Recipes() {
                                 {t('recipes.onlyMyFavorites')}
                             </label>
                         </div>
-                        <div className="flex flex-wrap gap-2" role="group" aria-label={t('recipes.filterCategory')}>
-                            <button type="button" className={chip(category === '')} aria-pressed={category === ''} onClick={() => setCategory('')}>
+                        <div className={CHIP_ROW} role="group" aria-label={t('recipes.filterCategory')}>
+                            <button
+                                type="button"
+                                className={chip(category === '')}
+                                aria-pressed={category === ''}
+                                onClick={() => setCategory('')}
+                            >
                                 {t('recipes.allCategories')}
                             </button>
                             {[...CATEGORIES, 'none' as const].map((key) => (
@@ -202,7 +251,7 @@ export default function Recipes() {
                             </div>
                         )}
                         {tags.length > 0 && (
-                            <div className="flex flex-wrap gap-2">
+                            <div className={CHIP_ROW}>
                                 <button type="button" className={chip(tag === '')} onClick={() => setTag('')}>
                                     {t('recipes.allTags')}
                                 </button>
@@ -221,7 +270,9 @@ export default function Recipes() {
                         {error && <p className={ERROR}>{error}</p>}
                         {recipes && recipes.length === 0 && <p className="text-slate-400">{t('recipes.none')}</p>}
                         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-                            {recipes?.map((recipe) => <RecipeCard key={recipe.id} recipe={recipe} />)}
+                            {recipes?.map((recipe) => (
+                                <RecipeCard key={recipe.id} recipe={recipe} />
+                            ))}
                         </div>
                     </>
                 )}

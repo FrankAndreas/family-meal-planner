@@ -151,7 +151,7 @@ export default function PlanPage() {
                     onDragEnd={onDragEnd}
                     onDragCancel={() => setDragging(null)}
                 >
-                    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_17rem]">
+                    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_16rem]">
                         <WeekGrid week={week} mode={mode} familySize={familySize} onCell={onCell} onOpenEntry={setMenuEntry} />
                         <SuggestionPanel
                             selectedId={picked?.id ?? null}

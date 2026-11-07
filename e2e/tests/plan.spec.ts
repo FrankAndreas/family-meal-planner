@@ -14,7 +14,7 @@ test('tap a suggestion, then a cell, to plan it', async ({ page, request }) => {
     await call(request, parent, 'PUT', `/recipes/${recipe.id}/favorite`, { favorite: true });
     const errors = await login(page, parent.name);
     await page.goto(`/?woche=${ownWeek()}`);
-    await expect(page.getByText('0 of 28 planned')).toBeVisible();
+    await expect(page.getByText('0 of 14 planned')).toBeVisible();
 
     await page.getByRole('tab', { name: 'Favourites' }).click();
     const card = page.getByRole('complementary').getByRole('button', { name: recipe.title });
@@ -22,7 +22,7 @@ test('tap a suggestion, then a cell, to plan it', async ({ page, request }) => {
     await expect(card).toHaveAttribute('aria-pressed', 'true');
     await page.getByRole('button', { name: 'Plan on Saturday, Dinner' }).click();
     await expect(page.getByTestId('cell-sat-dinner')).toContainText(recipe.title);
-    await expect(page.getByText('1 of 28 planned')).toBeVisible();
+    await expect(page.getByText('1 of 14 planned')).toBeVisible();
 
     // Tapping the card again lets go of it
     await card.click();
@@ -45,7 +45,7 @@ test('a note, moving and the number of people', async ({ page, request }) => {
     const dialog = page.getByRole('dialog', { name: 'Add a note' });
     await dialog.getByRole('button', { name: 'Pizza night' }).click();
     await expect(page.getByTestId('cell-sun-lunch')).toContainText('Pizza night');
-    await expect(page.getByText('2 of 28 planned')).toBeVisible();
+    await expect(page.getByText('2 of 14 planned')).toBeVisible();
 
     await page.getByTestId('cell-sat-dinner').getByRole('button', { name: recipe.title }).click();
     const menu = page.getByRole('dialog', { name: recipe.title });

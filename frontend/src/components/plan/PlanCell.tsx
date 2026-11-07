@@ -13,11 +13,12 @@ interface PlanCellProps {
     mode: CellMode;
     past: boolean;
     familySize: number;
+    fill: string;
     onTap: () => void;
     onOpenEntry: (entry: PlanEntry) => void;
 }
 
-export default function PlanCell({ day, slot, entries, mode, past, familySize, onTap, onOpenEntry }: PlanCellProps) {
+export default function PlanCell({ day, slot, entries, mode, past, familySize, fill, onTap, onOpenEntry }: PlanCellProps) {
     const { t } = useTranslation();
     const place = t('plan.place', { day: t(`weekdays.${weekdayKey(day)}`), slot: t(`plan.slots.${slot}`) });
     const label = mode === 'plan' ? t('plan.planOn', { place }) : mode === 'move' ? t('plan.moveTo', { place }) : t('plan.addTo', { place });
@@ -27,7 +28,7 @@ export default function PlanCell({ day, slot, entries, mode, past, familySize, o
         <div
             ref={setNodeRef}
             data-testid={`cell-${weekdayKey(day)}-${slot}`}
-            className={`flex min-h-20 flex-col gap-1 rounded-lg border p-1 ${
+            className={`flex min-h-20 ${fill} flex-col gap-1 rounded-lg border p-0.5 ${
                 isOver
                     ? 'border-fuchsia-300 bg-fuchsia-400/10'
                     : target

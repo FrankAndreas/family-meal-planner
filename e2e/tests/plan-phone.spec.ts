@@ -13,7 +13,7 @@ test('plan a dinner on the phone, day by day', async ({ page, request }) => {
     await sheet.getByRole('button', { name: recipe.title }).click();
     await expect(sheet).toHaveCount(0);
     await expect(page.getByTestId('day-dinner')).toContainText(recipe.title);
-    await expect(page.getByText('1 of 28 planned')).toBeVisible();
+    await expect(page.getByText('1 of 14 planned')).toBeVisible();
 
     await page.getByRole('button', { name: 'Add to Sunday, Lunch' }).click();
     await page.getByRole('dialog', { name: 'Sunday, Lunch' }).getByRole('button', { name: 'Add a note' }).click();

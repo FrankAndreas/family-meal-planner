@@ -2,24 +2,19 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { errorMessage } from "../api";
-import i18next from "../i18n";
+import CategoryPicker from "../components/recipes/CategoryPicker";
 import IngredientEditor from "../components/recipes/IngredientEditor";
 import PhotoPicker, {
   type PhotoChoice,
 } from "../components/recipes/PhotoPicker";
-import type { Language } from "../i18n";
-import { fetchItem, type InboxItemDetail } from "../inbox";
+import { useRecipeToEdit } from "../hooks/useRecipeToEdit";
+import { isOtherLink } from "../links";
 import {
-  emptyRow,
-  ingredientsFrom,
-  rowInvalid,
-  rowsFrom,
-  type Row,
-} from "../ingredientRows";
-import { isOtherLink, isWebLink } from "../links";
-import { CATEGORIES, inOrder, type Category } from "../categories";
+  formInvalid,
+  recipeInputFrom,
+  type RecipeForm,
+} from "../recipeForm";
 import {
-  fetchRecipe,
   fetchTags,
   fetchUnits,
   photoFromLink,
@@ -27,36 +22,9 @@ import {
   removePhoto,
   saveRecipe,
   uploadPhoto,
-  type Recipe,
   type RecipeInput,
 } from "../recipes";
 import { BUTTON, BUTTON_SECONDARY, CARD, ERROR, FIELD, INPUT, PAGE } from "../ui";
-
-interface Form {
-  title: string;
-  servings: string;
-  servingsUnit: string;
-  prep: string;
-  cook: string;
-  tags: string;
-  steps: string;
-  notes: string;
-  source: string;
-}
-
-const EMPTY: Form = {
-  title: "",
-  servings: "4",
-  servingsUnit: "",
-  prep: "",
-  cook: "",
-  tags: "",
-  steps: "",
-  notes: "",
-  source: "",
-};
-const minutes = (text: string) =>
-  text.trim() === "" ? null : Math.max(0, Math.round(Number(text)));
 
 export default function RecipeEdit() {
   const { t } = useTranslation();
@@ -64,23 +32,25 @@ export default function RecipeEdit() {
   const [search] = useSearchParams();
   // A draft from the inbox: prefilled, with what the AI wasn't sure about listed on top
   const draftId = id ? null : search.get("entwurf");
-  const [draftItem, setDraftItem] = useState<InboxItemDetail | null>(null);
   const navigate = useNavigate();
-  const [form, setForm] = useState<Form>(EMPTY);
-  const [rows, setRows] = useState<Row[]>(() => [emptyRow()]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const toggleCategory = (category: Category) =>
-    setCategories((now) =>
-      now.includes(category) ? now.filter((c) => c !== category) : inOrder([...now, category]),
-    );
-  const [original, setOriginal] = useState<Recipe | null>(null);
+  const {
+    original,
+    draftItem,
+    form,
+    setForm,
+    rows,
+    setRows,
+    categories,
+    setCategories,
+    error,
+    setError,
+  } = useRecipeToEdit(id, draftId);
   const [units, setUnits] = useState<string[]>([]);
   const [knownTags, setKnownTags] = useState<string[]>([]);
   const [photo, setPhoto] = useState<PhotoChoice>({ kind: "keep" });
   // A new recipe saved while its photo failed: saving again updates it instead of making a second one
   const [createdId, setCreatedId] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
 
   useEffect(() => {
     fetchUnits()
@@ -91,81 +61,9 @@ export default function RecipeEdit() {
       .catch(() => {});
   }, []);
 
-  useEffect(() => {
-    if (!id) return;
-    // A late answer must not overwrite what someone already typed
-    let current = true;
-    fetchRecipe(id)
-      .then((recipe) => {
-        if (!current) return;
-        setOriginal(recipe);
-        setForm({
-          title: recipe.title,
-          servings: String(recipe.servings),
-          servingsUnit: recipe.servings_unit ?? "",
-          prep: recipe.prep_minutes === null ? "" : String(recipe.prep_minutes),
-          cook: recipe.cook_minutes === null ? "" : String(recipe.cook_minutes),
-          tags: recipe.tags.join(", "),
-          steps: recipe.steps.join("\n"),
-          notes: recipe.notes,
-          source: recipe.source_url ?? "",
-        });
-        setRows(rowsFrom(recipe.ingredients, i18next.language as Language));
-        setCategories(inOrder(recipe.categories));
-      })
-      .catch((err) => current && setError(errorMessage(err)));
-    return () => {
-      current = false;
-    };
-  }, [id]);
-
-  useEffect(() => {
-    if (!draftId) return;
-    let current = true;
-    fetchItem(draftId)
-      .then((item) => {
-        const draft = item.draft;
-        if (!draft || !current) return;
-        setDraftItem(item);
-        setForm({
-          title: draft.title,
-          servings: String(draft.servings),
-          servingsUnit: draft.servings_unit ?? "",
-          prep: draft.prep_minutes == null ? "" : String(draft.prep_minutes),
-          cook: draft.cook_minutes == null ? "" : String(draft.cook_minutes),
-          tags: draft.tags.join(", "),
-          steps: draft.steps.join("\n"),
-          notes: draft.notes ?? "",
-          source: draft.source_url ?? "",
-        });
-        setCategories(inOrder(draft.categories ?? []));
-        setRows(
-          rowsFrom(
-            draft.ingredients.map((i, n) => ({
-              ...i,
-              id: n,
-              group: null,
-              scaled_amount: i.amount,
-            })),
-            i18next.language as Language,
-          ),
-        );
-      })
-      .catch((err) => current && setError(errorMessage(err)));
-    return () => {
-      current = false;
-    };
-  }, [draftId]);
-
-  const set = (key: keyof Form) => (e: { target: { value: string } }) =>
+  const set = (key: keyof RecipeForm) => (e: { target: { value: string } }) =>
     setForm({ ...form, [key]: e.target.value });
-  const servings = Number(form.servings.replace(",", "."));
-  const invalid =
-    !form.title.trim() ||
-    !(servings > 0 && servings <= 100) ||
-    rows.some(rowInvalid) ||
-    (photo.kind === "link" && !isWebLink(photo.url)) ||
-    isOtherLink(form.source);
+  const invalid = formInvalid(form, rows, photo);
 
   const save = async (e: FormEvent) => {
     e.preventDefault();
@@ -173,25 +71,9 @@ export default function RecipeEdit() {
     setBusy(true);
     setError("");
     const body: RecipeInput = {
-      title: form.title.trim(),
-      servings,
-      servings_unit: form.servingsUnit.trim() || null,
-      prep_minutes: minutes(form.prep),
-      cook_minutes: minutes(form.cook),
-      ingredients: ingredientsFrom(rows),
-      steps: form.steps
-        .split("\n")
-        .map((s) => s.trim())
-        .filter(Boolean),
-      tags: form.tags
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean),
-      categories,
-      notes: form.notes,
+      ...recipeInputFrom(form, rows, categories),
       // Kept as they were: an imported recipe stays imported
       source_kind: original?.source_kind ?? "manual",
-      source_url: form.source.trim() || null,
       language: original?.language ?? draftItem?.draft?.language ?? null,
       ...(draftItem && !createdId ? { inbox_item_id: draftItem.id } : {}),
     };
@@ -330,35 +212,11 @@ export default function RecipeEdit() {
             ))}
           </datalist>
         </div>
-        <div
-          className="sm:col-span-2"
-          role="group"
-          aria-labelledby="categories-label"
-        >
-          <p id="categories-label" className={label}>
-            {t("recipes.categories")}
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {CATEGORIES.map((category) => {
-              const on = categories.includes(category);
-              return (
-                <button
-                  key={category}
-                  type="button"
-                  aria-pressed={on}
-                  onClick={() => toggleCategory(category)}
-                  className={`rounded-full border px-3 py-1 text-sm ${
-                    on
-                      ? "border-amber-300 bg-amber-300/15 text-white"
-                      : "border-white/10 text-slate-300 hover:bg-white/5"
-                  }`}
-                >
-                  {t(`recipes.category.${category}`)}
-                </button>
-              );
-            })}
-          </div>
-        </div>
+        <CategoryPicker
+          value={categories}
+          onChange={setCategories}
+          labelClass={label}
+        />
         <div className="sm:col-span-2">
           <label htmlFor="source" className={label}>
             {t("recipes.source")}

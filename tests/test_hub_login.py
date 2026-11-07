@@ -1,12 +1,15 @@
 """Logging in through the family hub, and the people the hub gives the planner (spec 2026-10-30). Invented people."""
 
+import threading
+import time
+
 import fake_hub
 import pytest
 from helpers import ADMIN, bearer, create_recipe, create_user, login, remove_from_hub
 from mails import build_mail
 from test_inbound import SECRET
 
-from app import database, models
+from app import database, hub, hub_people, models
 
 
 def me(client, headers=None, **kwargs):
@@ -51,7 +54,7 @@ def test_hub_down_503(client, family_hub):
     family_hub.down = True
     from app import hub
 
-    hub.forget()
+    hub.client.forget()
     response = me(client, headers)
     assert response.status_code == 503 and response.json()["detail"] == "hub_unavailable"
 
@@ -216,3 +219,54 @@ def test_the_people_list_asks_the_hub_now(client, family_hub):
     family_hub.access.discard("Lena")  # changed in the hub, without the app hearing about it
     assert "Lena" not in [u["name"] for u in client.get("/api/users", headers=admin).json()]
     assert [u["name"] for u in client.get("/api/users/removed", headers=admin).json()] == ["Lena"]
+
+
+# App integration review 2026-11-07: someone who only opens the planner never opens the hub, which renews a login. In
+# its last week the hub says so, and the page sends the browser through the hub once (frontend api.ts)
+def test_a_login_in_its_last_week_is_renewed_through_the_hub(client, family_hub):
+    assert "X-Hub-Renew" not in me(client, bearer(fake_hub.token(ADMIN))).headers
+    family_hub.renewing.add(ADMIN)
+    hub.client.forget()
+    assert me(client, bearer(fake_hub.token(ADMIN))).headers["X-Hub-Renew"] == "1"
+
+
+# App integration review 2026-11-07: a hub that stops answering just as someone's role changed is a 503, not an error
+def test_hub_gone_while_the_role_changes(client, family_hub, monkeypatch):
+    create_user(client, None, "Mama", role="PARENT")
+    family_hub.set_role("Mama", "CHILD")
+    hub_people.refresh(database.SessionLocal(), hub.Login(fake_hub.token(ADMIN)))
+
+    def people_down(path, headers):
+        if path.endswith("/people"):
+            raise hub.HubUnavailable("down")
+        return family_hub(path, headers)
+
+    monkeypatch.setattr(hub.client, "transport", people_down)
+    with database.SessionLocal() as db:
+        db.query(models.User).filter(models.User.name == "Mama").update({"role": models.UserRole.PARENT})
+        db.commit()
+    response = me(client, bearer(fake_hub.token("Mama")))
+    assert response.status_code == 503 and response.json()["detail"] == "hub_unavailable"
+
+
+# App integration review 2026-11-07 (as in the budget app): the first requests of someone given access come together;
+# the one that finds another refreshing waits for it instead of answering "no access"
+def test_a_new_persons_requests_at_the_same_moment(client, family_hub):
+    family_hub.add("Mia", "CHILD")
+    with hub_people._lock:
+        hub_people._running = True
+
+    def the_other_request():
+        time.sleep(0.2)
+        with database.SessionLocal() as db:
+            hub_people._apply(db, hub.client.fetch_people(hub.Login(fake_hub.token("Mia"))))
+        with hub_people._lock:
+            hub_people._running = False
+            hub_people._lock.notify_all()
+
+    other = threading.Thread(target=the_other_request)
+    other.start()
+    try:
+        assert me(client, bearer(fake_hub.token("Mia"))).status_code == 200
+    finally:
+        other.join()

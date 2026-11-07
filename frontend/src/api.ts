@@ -1,6 +1,6 @@
 import axios from 'axios';
 import i18n from './i18n';
-import { loginAddress, type HubLinks } from './hubAddress';
+import { loginAddress, renewNow, type HubLinks } from './hubAddress';
 
 // Same origin: Vite (dev, browser tests) or nginx (Docker) forwards /api to the backend, and the login is the family
 // hub's cookie, which the browser sends by itself. The backend takes changes made with the cookie only with this header
@@ -34,6 +34,22 @@ export async function hubLinks(): Promise<HubLinks> {
 export async function goToHub(next: string | null = window.location.href): Promise<void> {
     const address = loginAddress(await hubLinks(), next);
     if (address) window.location.href = address;
+}
+
+// The browser's storage, if it may be used (blocked site data, private windows: null)
+function storage(): Storage | null {
+    try {
+        return window.localStorage;
+    } catch {
+        return null;
+    }
+}
+
+// The hub login is in its last week: through the hub once (hubAddress.renewNow), which sends the browser back here
+export function renewsAtHub(headers: Record<string, unknown>): boolean {
+    if (!renewNow(headers, storage())) return false;
+    void goToHub();
+    return true;
 }
 
 // "Log out": the hub ends the login, for the planner and every other family app, then shows its login (back here after)

@@ -3,7 +3,7 @@ import { errorCode, errorStatus, goToHubLogout } from './api';
 import { applyLanguage } from './i18n';
 import { guestLanguage } from './language';
 import type { User } from './types';
-import { fetchMe } from './users';
+import { fetchMe, fetchMeOrRenew } from './users';
 
 // in: logged in; no_access: logged in at the hub, but not ticked for the planner; hub_unavailable: the hub doesn't
 // answer; away: on the way to the hub's login (the API's 401 sends the browser there)
@@ -39,7 +39,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     useEffect(() => {
         const check = async () => {
             try {
-                await loadUser();
+                const me = await fetchMeOrRenew();
+                if (!me) {
+                    setState('away');
+                    return;
+                }
+                applyLanguage(me.language);
+                setUser(me);
                 setState('in');
             } catch (error) {
                 // 401: the API has sent the browser to the hub's login. Anything else but "no access" (the hub down, a
@@ -51,7 +57,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
         };
         void check();
-    }, [loadUser, attempt]);
+    }, [attempt]);
 
     const logout = useCallback(async () => {
         await goToHubLogout();

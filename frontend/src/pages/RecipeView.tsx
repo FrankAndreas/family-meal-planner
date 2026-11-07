@@ -1,4 +1,3 @@
-import { format, parseISO } from "date-fns";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -7,58 +6,27 @@ import {
   useParams,
   useSearchParams,
 } from "react-router-dom";
-import { formatAmount } from "../amounts";
 import { fetchAiEnabled } from "../ai";
 import { errorMessage } from "../api";
 import { useAuth } from "../AuthContext";
-import PeopleStepper from "../components/recipes/PeopleStepper";
+import IngredientList from "../components/recipes/IngredientList";
 import PlanRecipeDialog from "../components/recipes/PlanRecipeDialog";
 import { RecipeThumb } from "../components/recipes/RecipeCard";
+import RecipeFacts from "../components/recipes/RecipeFacts";
+import RecipeSteps from "../components/recipes/RecipeSteps";
 import Stars from "../components/recipes/Stars";
-import type { Language } from "../i18n";
-import { isWebLink, siteName } from "../links";
-import { type PlanEntry, type Slot, weekdayKey } from "../plan";
+import { usePlaceText } from "../hooks/usePlaceText";
+import { useRecipe, useRecipeDates } from "../hooks/useRecipe";
+import type { PlanEntry } from "../plan";
 import {
   categorize,
-  defaultPeople,
   deleteRecipe,
   favoriteRecipe,
-  fetchEatenOn,
-  fetchPlannedFor,
-  fetchRecipe,
-  type Ingredient,
   rateRecipe,
-  type Recipe,
   translateRecipe,
 } from "../recipes";
-import { fetchSettings } from "../settings";
+import { withOriginal } from "../recipeView";
 import { BUTTON, BUTTON_SECONDARY, CARD, ERROR, PAGE } from "../ui";
-
-function IngredientLine({ ingredient }: { ingredient: Ingredient }) {
-  const { t, i18n } = useTranslation();
-  const amount = ingredient.scaled_amount;
-  const parts = [
-    amount === null ? "" : formatAmount(amount, i18n.language as Language),
-    ingredient.unit ? t(`units.${ingredient.unit}` as "units.g") : "",
-    ingredient.name,
-  ].filter(Boolean);
-  return (
-    <li className="flex gap-2 py-1">
-      <span>{parts.join(" ")}</span>
-      {ingredient.note && (
-        <span className="text-slate-400">({ingredient.note})</span>
-      )}
-    </li>
-  );
-}
-
-// How a recipe from the inbox came in
-const SOURCE_TEXT = {
-  mail: "recipes.sourceByMail",
-  url: "recipes.sourceByLink",
-  scan: "recipes.sourceByScan",
-  text: "recipes.sourceByText",
-} as const;
 
 export default function RecipeView() {
   const { t } = useTranslation();
@@ -66,89 +34,21 @@ export default function RecipeView() {
   const navigate = useNavigate();
   const [search] = useSearchParams();
   const { user } = useAuth();
-  const [recipe, setRecipe] = useState<Recipe | null>(null);
-  const [people, setPeople] = useState<number | null>(
-    Number(search.get("personen")) || null,
-  );
-  const [error, setError] = useState("");
-  const [eatenOn, setEatenOn] = useState<string[]>([]);
+  const { recipe, people, setPeople, error, setError, reload, change } =
+    useRecipe(id!, Number(search.get("personen")) || null);
+  const { eatenOn, planned, refreshPlanned } = useRecipeDates(id!);
+  const place = usePlaceText();
   const [showOriginal, setShowOriginal] = useState(false);
   const [translating, setTranslating] = useState(false);
   const [aiOn, setAiOn] = useState(false);
   const [categorizing, setCategorizing] = useState(false);
   const [planning, setPlanning] = useState(false);
   const [justPlanned, setJustPlanned] = useState<PlanEntry | null>(null);
-  // Where it's planned from today on, so nobody plans it twice by accident; asked again after planning
-  const [planned, setPlanned] = useState<{ date: string; slot: Slot }[]>([]);
-  const [plannedVersion, setPlannedVersion] = useState(0);
   const planButton = useRef<HTMLButtonElement>(null);
-
-  useEffect(() => {
-    let current = true;
-    fetchEatenOn(id!)
-      .then((days) => current && setEatenOn(days))
-      .catch(() => {});
-    return () => {
-      current = false;
-    };
-  }, [id]);
-
-  useEffect(() => {
-    let current = true;
-    fetchPlannedFor(id!)
-      .then((found) => current && setPlanned(found))
-      .catch(() => {});
-    return () => {
-      current = false;
-    };
-  }, [id, plannedVersion]);
 
   const closePlanning = () => {
     setPlanning(false);
     planButton.current?.focus();
-  };
-
-  // First load without people, to learn the recipe's own yield; then every change of people asks again
-  useEffect(() => {
-    let current = true;
-    const load = async () => {
-      let wanted = people;
-      if (wanted === null) {
-        const [plain, settings] = await Promise.all([
-          fetchRecipe(id!),
-          fetchSettings(),
-        ]);
-        wanted = defaultPeople(plain, settings.family_size);
-        if (!current) return;
-        setPeople(wanted);
-      }
-      const scaled = await fetchRecipe(id!, wanted);
-      if (current) setRecipe(scaled);
-    };
-    load().catch((err) => current && setError(errorMessage(err)));
-    return () => {
-      current = false;
-    };
-  }, [id, people]);
-
-  const change = async (action: () => Promise<{ data: Recipe }>) => {
-    setError("");
-    try {
-      const changed = (await action()).data;
-      // The answer is unscaled: keep the amounts of whatever people the view shows by now
-      setRecipe((shown) =>
-        shown
-          ? {
-              ...changed,
-              ingredients: shown.ingredients,
-              people: shown.people,
-              factor: shown.factor,
-            }
-          : changed,
-      );
-    } catch (err) {
-      setError(errorMessage(err));
-    }
   };
 
   const remove = async () => {
@@ -173,7 +73,7 @@ export default function RecipeView() {
     setError("");
     try {
       await categorize(recipe!.id);
-      setRecipe(await fetchRecipe(recipe!.id, people));
+      await reload();
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -186,7 +86,7 @@ export default function RecipeView() {
     setError("");
     try {
       await translateRecipe(recipe!.id);
-      setRecipe(await fetchRecipe(recipe!.id, people));
+      await reload();
       setShowOriginal(false);
     } catch (err) {
       setError(errorMessage(err));
@@ -202,38 +102,11 @@ export default function RecipeView() {
       <p className="text-slate-400">{t("common.loading")}</p>
     );
 
-  // The text before the translation, with today's amounts (they never change in a translation)
-  const shown: Recipe =
-    showOriginal && recipe.original
-      ? {
-          ...recipe,
-          title: recipe.original.title,
-          steps: recipe.original.steps,
-          notes: recipe.original.notes,
-          ingredients: recipe.ingredients.map((i, n) => ({
-            ...i,
-            ...(recipe.original!.ingredients[n] ?? {}),
-          })),
-        }
-      : recipe;
+  const shown = showOriginal ? withOriginal(recipe) : recipe;
   // Not in the family's language (or unknown, from outside; the backend knows DEFAULT_LANGUAGE): parents can have
   // it translated
   const canTranslate = user?.role === "PARENT" && !recipe.deleted && recipe.translate_into !== null;
   const canCategorize = user?.role === "PARENT" && aiOn && !recipe.deleted && recipe.categories.length === 0;
-
-  const place = (day: string, slot: Slot) =>
-    t("plan.place", {
-      day: `${t(`weekdays.${weekdayKey(day)}`)} ${format(parseISO(day), "d.M.")}`,
-      slot: t(`plan.slots.${slot}`),
-    });
-
-  // Ingredients under their headings, in order
-  const groups: { name: string | null; items: Ingredient[] }[] = [];
-  for (const ingredient of shown.ingredients) {
-    const last = groups[groups.length - 1];
-    if (last && last.name === ingredient.group) last.items.push(ingredient);
-    else groups.push({ name: ingredient.group, items: [ingredient] });
-  }
 
   return (
     <article className={`${PAGE} space-y-6`}>
@@ -245,101 +118,7 @@ export default function RecipeView() {
         />
         <div className="space-y-3">
           <h1 className="text-3xl">{shown.title}</h1>
-          <div className="flex flex-wrap gap-2 text-sm text-slate-400">
-            {recipe.prep_minutes !== null && (
-              <span>{t("recipes.prep", { count: recipe.prep_minutes })}</span>
-            )}
-            {recipe.cook_minutes !== null && (
-              <span>{t("recipes.cook", { count: recipe.cook_minutes })}</span>
-            )}
-            {recipe.servings_unit && (
-              <span>
-                {t("recipes.yields", {
-                  amount: recipe.servings,
-                  unit: recipe.servings_unit,
-                })}
-              </span>
-            )}
-          </div>
-          {(recipe.source_url || recipe.source_mail) && (
-            <p className="text-sm text-slate-300">
-              {t("recipes.sourceLabel")}{" "}
-              {recipe.source_url &&
-                (isWebLink(recipe.source_url) ? (
-                  <a
-                    href={recipe.source_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-cyan-300 underline"
-                  >
-                    {siteName(recipe.source_url)}
-                    <span aria-hidden> ↗</span>
-                  </a>
-                ) : (
-                  recipe.source_url
-                ))}
-              {recipe.source_url && recipe.source_mail && " · "}
-              {recipe.source_mail &&
-                t(SOURCE_TEXT[recipe.source_mail.kind], {
-                  name: recipe.source_mail.user_name ?? "?",
-                  date: format(
-                    parseISO(`${recipe.source_mail.received_at}Z`),
-                    "d.M.yyyy",
-                  ),
-                })}
-            </p>
-          )}
-          {recipe.last_eaten ? (
-            <details className="text-sm text-slate-300">
-              <summary className="cursor-pointer">
-                {t("recipes.lastEatenOn", {
-                  date: format(parseISO(recipe.last_eaten), "d.M.yyyy"),
-                  count: recipe.times_eaten,
-                })}
-              </summary>
-              <ul className="mt-1 flex flex-wrap gap-x-3 text-slate-400">
-                {eatenOn.map((day) => (
-                  <li key={day}>{format(parseISO(day), "d.M.yyyy")}</li>
-                ))}
-              </ul>
-            </details>
-          ) : (
-            <p className="text-sm text-slate-400">{t("recipes.neverEaten")}</p>
-          )}
-          {planned.length > 0 && (
-            <p className="text-sm text-cyan-200" data-testid="planned-ahead">
-              {t("plan.plannedAhead", {
-                places: planned.map((p) => place(p.date, p.slot)).join(" · "),
-              })}
-            </p>
-          )}
-          {recipe.categories.length > 0 && (
-            <ul
-              aria-label={t("recipes.categories")}
-              className="flex flex-wrap gap-2"
-            >
-              {recipe.categories.map((category) => (
-                <li
-                  key={category}
-                  className="rounded-full border border-amber-300/40 px-2 py-0.5 text-xs text-amber-100"
-                >
-                  {t(`recipes.category.${category}`)}
-                </li>
-              ))}
-            </ul>
-          )}
-          {recipe.tags.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {recipe.tags.map((tag) => (
-                <span
-                  key={tag}
-                  className="rounded-full bg-white/10 px-2 py-0.5 text-xs"
-                >
-                  {tag}
-                </span>
-              ))}
-            </div>
-          )}
+          <RecipeFacts recipe={recipe} eatenOn={eatenOn} planned={planned} />
           {!recipe.deleted && (
             <div className="flex flex-wrap items-center gap-3">
               <Stars
@@ -458,51 +237,17 @@ export default function RecipeView() {
           onPlanned={(entry) => {
             closePlanning();
             setJustPlanned(entry);
-            setPlannedVersion((v) => v + 1);
+            refreshPlanned();
           }}
         />
       )}
       <div className="grid gap-6 md:grid-cols-[minmax(16rem,1fr)_2fr]">
-        <section className={`${CARD} space-y-3`}>
-          <h2 className="text-lg">{t("recipes.ingredients")}</h2>
-          {people !== null && (
-            <PeopleStepper value={people} onChange={setPeople} />
-          )}
-          <ul
-            aria-label={t("recipes.ingredients")}
-            className="divide-y divide-white/5"
-          >
-            {groups.map((group, n) => [
-              group.name && (
-                <li
-                  key={`g${n}`}
-                  className="pt-3 text-sm font-semibold text-cyan-200"
-                >
-                  {group.name}
-                </li>
-              ),
-              ...group.items.map((item) => (
-                <IngredientLine key={item.id} ingredient={item} />
-              )),
-            ])}
-          </ul>
-        </section>
-        <section className={`${CARD} space-y-3`}>
-          <h2 className="text-lg">{t("recipes.steps")}</h2>
-          <ol
-            aria-label={t("recipes.steps")}
-            className="list-decimal space-y-3 pl-5"
-          >
-            {shown.steps.map((step, n) => (
-              <li key={n} className="leading-relaxed">
-                {step}
-              </li>
-            ))}
-          </ol>
-          {shown.notes && (
-            <p className="whitespace-pre-line text-slate-300">{shown.notes}</p>
-          )}
-        </section>
+        <IngredientList
+          ingredients={shown.ingredients}
+          people={people}
+          onPeople={setPeople}
+        />
+        <RecipeSteps steps={shown.steps} notes={shown.notes} />
       </div>
       {/* Rarely needed, so away from the everyday actions at the top */}
       {user?.role === "PARENT" && !recipe.deleted && (

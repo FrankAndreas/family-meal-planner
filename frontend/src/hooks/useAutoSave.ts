@@ -49,19 +49,22 @@ export function useAutoSave<T extends object>(options: AutoSaveOptions<T>) {
     // The answer is applied here, whichever way it was sent
     const settle = useCallback(
         async (fields: Partial<T>, sentAt: Map<keyof T, number>, request: () => Promise<T>) => {
+            let saved: T;
             try {
-                const saved = await request();
-                sending.current -= 1;
-                latest.current.onSaved?.(saved, fields, (key) => versions.current.get(key) !== sentAt.get(key));
-                setError('');
-                // Only "saved" once nothing else waits
-                if (!waiting()) setStatus('saved');
+                saved = await request();
             } catch (err) {
                 sending.current -= 1;
                 pending.current = { ...fields, ...pending.current };
                 setError(errorMessage(err));
                 setStatus('idle');
+                return;
             }
+            sending.current -= 1;
+            setError('');
+            // Only "saved" once nothing else waits
+            if (!waiting()) setStatus('saved');
+            // After the bookkeeping, so a caller's mistake here can't count a save twice
+            latest.current.onSaved?.(saved, fields, (key) => versions.current.get(key) !== sentAt.get(key));
         },
         [waiting],
     );

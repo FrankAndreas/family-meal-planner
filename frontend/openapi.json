@@ -3399,7 +3399,8 @@
           "error",
           "recipe_id",
           "draft",
-          "ai_raw"
+          "ai_raw",
+          "text"
         ],
         "title": "InboxItemDetail"
       },
@@ -4269,7 +4270,8 @@
           "factor",
           "inbox_item_id",
           "source_mail",
-          "original"
+          "original",
+          "translate_into"
         ],
         "title": "RecipeOut"
       },

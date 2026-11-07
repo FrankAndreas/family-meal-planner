@@ -1277,7 +1277,7 @@ export interface components {
             /** Ai Raw */
             ai_raw: string | null;
             /** Text */
-            text?: string | null;
+            text: string | null;
         };
         /** InboxItemOut */
         InboxItemOut: {
@@ -1539,7 +1539,7 @@ export interface components {
             source_mail: components["schemas"]["SourceMail"] | null;
             original: components["schemas"]["Original"] | null;
             /** Translate Into */
-            translate_into?: ("de" | "en") | null;
+            translate_into: ("de" | "en") | null;
         };
         /** RecipeSummary */
         RecipeSummary: {

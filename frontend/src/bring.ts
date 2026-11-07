@@ -8,9 +8,9 @@ export type BringList = Schemas['BringListOut'];
 export const fetchBring = async () => (await api.get<BringLogin>('/api/bring')).data;
 
 export const bringLogin = async (email: string, password: string) =>
-    (await api.post<{ lists: BringList[] }>('/api/bring/login', { email, password })).data.lists;
+    (await api.post<Schemas['BringListsOut']>('/api/bring/login', { email, password })).data.lists;
 
-export const fetchBringLists = async () => (await api.get<{ lists: BringList[] }>('/api/bring/lists')).data.lists;
+export const fetchBringLists = async () => (await api.get<Schemas['BringListsOut']>('/api/bring/lists')).data.lists;
 
 export const chooseBringList = async (uuid: string) => (await api.put<BringLogin>('/api/bring/list', { uuid })).data;
 

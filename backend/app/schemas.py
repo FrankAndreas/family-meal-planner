@@ -240,7 +240,7 @@ class RecipeOut(RecipeSummary):
     inbox_item_id: int | None
     source_mail: SourceMail | None
     original: Original | None
-    translate_into: Language | None = None
+    translate_into: Language | None
 
 
 class TagCount(BaseModel):
@@ -399,7 +399,7 @@ class InboxItemDetail(InboxItemOut):
     draft: dict | None
     ai_raw: str | None
     # A pasted text, as it was pasted
-    text: str | None = None
+    text: str | None
 
 
 class CategorizeIn(BaseModel):

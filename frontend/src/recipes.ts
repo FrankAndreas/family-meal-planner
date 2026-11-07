@@ -1,13 +1,18 @@
 import api from './api';
 import type { Schemas } from './apiTypes';
 import type { Category } from './categories';
-import type { Slot } from './plan';
 
 // The backend's bodies (backend/app/schemas.py), generated
 export type RecipeSummary = Schemas['RecipeSummary'];
 export type Ingredient = Schemas['IngredientOut'];
 export type Recipe = Schemas['RecipeOut'];
-export type RecipeInput = Schemas['RecipeIn'];
+// What the recipe form saves: every field, also those the backend has a default for. A save replaces the whole
+// recipe (PUT), so a field left out would quietly be reset; only the inbox item is optional
+export type IngredientInput = Required<Schemas['IngredientIn']>;
+export type RecipeInput = Required<Omit<Schemas['RecipeIn'], 'ingredients' | 'inbox_item_id'>> & {
+    ingredients: IngredientInput[];
+    inbox_item_id?: number;
+};
 export type TagCount = Schemas['TagCount'];
 
 export interface RecipeFilter {
@@ -48,7 +53,7 @@ export const removePhoto = (id: number) => api.delete(`/api/recipes/${id}/photo`
 // The days it was eaten, newest first, and where it is planned from today on
 export const fetchEatenOn = async (id: number | string) => (await api.get<string[]>(`/api/recipes/${id}/history`)).data;
 export const fetchPlannedFor = async (id: number | string) =>
-    (await api.get<{ date: string; slot: Slot }[]>(`/api/recipes/${id}/planned`)).data;
+    (await api.get<Schemas['PlannedOut'][]>(`/api/recipes/${id}/planned`)).data;
 
 // A stored photo's address, by its name (a draft's photo before it belongs to a recipe)
 export const photoPath = (name: string) => `/api/photos/${name}`;
@@ -62,9 +67,9 @@ export const defaultPeople = (recipe: RecipeSummary, familySize: number) =>
 
 // How many recipes without categories the AI hasn't sorted yet (parents)
 export const fetchUncategorized = async () =>
-    (await api.get<{ remaining: number }>('/api/recipes/categorize')).data.remaining;
+    (await api.get<Schemas['CategorizeLeft']>('/api/recipes/categorize')).data.remaining;
 
 // The AI sorts one recipe, or the next batch of recipes without categories (parents)
 export const categorize = async (recipeId?: number) =>
-    (await api.post<{ categorized: number; remaining: number }>('/api/recipes/categorize', { recipe_id: recipeId ?? null }))
+    (await api.post<Schemas['CategorizeOut']>('/api/recipes/categorize', { recipe_id: recipeId ?? null }))
         .data;

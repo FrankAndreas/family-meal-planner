@@ -1,13 +1,13 @@
 import api, { fetchBlob } from './api';
 import type { Schemas } from './apiTypes';
 import type { Category } from './categories';
-import type { RecipeInput } from './recipes';
 
 export type InboxItem = Schemas['InboxItemOut'];
 export type InboxStatus = InboxItem['status'];
 export type Attachment = Schemas['Attachment'];
 
-export type Draft = Omit<RecipeInput, 'ingredients' | 'categories'> & {
+// As the importer made it (jsonld.py, ai.py): never with a source_kind or an inbox item, maybe without times
+export type Draft = Omit<Schemas['RecipeIn'], 'ingredients' | 'categories' | 'source_kind' | 'inbox_item_id'> & {
     // Missing in drafts made before there were categories
     categories?: Category[];
     ingredients: { amount: number | null; unit: string | null; name: string; note: string }[];

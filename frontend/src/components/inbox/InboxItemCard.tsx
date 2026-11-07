@@ -1,7 +1,7 @@
 import { format, parseISO } from 'date-fns';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { type InboxItem, isImage } from '../../inbox';
+import { attachmentPath, type InboxItem, isImage } from '../../inbox';
 import { BUTTON, BUTTON_DANGER, BUTTON_SECONDARY } from '../../ui';
 import AuthImage from '../AuthImage';
 
@@ -52,7 +52,7 @@ export default function InboxItemCard({ item, parent, onProcess, onDiscard }: In
                     {item.attachments.filter(isImage).map((a) => (
                         <AuthImage
                             key={a.index}
-                            src={`/api/inbox/${item.id}/attachments/${a.index}/thumb`}
+                            src={attachmentPath(item.id, a.index, true)}
                             alt={a.name}
                             className="h-24 w-24 rounded-lg object-cover"
                         />

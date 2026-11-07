@@ -58,4 +58,7 @@ export const addScan = (photos: Blob[]) => {
 };
 // The mail as it arrived, to download (parents)
 export const fetchRawMail = (id: number | string) => fetchBlob(`/api/inbox/${id}/raw`);
+// A picture of a mail or scan, or its small preview; for AuthImage (only logged-in people may see them)
+export const attachmentPath = (id: number, index: number, thumb = false) =>
+    `/api/inbox/${id}/attachments/${index}${thumb ? '/thumb' : ''}`;
 export const isImage = (a: Attachment) => a.type.startsWith('image/');

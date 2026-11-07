@@ -118,6 +118,9 @@ export const fetchEatenOn = async (id: number | string) => (await api.get<string
 export const fetchPlannedFor = async (id: number | string) =>
     (await api.get<{ date: string; slot: Slot }[]>(`/api/recipes/${id}/planned`)).data;
 
+// A stored photo's address, by its name (a draft's photo before it belongs to a recipe)
+export const photoPath = (name: string) => `/api/photos/${name}`;
+
 export const fetchTags = async () => (await api.get<{ name: string; count: number }[]>('/api/tags')).data;
 export const fetchUnits = async () => (await api.get<string[]>('/api/units')).data;
 

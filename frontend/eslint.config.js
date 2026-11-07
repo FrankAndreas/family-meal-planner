@@ -21,16 +21,17 @@ export default defineConfig([
     },
   },
   {
-    // Pages and components get their data through the modules in src (plan.ts, recipes.ts, ...), never the HTTP
-    // client itself: one place per backend route, and its types next to it
-    files: ['src/pages/**', 'src/components/**', 'src/AuthContext.tsx'],
+    // The React side (pages, components, hooks) gets its data through the modules in src (plan.ts, recipes.ts, ...),
+    // never an HTTP client itself: one place per backend route, and its types next to it
+    files: ['src/**/*.tsx', 'src/hooks/**'],
     rules: {
       'no-restricted-imports': [
         'error',
         {
+          paths: [{ name: 'axios', allowTypeImports: true, message: 'Call the backend through a module in src.' }],
           patterns: [
             {
-              regex: '^(\\.\\./)+api$|^\\./api$',
+              regex: '(^|/)api(\\.ts)?$',
               importNames: ['default'],
               message: 'Call the backend through a module in src (plan.ts, recipes.ts, ...), not the api client.',
             },
@@ -40,6 +41,11 @@ export default defineConfig([
       'no-restricted-globals': [
         'error',
         { name: 'fetch', message: 'Call the backend through a module in src (e.g. settings.ts), not fetch.' },
+      ],
+      'no-restricted-properties': [
+        'error',
+        { object: 'window', property: 'fetch', message: 'Call the backend through a module in src, not fetch.' },
+        { object: 'globalThis', property: 'fetch', message: 'Call the backend through a module in src, not fetch.' },
       ],
     },
   },

@@ -23,6 +23,7 @@ import {
   fetchTags,
   fetchUnits,
   photoFromLink,
+  photoPath,
   removePhoto,
   saveRecipe,
   uploadPhoto,
@@ -380,9 +381,7 @@ export default function RecipeEdit() {
           <PhotoPicker
             current={
               original?.photo_url ??
-              (draftItem?.draft?.photo
-                ? `/api/photos/${draftItem.draft.photo}`
-                : null)
+              (draftItem?.draft?.photo ? photoPath(draftItem.draft.photo) : null)
             }
             choice={photo}
             onChange={setPhoto}

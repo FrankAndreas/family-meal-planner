@@ -1,6 +1,5 @@
-import axios from 'axios';
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
-import { errorCode, goToHubLogout } from './api';
+import { errorCode, errorStatus, goToHubLogout } from './api';
 import { applyLanguage } from './i18n';
 import { guestLanguage } from './language';
 import type { User } from './types';
@@ -46,7 +45,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 // 401: the API has sent the browser to the hub's login. Anything else but "no access" (the hub down, a
                 // NAS restarting) says so and offers to try again
                 const code = errorCode(error);
-                const away = axios.isAxiosError(error) && error.response?.status === 401;
+                const away = errorStatus(error) === 401;
                 setState(code === 'no_access' ? 'no_access' : away ? 'away' : 'hub_unavailable');
                 applyLanguage(await guestLanguage());
             }

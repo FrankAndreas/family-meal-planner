@@ -46,6 +46,10 @@ export async function goToHubLogout(): Promise<void> {
         : `${logout_url}?next=${encodeURIComponent(window.location.origin)}`;
 }
 
+// The answer's HTTP status, if the backend answered at all
+export const errorStatus = (error: unknown): number | undefined =>
+    axios.isAxiosError(error) ? error.response?.status : undefined;
+
 // The code of an error the app acts on (no_access, hub_unavailable)
 export function errorCode(error: unknown): string | undefined {
     const detail = axios.isAxiosError(error) ? error.response?.data?.detail : undefined;

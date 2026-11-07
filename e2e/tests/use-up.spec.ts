@@ -60,7 +60,6 @@ test('a parent edits the basics and a missing one disappears', async ({ page, re
         const basics = page.getByLabel('Always at home');
         await basics.fill(spice);
         await basics.press('Enter');
-        await page.getByRole('button', { name: 'Save family settings' }).click();
         await expect(page.getByText('Saved')).toBeVisible();
 
         await page.goto('/rezepte');

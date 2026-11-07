@@ -11,6 +11,7 @@ const en: typeof de = {
         edit: 'Edit',
         add: 'Add',
         saved: 'Saved',
+        saving: 'Saving…',
     },
     nav: {
         plan: 'Week plan',
@@ -105,7 +106,6 @@ const en: typeof de = {
         staples: 'Always at home',
         staplesHint: 'Never shown as missing, e.g. salt and pepper.',
         weekStart: 'First day of the week',
-        saveFamily: 'Save family settings',
         members: 'Family members',
         confirmDelete: 'Really delete the stars, favourites and mail addresses of {{name}}?',
         inHub: 'Your language, your PIN and logging out on every device are in the family hub.',
@@ -158,6 +158,10 @@ const en: typeof de = {
         rate_one: 'Rate {{count}} star',
         rate_other: 'Rate {{count}} stars',
         ratingShown: '{{value}} of 5 stars',
+        familyAverage_one: 'Family: {{value}} of 5 stars, 1 rating',
+        familyAverage_other: 'Family average: {{value}} of 5 stars, {{count}} ratings',
+        averageOf_one: '1 rating',
+        averageOf_other: 'avg of {{count}}',
         ratingsBy: 'Ratings',
         favorite: 'Favourite',
         delete: 'Delete recipe',
@@ -238,6 +242,10 @@ const en: typeof de = {
     useUp: {
         tabs: { search: 'Search', use_up: '🧺 What do I have?' },
         modes: { use_up: 'Use up', cook_now: 'Cook now' },
+        explain: {
+            use_up: 'Recipes that use as much of it as possible, even if something is missing.',
+            cook_now: 'Recipes missing at most {{max}} ingredients: cook without a big shop. What’s always at home doesn’t count as missing.',
+        },
         ingredient: 'What’s at home?',
         placeholder: 'e.g. potatoes',
         hint: 'Type what’s at home, e.g. what needs using soon.',
@@ -295,7 +303,7 @@ const en: typeof de = {
         slots: { breakfast: 'Breakfast', snack: 'Snacks', lunch: 'Lunch', dinner: 'Dinner' },
         suggestFor: 'For',
         allSlots: 'All',
-        tabs: { favorites: '★ Favourites', long_ago: 'Long ago', new: 'New', again: 'Plan again?' },
+        tabs: { favorites: '★ Favourites', long_ago: 'Long ago', new: 'New', again: 'Skipped' },
         empty: {
             favorites: 'No favourites yet. Mark recipes with ♥.',
             long_ago: 'Recipes you haven’t had for a while show up here.',
@@ -332,6 +340,7 @@ const en: typeof de = {
     },
     history: {
         none: 'No past weeks yet.',
+        howTo: 'Weeks you planned show up here once they are over. Close a week, and it also shows what you really ate.',
         closed: 'closed',
         older: 'Load older weeks',
     },

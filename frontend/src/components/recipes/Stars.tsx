@@ -5,15 +5,17 @@ interface StarsProps {
     // Without onChange the stars are only shown; tapping the current value again removes the rating
     onChange?: (stars: number | null) => void;
     size?: 'sm' | 'lg';
+    // What the shown stars stand for, for screen readers (default: just the value)
+    label?: string;
 }
 
-export default function Stars({ value, onChange, size = 'sm' }: StarsProps) {
+export default function Stars({ value, onChange, size = 'sm', label }: StarsProps) {
     const { t } = useTranslation();
     const filled = Math.round(value ?? 0);
     const text = size === 'lg' ? 'text-3xl' : 'text-sm';
     if (!onChange) {
         return (
-            <span className={`${text} tracking-tight text-amber-300`} aria-label={t('recipes.ratingShown', { value: value ?? 0 })}>
+            <span role="img" className={`${text} tracking-tight text-amber-300`} aria-label={label ?? t('recipes.ratingShown', { value: value ?? 0 })}>
                 {[1, 2, 3, 4, 5].map((n) => (
                     <span key={n} className={n <= filled ? '' : 'text-slate-600'}>
                         ★

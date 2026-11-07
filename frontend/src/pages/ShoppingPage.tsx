@@ -20,7 +20,7 @@ import {
     type ShoppingLine,
     type ShoppingList,
 } from '../shopping';
-import { BUTTON, BUTTON_SECONDARY, CARD, ERROR, FIELD } from '../ui';
+import { BUTTON, BUTTON_SECONDARY, CARD, ERROR, FIELD, PAGE } from '../ui';
 
 // The shared shopping list (spec 2026-11-06): pick the week's meals, drop or add items, send them to Bring!
 export default function ShoppingPage() {
@@ -153,13 +153,13 @@ export default function ShoppingPage() {
     );
 
     if (list === undefined || weekStart === null) {
-        return <div className="mx-auto max-w-3xl space-y-4">{feedback}</div>;
+        return <div className={`${PAGE} space-y-4`}>{feedback}</div>;
     }
 
     if (list === null) {
         return (
-            <div className="mx-auto max-w-3xl space-y-4">
-                <h1 className="text-xl">{t('shopping.title')}</h1>
+            <div className={`${PAGE} space-y-4`}>
+                <h1 className="text-2xl">{t('shopping.title')}</h1>
                 {feedback}
                 <div className={CARD}>
                     <button type="button" className={BUTTON} disabled={busy} onClick={() => run(() => startShopping(weekStart))}>
@@ -177,8 +177,8 @@ export default function ShoppingPage() {
             run(() => startShopping(weekStart, true));
         };
         return (
-            <div className="mx-auto max-w-3xl space-y-4">
-                <h1 className="text-xl">{t('shopping.title')}</h1>
+            <div className={`${PAGE} space-y-4`}>
+                <h1 className="text-2xl">{t('shopping.title')}</h1>
                 {feedback}
                 <div className={`${CARD} space-y-3`}>
                     <p>{t('shopping.otherWeek', { week: range(list.week_start, list.week_end) })}</p>
@@ -239,9 +239,9 @@ export default function ShoppingPage() {
     };
 
     return (
-        <div className="mx-auto max-w-3xl space-y-4">
+        <div className={`${PAGE} space-y-4`}>
             <div className="flex flex-wrap items-baseline gap-x-3">
-                <h1 className="text-xl">
+                <h1 className="text-2xl">
                     {t('shopping.title')} · {range(list.week_start, list.week_end)}
                 </h1>
                 <p className="text-sm text-slate-400">

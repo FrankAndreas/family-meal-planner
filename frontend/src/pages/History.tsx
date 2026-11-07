@@ -5,9 +5,9 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import api, { errorMessage } from '../api';
 import { type PlanEntry, type Week, weekdayKey } from '../plan';
-import { BUTTON_SECONDARY, CARD, ERROR } from '../ui';
+import { BUTTON_SECONDARY, CARD, ERROR, PAGE } from '../ui';
 
-const PAGE = 8;
+const WEEKS_PER_LOAD = 8;
 
 function Entry({ entry }: { entry: PlanEntry }) {
     if (!entry.recipe) return <span className="italic text-slate-400">{entry.note}</span>;
@@ -25,14 +25,16 @@ export default function History() {
     const locale = i18n.language === 'de' ? de : enUS;
     const [weeks, setWeeks] = useState<Week[]>([]);
     const [more, setMore] = useState(true);
+    // Not "no weeks yet" while the first weeks are still on their way
+    const [loaded, setLoaded] = useState(false);
     const [error, setError] = useState('');
 
     const load = async (before?: string) => {
         try {
-            const older = (await api.get<Week[]>('/api/plan/history', { params: { weeks: PAGE, ...(before ? { before } : {}) } }))
+            const older = (await api.get<Week[]>('/api/plan/history', { params: { weeks: WEEKS_PER_LOAD, ...(before ? { before } : {}) } }))
                 .data;
             setWeeks((shown) => [...shown, ...older]);
-            setMore(older.length === PAGE);
+            setMore(older.length === WEEKS_PER_LOAD);
         } catch (err) {
             setError(errorMessage(err));
         }
@@ -40,11 +42,12 @@ export default function History() {
 
     useEffect(() => {
         let current = true;
-        api.get<Week[]>('/api/plan/history', { params: { weeks: PAGE } })
+        api.get<Week[]>('/api/plan/history', { params: { weeks: WEEKS_PER_LOAD } })
             .then((r) => {
                 if (!current) return;
                 setWeeks(r.data);
-                setMore(r.data.length === PAGE);
+                setMore(r.data.length === WEEKS_PER_LOAD);
+                setLoaded(true);
             })
             .catch((err) => current && setError(errorMessage(err)));
         return () => {
@@ -56,10 +59,15 @@ export default function History() {
         `${format(parseISO(week.start), 'EEEEEE d.M.', { locale })} – ${format(parseISO(week.end), 'EEEEEE d.M.', { locale })}`;
 
     return (
-        <div className="mx-auto max-w-5xl space-y-5">
+        <div className={`${PAGE} space-y-5`}>
             <h1 className="text-2xl">{t('nav.history')}</h1>
             {error && <p className={ERROR}>{error}</p>}
-            {weeks.length === 0 && !error && <p className="text-slate-400">{t('history.none')}</p>}
+            {loaded && weeks.length === 0 && (
+                <div className="space-y-1 text-slate-400">
+                    <p>{t('history.none')}</p>
+                    <p className="text-sm">{t('history.howTo')}</p>
+                </div>
+            )}
             {weeks.map((week) => (
                 <section key={week.start} aria-label={range(week)} className={`${CARD} space-y-3`}>
                     <h2 className="flex items-center gap-2 text-base">

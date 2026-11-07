@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { errorMessage } from '../../api';
 import { fetchSuggestions, loadSuggestionSlot, saveSuggestionSlot, SLOTS, type Slot, type SuggestionTab } from '../../plan';
@@ -29,6 +29,14 @@ export default function SuggestionPanel({ selectedId, onPick, version, slot: ope
     const [q, setQ] = useState('');
     const [recipes, setRecipes] = useState<RecipeSummary[] | null>(null);
     const [error, setError] = useState('');
+    // The "For" chips stay on one row and scroll sideways; the chosen one starts in view
+    const forRow = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+        // Only as far as needed, so the "Für" and the chips before stay in view when they fit
+        forRow.current
+            ?.querySelector<HTMLElement>('[aria-pressed="true"]')
+            ?.scrollIntoView({ inline: 'nearest', block: 'nearest' });
+    }, []);
 
     useEffect(() => {
         let current = true;
@@ -49,8 +57,13 @@ export default function SuggestionPanel({ selectedId, onPick, version, slot: ope
 
     return (
         <aside className="glass-card flex max-h-[calc(100vh-8rem)] flex-col gap-3 p-3">
-            <div role="group" aria-labelledby="suggest-for" className="flex flex-wrap items-center gap-1">
-                <span id="suggest-for" className="mr-1 text-xs text-slate-400">
+            <div
+                ref={forRow}
+                role="group"
+                aria-labelledby="suggest-for"
+                className="flex items-center gap-1 overflow-x-auto whitespace-nowrap py-1"
+            >
+                <span id="suggest-for" className="mr-1 shrink-0 text-xs text-slate-400">
                     {t('plan.suggestFor')}
                 </span>
                 {[null, ...SLOTS].map((key) => (
@@ -59,7 +72,7 @@ export default function SuggestionPanel({ selectedId, onPick, version, slot: ope
                         type="button"
                         aria-pressed={slot === key}
                         onClick={() => chooseSlot(key)}
-                        className={`rounded-full px-2 py-0.5 text-xs ${
+                        className={`shrink-0 rounded-full px-2 py-0.5 text-xs ${
                             slot === key ? 'bg-cyan-400/20 text-cyan-100' : 'text-slate-400 hover:bg-white/5'
                         }`}
                     >

@@ -6,7 +6,7 @@ import api, { errorMessage } from '../api';
 import { useAuth } from '../AuthContext';
 import AuthImage from '../components/AuthImage';
 import { fetchItem, type InboxItemDetail, isImage } from '../inbox';
-import { BUTTON_SECONDARY, CARD, ERROR } from '../ui';
+import { BUTTON_SECONDARY, CARD, ERROR, PAGE } from '../ui';
 
 // The original of an import: what arrived, as it arrived
 export default function InboxItemPage() {
@@ -43,7 +43,7 @@ export default function InboxItemPage() {
     if (!item) return error ? <p className={ERROR}>{error}</p> : <p className="text-slate-400">{t('common.loading')}</p>;
 
     return (
-        <div className="mx-auto max-w-4xl space-y-5">
+        <div className={`${PAGE} space-y-5`}>
             <section className={`${CARD} space-y-2`}>
                 <h1 className="text-2xl">{item.subject}</h1>
                 <p className="text-sm text-slate-400">

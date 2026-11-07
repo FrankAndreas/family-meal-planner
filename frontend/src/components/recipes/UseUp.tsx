@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { errorMessage } from '../../api';
 import { sinceText } from '../../lastEaten';
-import { fetchIngredientNames, fetchUseUp, MAX_HAVE, type UseUpMode, type UseUpResult } from '../../useUp';
+import { fetchIngredientNames, fetchUseUp, MAX_HAVE, MAX_MISSING, type UseUpMode, type UseUpResult } from '../../useUp';
 import { BUTTON_SECONDARY, ERROR } from '../../ui';
 import IngredientChips from './IngredientChips';
 import { RecipeThumb } from './RecipeCard';
@@ -85,6 +85,7 @@ export default function UseUp({ have, mode, onChange }: UseUpProps) {
                         key={key}
                         type="button"
                         aria-pressed={mode === key}
+                        aria-describedby={`use-up-mode-${key}`}
                         className={modeButton(key)}
                         onClick={() => change(have, key)}
                     >
@@ -92,6 +93,12 @@ export default function UseUp({ have, mode, onChange }: UseUpProps) {
                     </button>
                 ))}
             </div>
+            {/* What each mode does: the chosen one's shown, both read out with their button */}
+            {MODES.map((key) => (
+                <p key={key} id={`use-up-mode-${key}`} hidden={mode !== key} className="-mt-2 text-sm text-slate-400">
+                    {t(`useUp.explain.${key}`, { max: MAX_MISSING })}
+                </p>
+            ))}
             {error && <p className={ERROR}>{error}</p>}
             {!have.length ? (
                 <p className="text-slate-400">{t('useUp.hint')}</p>

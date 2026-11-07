@@ -25,6 +25,8 @@ export interface UseUpState {
 const KEY = 'meals.useUp';
 // The most ingredients one search takes (backend/app/use_up_api.py)
 export const MAX_HAVE = 20;
+// "Jetzt kochen" shows recipes missing at most this many ingredients (MAX_MISSING there)
+export const MAX_MISSING = 2;
 const EMPTY: UseUpState = { tab: 'search', have: [], mode: 'use_up' };
 
 export function loadUseUp(): UseUpState {

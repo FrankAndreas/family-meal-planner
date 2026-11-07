@@ -26,7 +26,7 @@ import {
   type Recipe,
 } from "../recipes";
 import type { FamilySettings } from "../types";
-import { BUTTON, BUTTON_DANGER, BUTTON_SECONDARY, CARD, ERROR } from "../ui";
+import { BUTTON, BUTTON_SECONDARY, CARD, ERROR, PAGE } from "../ui";
 
 function IngredientLine({ ingredient }: { ingredient: Ingredient }) {
   const { t, i18n } = useTranslation();
@@ -232,7 +232,7 @@ export default function RecipeView() {
   }
 
   return (
-    <article className="mx-auto max-w-4xl space-y-6">
+    <article className={`${PAGE} space-y-6`}>
       {recipe.deleted && <p className={ERROR}>{t("recipes.deletedBanner")}</p>}
       <div className={`${CARD} grid gap-5 md:grid-cols-[16rem_1fr]`}>
         <RecipeThumb
@@ -433,15 +433,6 @@ export default function RecipeView() {
                   {categorizing ? t("recipes.categorizing") : t("recipes.categorizeOne")}
                 </button>
               )}
-              {user?.role === "PARENT" && (
-                <button
-                  type="button"
-                  className={BUTTON_DANGER}
-                  onClick={remove}
-                >
-                  {t("recipes.delete")}
-                </button>
-              )}
             </div>
           )}
         </div>
@@ -515,6 +506,18 @@ export default function RecipeView() {
           )}
         </section>
       </div>
+      {/* Rarely needed, so away from the everyday actions at the top */}
+      {user?.role === "PARENT" && !recipe.deleted && (
+        <div className="flex justify-end">
+          <button
+            type="button"
+            className="rounded-lg px-3 py-2 text-sm text-red-300/80 hover:bg-red-900/30 hover:text-red-200"
+            onClick={remove}
+          >
+            {t("recipes.delete")}
+          </button>
+        </div>
+      )}
     </article>
   );
 }

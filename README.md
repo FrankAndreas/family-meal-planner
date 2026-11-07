@@ -84,6 +84,10 @@ cd cloudflare/email-worker && npm ci && npm test     # the mail worker
 
 Visible texts live in `frontend/src/locales/{de,en}.ts`; `npm run lint` fails on text written directly in components.
 
+The frontend's types for the backend's requests and answers are generated from its API (`frontend/src/apiSchema.ts`,
+from the snapshot `frontend/openapi.json`). After changing a schema or a route, run `scripts/api-types.sh`; until
+then a backend test and `npm run lint` fail.
+
 ## License
 
 MIT, see [`LICENSE`](LICENSE).

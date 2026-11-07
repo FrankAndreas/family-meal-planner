@@ -2,21 +2,21 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from . import ai, auth, models
+from . import ai, auth, models, schemas
 from .database import get_db
 from .timeutil import utcnow
 
 router = APIRouter(tags=["ai"])
 
 
-@router.get("/ai/status")
+@router.get("/ai/status", response_model=schemas.AiStatusOut)
 def ai_status(user: models.User = Depends(auth.get_current_user), db: Session = Depends(get_db)):
     settings = ai.Settings.from_env()
     left = max(0, settings.calls_per_hour - len(ai.calls_last_hour(db, user, utcnow()))) if settings.enabled else 0
     return {"enabled": settings.enabled, "calls_left_this_hour": left}
 
 
-@router.get("/ai/usage")
+@router.get("/ai/usage", response_model=schemas.AiUsageOut)
 def ai_usage(_parent: models.User = Depends(auth.require_parent), db: Session = Depends(get_db)):
     """AI calls this month per person, and all calls ever (the costs themselves are in Infomaniak's manager)."""
     now = utcnow()

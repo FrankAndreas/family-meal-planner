@@ -1,28 +1,8 @@
-import type { Language } from './i18n';
+import type { Schemas } from './apiTypes';
 
-export type Role = 'PARENT' | 'CHILD';
-
-export interface User {
-    id: number;
-    name: string;
-    role: Role;
-    // The language the person sees: their own choice, or the app's default language
-    language: Language;
-    language_chosen: boolean;
-}
-
-export interface PublicUser {
-    id: number;
-    name: string;
-}
-
-export interface FamilySettings {
-    family_size: number;
-    // Python weekday: 0 = Monday ... 6 = Sunday
-    week_start: number;
-    // Always at home: never shown as missing in "Was habe ich?"
-    staples: string[];
-}
+export type User = Schemas['UserOut'];
+export type Role = User['role'];
+export type FamilySettings = Schemas['SettingsOut'];
 
 // Python weekday number (0 = Monday) → locale key under weekdays.*
 export const WEEKDAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const;

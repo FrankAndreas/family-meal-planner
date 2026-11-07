@@ -1,45 +1,14 @@
 import api from './api';
-import type { Slot } from './plan';
+import type { Schemas } from './apiTypes';
 
 export { formatSpec } from './shoppingSpec';
 
 // The shared shopping list (spec 2026-11-06): the parents' decisions, with the lines worked out from the plan
-export interface ShoppingMeal {
-    entry_id: number;
-    date: string;
-    slot: Slot;
-    title: string;
-    people: number | null;
-    ticked: boolean;
-}
-
-export interface ShoppingNote {
-    date: string;
-    slot: Slot;
-    note: string;
-}
-
+export type ShoppingMeal = Schemas['ShoppingMealOut'];
+export type ShoppingNote = Schemas['ShoppingNoteOut'];
 export type { ShoppingLine } from './shoppingSpec';
-import type { ShoppingLine } from './shoppingSpec';
-
-export interface ShoppingExtra {
-    id: number;
-    name: string;
-    amount: string;
-}
-
-export interface ShoppingList {
-    week_start: string;
-    week_end: string;
-    started_by: string | null;
-    changed_by: string | null;
-    changed_at: string;
-    meals: ShoppingMeal[];
-    notes: ShoppingNote[];
-    lines: ShoppingLine[];
-    extras: ShoppingExtra[];
-    version: string;
-}
+export type ShoppingExtra = Schemas['ShoppingExtraOut'];
+export type ShoppingList = Schemas['ShoppingOut'];
 
 export const fetchShopping = async () => (await api.get<{ list: ShoppingList | null }>('/api/shopping')).data.list;
 

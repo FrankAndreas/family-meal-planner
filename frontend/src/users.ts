@@ -1,13 +1,8 @@
 import api from './api';
+import type { Schemas } from './apiTypes';
 import type { User } from './types';
 
-// Mirrors backend/app/schemas.py (EmailOut)
-export interface MailAddress {
-    id: number;
-    user_id: number;
-    user_name: string;
-    address: string;
-}
+export type MailAddress = Schemas['EmailOut'];
 
 export const fetchMe = async () => (await api.get<User>('/api/me')).data;
 export const fetchUsers = async () => (await api.get<User[]>('/api/users')).data;

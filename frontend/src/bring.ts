@@ -1,16 +1,9 @@
 import api from './api';
+import type { Schemas } from './apiTypes';
 
 // The Bring! account the planner sends shopping lists to (spec 2026-11-06); the password never comes back
-export interface BringLogin {
-    email: string | null;
-    list_uuid: string | null;
-    list_name: string | null;
-}
-
-export interface BringList {
-    uuid: string;
-    name: string;
-}
+export type BringLogin = Schemas['BringOut'];
+export type BringList = Schemas['BringListOut'];
 
 export const fetchBring = async () => (await api.get<BringLogin>('/api/bring')).data;
 

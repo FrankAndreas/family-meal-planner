@@ -7,10 +7,12 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "lint": "eslint . --report-unused-disable-directives --max-warnings 0 && npm run check-texts",
+    "lint": "eslint . --report-unused-disable-directives --max-warnings 0 && npm run check-texts && npm run check-types",
     "preview": "vite preview",
     "type-check": "tsc -b",
     "check-texts": "node scripts/check-texts.mjs",
+    "gen-types": "openapi-typescript openapi.json -o src/apiSchema.ts",
+    "check-types": "openapi-typescript openapi.json -o src/apiSchema.ts --check",
     "test": "vitest run"
   },
   "dependencies": {
@@ -35,6 +37,7 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.7",
     "globals": "^17.13.0",
+    "openapi-typescript": "7.13.0",
     "postcss": "^8.5.31",
     "tailwindcss": "^4.1.18",
     "typescript": "~5.9.3",

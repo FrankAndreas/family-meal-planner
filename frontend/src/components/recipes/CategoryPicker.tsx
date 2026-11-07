@@ -1,9 +1,11 @@
+import type { Dispatch, SetStateAction } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CATEGORIES, inOrder, type Category } from '../../categories';
 
 interface CategoryPickerProps {
     value: Category[];
-    onChange: (categories: Category[]) => void;
+    // A state setter: each toggle works on the newest list, even two in a row
+    onChange: Dispatch<SetStateAction<Category[]>>;
     labelClass: string;
 }
 
@@ -11,7 +13,7 @@ interface CategoryPickerProps {
 export default function CategoryPicker({ value, onChange, labelClass }: CategoryPickerProps) {
     const { t } = useTranslation();
     const toggle = (category: Category) =>
-        onChange(value.includes(category) ? value.filter((c) => c !== category) : inOrder([...value, category]));
+        onChange((now) => (now.includes(category) ? now.filter((c) => c !== category) : inOrder([...now, category])));
     return (
         <div className="sm:col-span-2" role="group" aria-labelledby="categories-label">
             <p id="categories-label" className={labelClass}>

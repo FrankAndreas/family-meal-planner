@@ -33,9 +33,11 @@ describe('formFromRecipe and formFromDraft', () => {
         });
     });
 
-    it('takes a draft whose times and notes may be missing', () => {
-        const draft = { ...recipe, prep_minutes: undefined, notes: undefined, source_url: undefined } as unknown as Draft;
-        expect(formFromDraft(draft)).toMatchObject({ prep: '', notes: '', source: '' });
+    it('takes a draft whose times and notes may be missing or null', () => {
+        for (const nothing of [undefined, null]) {
+            const draft = { ...recipe, prep_minutes: nothing, notes: nothing, source_url: nothing } as unknown as Draft;
+            expect(formFromDraft(draft)).toMatchObject({ prep: '', notes: '', source: '' });
+        }
     });
 });
 

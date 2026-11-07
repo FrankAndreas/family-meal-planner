@@ -20,4 +20,27 @@ export default defineConfig([
       globals: globals.browser,
     },
   },
+  {
+    // Pages and components get their data through the modules in src (plan.ts, recipes.ts, ...), never the HTTP
+    // client itself: one place per backend route, and its types next to it
+    files: ['src/pages/**', 'src/components/**', 'src/AuthContext.tsx'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              regex: '^(\\.\\./)+api$|^\\./api$',
+              importNames: ['default'],
+              message: 'Call the backend through a module in src (plan.ts, recipes.ts, ...), not the api client.',
+            },
+          ],
+        },
+      ],
+      'no-restricted-globals': [
+        'error',
+        { name: 'fetch', message: 'Call the backend through a module in src (e.g. settings.ts), not fetch.' },
+      ],
+    },
+  },
 ])

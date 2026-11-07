@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import api from '../api';
+import { fetchBlob } from '../api';
 
 // An image only logged-in people may see: <img src> can't send the token, so it is fetched and shown as a blob
 export default function AuthImage({ src, alt, className }: { src: string; alt: string; className?: string }) {
@@ -7,10 +7,10 @@ export default function AuthImage({ src, alt, className }: { src: string; alt: s
     useEffect(() => {
         let current = true;
         let made: string | null = null;
-        api.get<Blob>(src, { responseType: 'blob' })
-            .then((response) => {
+        fetchBlob(src)
+            .then((blob) => {
                 if (!current) return;
-                made = URL.createObjectURL(response.data);
+                made = URL.createObjectURL(blob);
                 setUrl(made);
             })
             .catch(() => {});

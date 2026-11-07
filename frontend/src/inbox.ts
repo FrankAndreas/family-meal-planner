@@ -1,4 +1,4 @@
-import api from './api';
+import api, { fetchBlob } from './api';
 import type { Category } from './categories';
 import type { RecipeInput } from './recipes';
 
@@ -56,4 +56,6 @@ export const addScan = (photos: Blob[]) => {
     photos.forEach((photo, n) => body.append('files', photo, `scan-${n + 1}.jpg`));
     return api.post<InboxItem>('/api/inbox/scans', body);
 };
+// The mail as it arrived, to download (parents)
+export const fetchRawMail = (id: number | string) => fetchBlob(`/api/inbox/${id}/raw`);
 export const isImage = (a: Attachment) => a.type.startsWith('image/');

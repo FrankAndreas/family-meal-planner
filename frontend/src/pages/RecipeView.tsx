@@ -8,7 +8,8 @@ import {
   useSearchParams,
 } from "react-router-dom";
 import { formatAmount } from "../amounts";
-import api, { errorMessage } from "../api";
+import { fetchAiEnabled } from "../ai";
+import { errorMessage } from "../api";
 import { useAuth } from "../AuthContext";
 import PeopleStepper from "../components/recipes/PeopleStepper";
 import PlanRecipeDialog from "../components/recipes/PlanRecipeDialog";
@@ -20,12 +21,17 @@ import { type PlanEntry, type Slot, weekdayKey } from "../plan";
 import {
   categorize,
   defaultPeople,
-  fetchAiEnabled,
+  deleteRecipe,
+  favoriteRecipe,
+  fetchEatenOn,
+  fetchPlannedFor,
   fetchRecipe,
   type Ingredient,
+  rateRecipe,
   type Recipe,
+  translateRecipe,
 } from "../recipes";
-import type { FamilySettings } from "../types";
+import { fetchSettings } from "../settings";
 import { BUTTON, BUTTON_SECONDARY, CARD, ERROR, PAGE } from "../ui";
 
 function IngredientLine({ ingredient }: { ingredient: Ingredient }) {
@@ -79,9 +85,8 @@ export default function RecipeView() {
 
   useEffect(() => {
     let current = true;
-    api
-      .get<string[]>(`/api/recipes/${id}/history`)
-      .then((r) => current && setEatenOn(r.data))
+    fetchEatenOn(id!)
+      .then((days) => current && setEatenOn(days))
       .catch(() => {});
     return () => {
       current = false;
@@ -90,9 +95,8 @@ export default function RecipeView() {
 
   useEffect(() => {
     let current = true;
-    api
-      .get<{ date: string; slot: Slot }[]>(`/api/recipes/${id}/planned`)
-      .then((r) => current && setPlanned(r.data))
+    fetchPlannedFor(id!)
+      .then((found) => current && setPlanned(found))
       .catch(() => {});
     return () => {
       current = false;
@@ -112,9 +116,9 @@ export default function RecipeView() {
       if (wanted === null) {
         const [plain, settings] = await Promise.all([
           fetchRecipe(id!),
-          api.get<FamilySettings>("/api/settings"),
+          fetchSettings(),
         ]);
-        wanted = defaultPeople(plain, settings.data.family_size);
+        wanted = defaultPeople(plain, settings.family_size);
         if (!current) return;
         setPeople(wanted);
       }
@@ -150,7 +154,7 @@ export default function RecipeView() {
   const remove = async () => {
     if (!confirm(t("recipes.confirmDelete", { title: recipe!.title }))) return;
     try {
-      await api.delete(`/api/recipes/${recipe!.id}`);
+      await deleteRecipe(recipe!.id);
       navigate("/rezepte");
     } catch (err) {
       setError(errorMessage(err));
@@ -181,7 +185,7 @@ export default function RecipeView() {
     setTranslating(true);
     setError("");
     try {
-      await api.post(`/api/recipes/${recipe!.id}/translate`);
+      await translateRecipe(recipe!.id);
       setRecipe(await fetchRecipe(recipe!.id, people));
       setShowOriginal(false);
     } catch (err) {
@@ -342,9 +346,7 @@ export default function RecipeView() {
                 value={recipe.my_rating}
                 size="lg"
                 onChange={(stars) =>
-                  change(() =>
-                    api.put(`/api/recipes/${recipe.id}/rating`, { stars }),
-                  )
+                  change(() => rateRecipe(recipe.id, stars))
                 }
               />
               <button
@@ -352,11 +354,7 @@ export default function RecipeView() {
                 aria-pressed={recipe.my_favorite}
                 aria-label={t("recipes.favorite")}
                 onClick={() =>
-                  change(() =>
-                    api.put(`/api/recipes/${recipe.id}/favorite`, {
-                      favorite: !recipe.my_favorite,
-                    }),
-                  )
+                  change(() => favoriteRecipe(recipe.id, !recipe.my_favorite))
                 }
                 className={`text-3xl ${recipe.my_favorite ? "text-fuchsia-300" : "text-slate-600 hover:text-fuchsia-200"}`}
               >

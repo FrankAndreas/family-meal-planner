@@ -3,10 +3,11 @@ import { de, enUS } from 'date-fns/locale';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import api, { errorMessage } from '../api';
+import { errorMessage } from '../api';
 import NoteDialog from '../components/plan/NoteDialog';
 import Stars from '../components/recipes/Stars';
-import { addEntry, fetchWeek, type PlanEntry, updateEntry, type Week, weekdayKey } from '../plan';
+import { addEntry, closeWeek, fetchWeek, type PlanEntry, updateEntry, type Week, weekdayKey } from '../plan';
+import { rateRecipe } from '../recipes';
 import { BUTTON, CARD, ERROR, PAGE } from '../ui';
 
 export default function CloseWeek() {
@@ -52,7 +53,7 @@ export default function CloseWeek() {
 
     const close = async () => {
         try {
-            await api.post('/api/plan/close', { start: week!.start });
+            await closeWeek(week!.start);
             navigate('/');
         } catch (err) {
             setError(errorMessage(err));
@@ -97,7 +98,7 @@ export default function CloseWeek() {
                                                 <Stars
                                                     value={entry.recipe.my_rating}
                                                     onChange={(stars) =>
-                                                        run(() => api.put(`/api/recipes/${entry.recipe!.id}/rating`, { stars }))
+                                                        run(() => rateRecipe(entry.recipe!.id, stars))
                                                     }
                                                 />
                                             )}

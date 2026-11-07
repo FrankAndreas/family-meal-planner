@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import api, { errorMessage } from "../api";
+import { errorMessage } from "../api";
 import i18next from "../i18n";
 import IngredientEditor from "../components/recipes/IngredientEditor";
 import PhotoPicker, {
@@ -18,7 +18,17 @@ import {
 } from "../ingredientRows";
 import { isOtherLink, isWebLink } from "../links";
 import { CATEGORIES, inOrder, type Category } from "../categories";
-import { fetchRecipe, type Recipe, type RecipeInput } from "../recipes";
+import {
+  fetchRecipe,
+  fetchTags,
+  fetchUnits,
+  photoFromLink,
+  removePhoto,
+  saveRecipe,
+  uploadPhoto,
+  type Recipe,
+  type RecipeInput,
+} from "../recipes";
 import { BUTTON, BUTTON_SECONDARY, CARD, ERROR, FIELD, INPUT, PAGE } from "../ui";
 
 interface Form {
@@ -72,13 +82,11 @@ export default function RecipeEdit() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    api
-      .get<string[]>("/api/units")
-      .then((r) => setUnits(r.data))
+    fetchUnits()
+      .then(setUnits)
       .catch(() => {});
-    api
-      .get<{ name: string }[]>("/api/tags")
-      .then((r) => setKnownTags(r.data.map((tag) => tag.name)))
+    fetchTags()
+      .then((tags) => setKnownTags(tags.map((tag) => tag.name)))
       .catch(() => {});
   }, []);
 
@@ -188,20 +196,14 @@ export default function RecipeEdit() {
     };
     try {
       const target = id ?? createdId;
-      const saved = target
-        ? (await api.put<Recipe>(`/api/recipes/${target}`, body)).data
-        : (await api.post<Recipe>("/api/recipes", body)).data;
+      const saved = await saveRecipe(target, body);
       setCreatedId(saved.id);
       if (photo.kind === "file") {
-        const data = new FormData();
-        data.append("file", photo.file);
-        await api.post(`/api/recipes/${saved.id}/photo`, data);
+        await uploadPhoto(saved.id, photo.file);
       } else if (photo.kind === "link") {
-        await api.post(`/api/recipes/${saved.id}/photo-url`, {
-          url: photo.url.trim(),
-        });
+        await photoFromLink(saved.id, photo.url.trim());
       } else if (photo.kind === "remove" && saved.photo_url) {
-        await api.delete(`/api/recipes/${saved.id}/photo`);
+        await removePhoto(saved.id);
       }
       navigate(`/rezepte/${saved.id}`, { replace: true });
     } catch (err) {

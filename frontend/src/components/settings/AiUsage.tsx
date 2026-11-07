@@ -1,12 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import api, { errorMessage } from '../../api';
+import { fetchAiEnabled, fetchAiUsage, type AiUsage as Usage } from '../../ai';
+import { errorMessage } from '../../api';
 import { CARD, ERROR } from '../../ui';
-
-interface Usage {
-    month: { user_name: string; calls: number }[];
-    total: number;
-}
 
 // Who started how many AI calls this month; what they cost shows in Infomaniak's manager
 export default function AiUsage() {
@@ -17,11 +13,11 @@ export default function AiUsage() {
 
     useEffect(() => {
         let current = true;
-        Promise.all([api.get<Usage>('/api/ai/usage'), api.get<{ enabled: boolean }>('/api/ai/status')])
-            .then(([u, s]) => {
+        Promise.all([fetchAiUsage(), fetchAiEnabled()])
+            .then(([u, on]) => {
                 if (!current) return;
-                setUsage(u.data);
-                setEnabled(s.data.enabled);
+                setUsage(u);
+                setEnabled(on);
             })
             .catch((err) => current && setError(errorMessage(err)));
         return () => {

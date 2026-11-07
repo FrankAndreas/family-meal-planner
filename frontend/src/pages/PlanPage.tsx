@@ -11,7 +11,7 @@ import {
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
-import api, { errorMessage } from '../api';
+import { errorMessage } from '../api';
 import DayView from '../components/plan/DayView';
 import EntryMenu from '../components/plan/EntryMenu';
 import NoteDialog from '../components/plan/NoteDialog';
@@ -20,7 +20,7 @@ import WeekGrid from '../components/plan/WeekGrid';
 import WeekHeader from '../components/plan/WeekHeader';
 import { addEntry, fetchWeek, type PlanEntry, removeEntry, type Slot, updateEntry, type Week, weekdayKey } from '../plan';
 import type { RecipeSummary } from '../recipes';
-import type { FamilySettings } from '../types';
+import { fetchSettings } from '../settings';
 import { ERROR } from '../ui';
 import { useWide } from '../useWide';
 
@@ -62,8 +62,8 @@ export default function PlanPage() {
                 setVersion((v) => v + 1);
             })
             .catch((err) => current && setError(errorMessage(err)));
-        api.get<FamilySettings>('/api/settings')
-            .then((r) => setFamilySize(r.data.family_size))
+        fetchSettings()
+            .then((settings) => setFamilySize(settings.family_size))
             .catch(() => {});
         return () => {
             current = false;

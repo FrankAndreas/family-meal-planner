@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import api, { errorMessage } from '../../api';
+import { errorMessage } from '../../api';
+import { fetchSettings, saveSettings, saveSettingsOnLeave } from '../../settings';
 import { WEEKDAYS, type FamilySettings as Settings } from '../../types';
 import { CARD, ERROR, FIELD } from '../../ui';
 import IngredientChips from '../recipes/IngredientChips';
@@ -24,11 +25,11 @@ export default function FamilySettings() {
     useEffect(() => {
         // A late answer must not overwrite what someone already typed
         let current = true;
-        api.get<Settings>('/api/settings')
-            .then((response) => {
+        fetchSettings()
+            .then((loaded) => {
                 if (!current) return;
-                savedSize.current = response.data.family_size;
-                setSettings(response.data);
+                savedSize.current = loaded.family_size;
+                setSettings(loaded);
             })
             .catch((err) => current && setError(errorMessage(err)));
         return () => {
@@ -78,7 +79,7 @@ export default function FamilySettings() {
     const send = useCallback(() => {
         const { fields, version } = take();
         queue.current = queue.current.then(() =>
-            settle(fields, version, async () => (await api.patch<Settings>('/api/settings', fields)).data),
+            settle(fields, version, () => saveSettings(fields)),
         );
     }, [take, settle]);
 
@@ -106,18 +107,9 @@ export default function FamilySettings() {
         const leave = () => {
             if (!Object.keys(pending.current).length) return;
             const { fields, version } = take();
-            const request = fetch('/api/settings', {
-                method: 'PATCH',
-                keepalive: true,
-                credentials: 'include',
-                headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'meals' },
-                body: JSON.stringify(fields),
-            });
-            void settle(fields, version, async () => {
-                const response = await request;
-                if (!response.ok) throw new Error(`${response.status}`);
-                return (await response.json()) as Settings;
-            });
+            // Sent now, while the page still exists; settle only waits for its answer
+            const request = saveSettingsOnLeave(fields);
+            void settle(fields, version, () => request);
         };
         const hidden = () => document.visibilityState === 'hidden' && leave();
         window.addEventListener('pagehide', leave);

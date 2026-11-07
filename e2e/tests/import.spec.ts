@@ -69,6 +69,7 @@ test('a recipe link is pasted on the recipes page and lands in the inbox', async
     await login(page, child.name);
     await page.goto('/rezepte');
     await expect(page.getByLabel('Recipe link')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Add recipe' }).click();
     await page.getByRole('button', { name: 'Import from link' }).click();
     await page.getByLabel('Recipe link').fill('https://www.fooby.ch/de/rezepte/12345/risotto');
     await page.getByRole('button', { name: 'Add link' }).click();

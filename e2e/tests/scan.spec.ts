@@ -9,6 +9,7 @@ test('a child photographs a recipe in the app; it waits in the inbox for a paren
     const child = await newPerson(request, 'CHILD');
     const errors = await login(page, child.name);
     await page.goto('/rezepte');
+    await page.getByRole('button', { name: 'Add recipe' }).click();
     await page.getByRole('button', { name: 'Photograph a recipe' }).click();
     await page.getByLabel('Choose from photos').setInputFiles([photo('front.png'), photo('back.png')]);
     await expect(page.getByRole('img', { name: /^Photo \d$/ })).toHaveCount(2);
@@ -29,6 +30,7 @@ test('a parent photographs a recipe; the AI reads it at once and it is saved as 
     const parent = await newPerson(request);
     await login(page, parent.name);
     await page.goto('/rezepte');
+    await page.getByRole('button', { name: 'Add recipe' }).click();
     await page.getByRole('button', { name: 'Photograph a recipe' }).click();
     await page.getByLabel('Take a photo').setInputFiles(photo('back.png'));
     await page.getByRole('button', { name: 'Make a recipe of it (1 photo)' }).click();

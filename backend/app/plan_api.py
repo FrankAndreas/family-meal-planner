@@ -77,9 +77,31 @@ def _needs_closing(db: Session, start: date) -> bool:
     )
 
 
+USUAL_SLOTS = ("lunch", "dinner")
+
+
+def counted_slots(db: Session, start: date) -> tuple[str, ...]:
+    """The slots the counter counts: those planned on at least half the days of the four weeks before.
+
+    Counting every Zmorge and Znüni makes a well-planned week look half empty (UX review). Without such a
+    history, Zmittag and Znacht. A week planned far ahead looks back from today, not from its own empty weeks before.
+    """
+    end = min(start, timeutil.today() + timedelta(days=1))
+    first = end - timedelta(days=28)
+    rows = (
+        db.query(models.PlanEntry.slot, func.count(func.distinct(models.PlanEntry.date)))
+        .filter(models.PlanEntry.date >= first, models.PlanEntry.date < end)
+        .group_by(models.PlanEntry.slot)
+        .all()
+    )
+    regular = {slot for slot, days in rows if days >= 14}
+    return tuple(slot for slot in SLOTS if slot in regular) or USUAL_SLOTS
+
+
 def week_out(db: Session, start: date, me: models.User) -> schemas.WeekOut:
     days = week_days(start)
     entries = _entries(db, days[0], days[-1])
+    counted = counted_slots(db, days[0])
     return schemas.WeekOut(
         start=days[0],
         end=days[-1],
@@ -88,8 +110,8 @@ def week_out(db: Session, start: date, me: models.User) -> schemas.WeekOut:
         entries=entries_out(db, entries, me),
         closed=_closed(db, days[0], days[-1]),
         previous_needs_closing=_needs_closing(db, days[0]),
-        planned_slots=len({(e.date, e.slot) for e in entries}),
-        total_slots=len(days) * len(SLOTS),
+        planned_slots=len({(e.date, e.slot) for e in entries if e.slot in counted}),
+        total_slots=len(days) * len(counted),
     )
 
 

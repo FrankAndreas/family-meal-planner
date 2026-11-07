@@ -65,6 +65,7 @@ const de = {
         items: '2 · Was müssen wir kaufen?',
         noItems: 'Noch nichts zu kaufen: hake eine Mahlzeit an oder füge etwas dazu.',
         from: 'für {{meals}}',
+        notBuying: 'Nicht kaufen',
         usuallyAtHome: '· meist zu Hause',
         addName: 'Etwas dazu',
         addNamePlaceholder: 'z.B. WC-Papier',
@@ -114,6 +115,8 @@ const de = {
         deleteData: 'Daten von {{name}} löschen',
     },
     recipes: {
+        closePanel: '✕ Schliessen',
+        add: '+ Rezept hinzufügen',
         new: '+ Neues Rezept',
         scan: '📷 Rezept fotografieren',
         scanIntro: 'Fotografiere das Rezept, z. B. auf der Rückseite einer Packung. Mehrere Fotos ergeben ein Rezept. Eltern: Die KI liest es sofort; sonst wartet es im Posteingang auf die Eltern.',

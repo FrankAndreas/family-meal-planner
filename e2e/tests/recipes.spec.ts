@@ -6,6 +6,7 @@ test('a child types in a recipe with fractions and sees it scaled', async ({ pag
     const errors = await login(page, child.name);
     const title = uniqueName('Testrisotto ');
     await page.goto('/rezepte');
+    await page.getByRole('button', { name: 'Add recipe' }).click();
     await page.getByRole('link', { name: 'New recipe' }).click();
     await page.getByLabel('Title').fill(title);
     await page.getByLabel('Amount 1').fill('1/2');

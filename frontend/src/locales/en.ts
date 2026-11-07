@@ -66,6 +66,7 @@ const en: typeof de = {
         items: '2 · What do we need to buy?',
         noItems: 'Nothing to buy yet: tick a meal or add something.',
         from: 'for {{meals}}',
+        notBuying: 'Not buying',
         usuallyAtHome: '· usually at home',
         addName: 'Add something',
         addNamePlaceholder: 'e.g. Toilet paper',
@@ -115,6 +116,8 @@ const en: typeof de = {
         deleteData: 'Delete data of {{name}}',
     },
     recipes: {
+        closePanel: '✕ Close',
+        add: '+ Add recipe',
         new: '+ New recipe',
         scan: '📷 Photograph a recipe',
         scanIntro: 'Take a photo of the recipe, e.g. on the back of a pack. Several photos make one recipe. Parents: the AI reads it at once; otherwise it waits in the inbox for a parent.',

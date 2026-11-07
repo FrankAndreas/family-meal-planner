@@ -49,3 +49,12 @@ test('someone removed in the hub is deleted here by a parent', async ({ page, re
     await page.getByRole('button', { name: `Delete data of ${name}` }).click();
     await expect(page.getByRole('button', { name: `Delete data of ${name}` })).toHaveCount(0);
 });
+
+// UX review (2026-11-06): the owner of a new mail address defaults to the parent adding it, and says so
+test('a new mail address belongs to me unless I choose someone', async ({ page, request }) => {
+    const parent = await newPerson(request);
+    await login(page, parent.name);
+    await page.goto('/einstellungen');
+    const owner = page.getByRole('combobox', { name: 'Belongs to' });
+    await expect(owner.locator('option:checked')).toHaveText('Me');
+});

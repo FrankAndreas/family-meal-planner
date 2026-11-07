@@ -90,6 +90,7 @@ const en: typeof de = {
         mailAddressesHint: 'Recipes mailed to rezepte@… are only accepted from these addresses.',
         newMailAddress: 'New mail address',
         newMailAddressPlaceholder: 'name@example.ch',
+        mailForMe: 'Me',
         mailAddressOf: 'Belongs to',
         addMailAddress: 'Add address',
         aiUsage: 'AI usage',

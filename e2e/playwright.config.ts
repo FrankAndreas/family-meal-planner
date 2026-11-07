@@ -29,8 +29,8 @@ export default defineConfig({
     },
     projects: [
         // The Friday planning happens on an iPad-sized screen in landscape
-        { name: 'tablet', testIgnore: /(plan|shopping)-phone\.spec\.ts/, use: { ...devices['Desktop Chrome'], viewport: { width: 1180, height: 820 }, hasTouch: true } },
-        { name: 'phone', use: { ...devices['Pixel 7'] }, testMatch: /(login|plan-phone|shopping-phone|use-up|swissmilk)\.spec\.ts/ },
+        { name: 'tablet', testIgnore: /(plan|shopping|ux)-phone\.spec\.ts/, use: { ...devices['Desktop Chrome'], viewport: { width: 1180, height: 820 }, hasTouch: true } },
+        { name: 'phone', use: { ...devices['Pixel 7'] }, testMatch: /(login|plan-phone|shopping-phone|ux-phone|use-up|swissmilk)\.spec\.ts/ },
     ],
     webServer: [
         {

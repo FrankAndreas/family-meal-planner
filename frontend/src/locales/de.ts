@@ -89,6 +89,7 @@ const de = {
         mailAddressesHint: 'Rezepte an rezepte@… werden nur von diesen Adressen angenommen.',
         newMailAddress: 'Neue Mail-Adresse',
         newMailAddressPlaceholder: 'name@example.ch',
+        mailForMe: 'Ich',
         mailAddressOf: 'Gehört zu',
         addMailAddress: 'Adresse hinzufügen',
         aiUsage: 'KI-Nutzung',

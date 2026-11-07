@@ -158,10 +158,13 @@ def _basic_word(staple_base: str, joined: str, parts: tuple[str, ...]) -> bool:
     return joined == staple_base or joined in kinds or any(part in kinds for part in parts)
 
 
-def covered(ingredient: str, staples: list[str]) -> bool:
+def covered(ingredient: str, staples: list[str], *, kinds: bool = True) -> bool:
     """Is the ingredient a basic? Read up to a comma (the rest describes it); each thing it names together
     ("Salz und Pfeffer") must be a basic, of alternatives ("Butter oder Öl") one is enough. "Zitronensaft und Salz"
-    is no basic: the lemon juice is still to buy."""
+    is no basic: the lemon juice is still to buy.
+
+    kinds=False (the shopping list, spec 2026-11-06): only the basic itself counts, never a kind or compound of it.
+    500 g Zopfmehl for a Zopf is still to buy; a line wrongly left to buy costs a tap, one wrongly dropped is missed."""
     name = re.sub(r"\([^)]*\)", " ", ingredient).split(",")[0]
 
     def is_basic(part: str) -> bool:
@@ -171,8 +174,12 @@ def covered(ingredient: str, staples: list[str]) -> bool:
         words = _basic_words(part)
         for staple in staples:
             bases = _typed_words(staple)
-            if len(bases) == 1 and any(_basic_word(bases[0], joined, parts) for joined, parts in words):
+            if len(bases) == 1 and kinds and any(_basic_word(bases[0], joined, parts) for joined, parts in words):
                 return True
+            if len(bases) == 1 and not kinds:
+                forms = _GROUP.get(bases[0], (bases[0],))
+                if any(joined in forms for joined, _ in words):
+                    return True
             if len(bases) > 1 and matches(staple, part, strict=True):
                 return True
         return False

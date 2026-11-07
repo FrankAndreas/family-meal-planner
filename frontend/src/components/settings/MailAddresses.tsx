@@ -101,7 +101,7 @@ export default function MailAddresses() {
                         value={owner}
                         onChange={(e) => setOwner(e.target.value ? Number(e.target.value) : '')}
                     >
-                        <option value="">{t('settings.mine')}</option>
+                        <option value="">{t('settings.mailForMe')}</option>
                         {people
                             .filter((p) => p.id !== user?.id)
                             .map((p) => (

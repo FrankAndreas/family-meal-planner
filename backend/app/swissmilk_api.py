@@ -67,7 +67,7 @@ def _already(db: Session) -> tuple[dict[str, int], set[str]]:
     waiting = {
         number
         for (url,) in db.query(models.InboxItem.url).filter(
-            models.InboxItem.kind == InboxKind.URL, models.InboxItem.status.in_(inbox.OPEN)
+            models.InboxItem.kind == InboxKind.URL, inbox.is_open()
         )
         if url and (number := swissmilk.recipe_id(url))
     }

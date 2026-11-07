@@ -24,7 +24,7 @@ def enable_foreign_keys(engine: Engine) -> None:
         cursor.close()
 
 
-ensure_sqlite_folder(SQLALCHEMY_DATABASE_URL)
+# Connects only when first used: main.start creates the folder and the schema first
 # check_same_thread is needed for SQLite with FastAPI's thread pool
 engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
 enable_foreign_keys(engine)

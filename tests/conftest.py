@@ -18,7 +18,7 @@ import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
 import fake_hub  # noqa: E402
-from app import database, hub, hub_people, models  # noqa: E402
+from app import database, hub, hub_people, models, settings_store  # noqa: E402
 from app.main import app  # noqa: E402
 from helpers import ADMIN, login  # noqa: E402
 
@@ -33,6 +33,8 @@ def fresh_db(tmp_path, monkeypatch):
     with database.SessionLocal() as session:
         session.add(models.User(name=ADMIN, name_key=ADMIN.casefold(), role=models.UserRole.PARENT))
         session.commit()
+        # What the app's start does (main.start); the tests build the schema themselves
+        settings_store.ensure_settings(session)
     yield
 
 

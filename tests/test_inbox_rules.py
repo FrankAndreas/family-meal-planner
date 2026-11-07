@@ -83,18 +83,6 @@ def test_only_a_draft_becomes_a_recipe(db):
     assert (item.status, item.recipe_id) == (InboxStatus.DONE, 42)
 
 
-def test_stuck_processing_counts_as_failed(db):
-    parent, _ = _people(db)
-    old = models.InboxItem(kind=InboxKind.URL, subject="old", url="https://example.ch/", user_id=parent.id)
-    new = models.InboxItem(kind=InboxKind.URL, subject="new", url="https://example.ch/", user_id=parent.id)
-    inbox.add(db, parent, old)
-    inbox.add(db, parent, new)
-    old.processing_since = utcnow() - inbox.STUCK_AFTER - timedelta(minutes=1)
-    db.commit()
-    inbox.unstick(db)
-    assert (old.status, old.error) == (InboxStatus.FAILED, "ai_failed") and new.status == InboxStatus.PROCESSING
-
-
 def test_visible_to_its_sender_and_the_parents(db):
     parent, child = _people(db)
     item = models.InboxItem(kind=InboxKind.URL, subject="y", url="https://example.ch/")
@@ -121,3 +109,50 @@ def test_thumbnail_is_a_small_jpeg():
         assert image.format == "JPEG" and max(image.size) == 320
     with pytest.raises(photos.PhotoUnreadable):
         photos.downscale(b"not a picture", 320)
+
+
+def _stuck(db, parent):
+    item = models.InboxItem(kind=InboxKind.URL, subject="old", url="https://example.ch/", user_id=parent.id)
+    inbox.add(db, parent, item)
+    item.processing_since = utcnow() - inbox.STUCK_AFTER - timedelta(minutes=1)
+    db.commit()
+    return item
+
+
+def test_stuck_shows_as_failed_without_writing(db):
+    """Stuck is worked out when read: looking at the inbox writes nothing."""
+    parent, _ = _people(db)
+    old = _stuck(db, parent)
+    new = models.InboxItem(kind=InboxKind.URL, subject="new", url="https://example.ch/", user_id=parent.id)
+    inbox.add(db, parent, new)
+    assert inbox.shown(old) == (InboxStatus.FAILED, "ai_failed")
+    assert inbox.shown(new) == (InboxStatus.PROCESSING, None)
+    assert old.status == InboxStatus.PROCESSING and not db.dirty
+
+
+def test_a_stuck_item_can_be_released_again(db):
+    parent, _ = _people(db)
+    item = _stuck(db, parent)
+    inbox.release(db, item)
+    assert item.status == InboxStatus.PROCESSING and item.processing_since > utcnow() - timedelta(minutes=1)
+
+
+def test_a_stuck_item_no_longer_counts_as_open(db):
+    parent, _ = _people(db)
+    stuck = _stuck(db, parent)
+    waiting = models.InboxItem(kind=InboxKind.URL, subject="w", url="https://example.ch/", user_id=None)
+    db.add(waiting)
+    db.commit()
+    assert {i.id for i in db.query(models.InboxItem).filter(inbox.is_open())} == {waiting.id}
+    assert stuck.id not in {i.id for i in db.query(models.InboxItem).filter(inbox.is_open())}
+
+
+def test_reading_the_inbox_writes_nothing(client, admin_headers, db):
+    parent = db.query(models.User).filter_by(name="Admin").one()
+    item = _stuck(db, parent)
+    shown = client.get("/api/inbox", headers=admin_headers).json()
+    assert [(i["status"], i["error"]) for i in shown] == [("failed", "ai_failed")]
+    assert client.get("/api/inbox/count", headers=admin_headers).json() == {"waiting": 1}
+    assert client.get(f"/api/inbox/{item.id}", headers=admin_headers).json()["status"] == "failed"
+    db.expire_all()
+    assert db.get(models.InboxItem, item.id).status == InboxStatus.PROCESSING

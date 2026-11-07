@@ -4,10 +4,13 @@
   draft released again is read anew);
 - fail / finish (the importer): → failed / draft, whatever the status meanwhile (not checked);
 - saved_as (saving the draft as a recipe): draft → done.
-Processing that never ended (the backend restarted meanwhile) counts as failed after STUCK_AFTER (unstick)."""
+Processing that never ended (the backend restarted meanwhile) is stuck after STUCK_AFTER: worked out when read, so
+looking at the inbox writes nothing. A stuck item is shown as failed (shown), no longer counts as open (is_open), and
+can be released again."""
 
 from datetime import timedelta
 
+from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
 from . import models
@@ -17,8 +20,6 @@ from .models import InboxStatus
 from .timeutil import utcnow
 
 STUCK_AFTER = timedelta(minutes=10)
-# Still on their way to a recipe: waiting for a parent, being read, or a draft to check
-OPEN = (InboxStatus.WAITING, InboxStatus.PROCESSING, InboxStatus.DRAFT)
 
 
 class ItemBusy(Refused):
@@ -50,7 +51,7 @@ def add(db: Session, user: models.User, item: models.InboxItem, raw: bytes | Non
 
 def release(db: Session, item: models.InboxItem) -> None:
     """A parent's go: only now is it read, are links fetched and may the AI see it."""
-    if item.status in (InboxStatus.PROCESSING, InboxStatus.DONE):
+    if item.status == InboxStatus.DONE or (item.status == InboxStatus.PROCESSING and not _stuck(item)):
         raise ItemBusy()
     item.status, item.error, item.processing_since = InboxStatus.PROCESSING, None, utcnow()
     db.commit()
@@ -77,13 +78,32 @@ def saved_as(item: models.InboxItem, recipe_id: int) -> None:
     item.status, item.recipe_id = InboxStatus.DONE, recipe_id
 
 
-def unstick(db: Session) -> None:
-    stuck = db.query(models.InboxItem).filter(
-        models.InboxItem.status == InboxStatus.PROCESSING, models.InboxItem.processing_since < utcnow() - STUCK_AFTER
+def _stuck(item: models.InboxItem) -> bool:
+    return (
+        item.status == InboxStatus.PROCESSING
+        and item.processing_since is not None
+        and item.processing_since < utcnow() - STUCK_AFTER
     )
-    for item in stuck:
-        item.status, item.error, item.processing_since = InboxStatus.FAILED, "ai_failed", None
-    db.commit()
+
+
+def shown(item: models.InboxItem) -> tuple[str, str | None]:
+    """The status and error a person sees: a stuck item as failed."""
+    if _stuck(item):
+        return InboxStatus.FAILED, "ai_failed"
+    return item.status, item.error
+
+
+def is_open():
+    """A filter for items still on their way to a recipe: waiting for a parent, being read (not stuck), or a draft to
+    check."""
+    item = models.InboxItem
+    return or_(
+        item.status.in_((InboxStatus.WAITING, InboxStatus.DRAFT)),
+        and_(
+            item.status == InboxStatus.PROCESSING,
+            or_(item.processing_since.is_(None), item.processing_since >= utcnow() - STUCK_AFTER),
+        ),
+    )
 
 
 def visible(db: Session, item_id: int, user: models.User) -> models.InboxItem:

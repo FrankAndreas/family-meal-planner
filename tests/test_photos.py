@@ -189,7 +189,6 @@ def test_huge_picture_refused():
     import io
 
     import pytest
-    from fastapi import HTTPException
     from PIL import Image
 
     from app import photos
@@ -197,7 +196,7 @@ def test_huge_picture_refused():
     out = io.BytesIO()
     Image.new("1", (12000, 12000)).save(out, "PNG")
     assert len(out.getvalue()) < 1_000_000
-    with pytest.raises(HTTPException):
+    with pytest.raises(photos.PhotoUnreadable):
         photos.downscale(out.getvalue())
 
 

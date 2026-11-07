@@ -16,7 +16,8 @@ from sqlalchemy.orm import Session
 
 from . import ai, auth, config, importer, mail, models, photos, schemas, swissmilk  # noqa: F401  (photos: HEIC opener)
 from .database import get_db
-from .errors import api_error
+from .http_errors import api_error
+from .inbox_files import inbox_dir, raw_path
 from .timeutil import utcnow
 
 router = APIRouter(tags=["inbox"])
@@ -28,16 +29,6 @@ THUMB_SIDE = 320
 RASTER_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp", "image/heic", "image/heif"}
 # Processing that never finished (e.g. the backend restarted meanwhile) counts as failed after this
 STUCK_AFTER = timedelta(minutes=10)
-
-
-def inbox_dir():
-    folder = config.data_dir() / "inbox"
-    folder.mkdir(parents=True, exist_ok=True)
-    return folder
-
-
-def raw_path(item: models.InboxItem):
-    return inbox_dir() / f"{item.id}.eml"
 
 
 def item_out(item: models.InboxItem) -> schemas.InboxItemOut:

@@ -497,9 +497,9 @@ def test_start_only_takes_the_one_list_conflict(client, admin_headers, week, mon
     """Another failure while starting (here: a planned meal deleted meanwhile) is not taken for "a list exists"."""
     from sqlalchemy.exc import IntegrityError
 
-    from app import models, plan_api, shopping_api
+    from app import models, plan, shopping_api
 
-    real = plan_api.entries_in_week
+    real = plan.entries_in_week
 
     def deleted_meanwhile(db_, start):
         entries = real(db_, start)

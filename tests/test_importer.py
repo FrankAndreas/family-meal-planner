@@ -125,11 +125,26 @@ def test_nothing_found(client, admin_headers, world, monkeypatch):
     assert got["status"] == "failed" and got["error"] == "nothing_found"
 
 
-def test_ai_limit_reported(client, admin_headers, world, monkeypatch):
+def test_ai_off_reported(client, admin_headers, world, monkeypatch):
     monkeypatch.setenv("AI_CALLS_PER_HOUR", "0")
     item = _mail(client, admin_headers, text="Rezept: Reis kochen")
     client.post(f"/api/inbox/{item}/process", headers=admin_headers)
     assert _item(client, admin_headers, item)["error"] == "ai_off"
+
+
+def _hour_used_up(db, monkeypatch):
+    monkeypatch.setenv("AI_CALLS_PER_HOUR", "1")
+    admin = db.query(models.User).filter_by(name="Admin").one()
+    db.add(models.AiCall(user_id=admin.id, at=utcnow(), purpose="import"))
+    db.commit()
+
+
+def test_ai_limit_reported(client, admin_headers, world, db, monkeypatch):
+    item = _mail(client, admin_headers, text="Rezept: Reis kochen")
+    _hour_used_up(db, monkeypatch)
+    client.post(f"/api/inbox/{item}/process", headers=admin_headers)
+    got = _item(client, admin_headers, item)
+    assert got["status"] == "failed" and got["error"] == "ai_limit"
 
 
 def test_busy_and_children(client, admin_headers, world, db, monkeypatch):
@@ -507,6 +522,19 @@ def test_ai_off_leaves_a_recipe_page_untranslated(client, admin_headers, world, 
     got = _item(client, admin_headers, item["id"])
     assert got["status"] == "draft" and calls == [] and got["draft"]["title"] == "Fudgy brownies"
     assert got["draft"]["uncertain"] == ["Nicht übersetzt: Die KI ist ausgeschaltet."]
+
+
+def test_ai_limit_leaves_a_recipe_page_untranslated(client, admin_headers, world, bilingual, db, monkeypatch):
+    """Not translated, but the draft is there: the Translate button can do it later."""
+    pages, calls = world
+    page = json.dumps({"@context": "https://schema.org", "@type": "Recipe", "name": "Fudgy brownies", "inLanguage": "en",
+                       "recipeIngredient": ["3 bananas"], "recipeInstructions": ["Bake."]})
+    pages["https://blog.example/brownies"] = ("text/html", f'<script type="application/ld+json">{page}</script>'.encode())
+    _hour_used_up(db, monkeypatch)
+    item = client.post("/api/inbox/urls", json={"url": "https://blog.example/brownies"}, headers=admin_headers).json()
+    got = _item(client, admin_headers, item["id"])
+    assert got["status"] == "draft" and calls == [] and got["draft"]["title"] == "Fudgy brownies"
+    assert got["draft"]["uncertain"] == [importer.NOT_TRANSLATED["de"]]
 
 
 def test_ai_draft_has_categories(client, admin_headers, world, monkeypatch):

@@ -11,9 +11,9 @@ import logging
 import threading
 from urllib.parse import urlsplit
 
-from fastapi import HTTPException
-
 from . import ai, config, database, fetch, jsonld, mail, microdata, models, photos, swissmilk
+from .errors import Refused
+from .inbox_files import raw_path
 
 logger = logging.getLogger(__name__)
 
@@ -35,10 +35,9 @@ def run(item_id: int, user_id: int) -> None:
             return
         try:
             process(db, item, user)
-        except HTTPException as error:
-            # ai_off or ai_limit from take_call
-            detail = error.detail
-            _fail(db, item, detail["code"] if isinstance(detail, dict) else str(detail))
+        except Refused as error:
+            # e.g. ai_off or ai_limit from take_call
+            _fail(db, item, error.code)
         except ai.AiFailed:
             _fail(db, item, "ai_failed")
         except Exception:
@@ -84,8 +83,8 @@ def _translated(db, item: models.InboxItem, user: models.User, draft: dict) -> d
     try:
         call = ai.take_call(db, user, "translate", item_id=item.id)
         done, tokens = ai.translate(ai.client_for(ai.Settings.from_env()), text, target)
-    except (HTTPException, ai.AiFailed) as error:
-        off = isinstance(error, HTTPException) and error.status_code == 503
+    except (ai.AiOff, ai.AiLimit, ai.AiFailed) as error:
+        off = isinstance(error, ai.AiOff)
         return {**draft, "uncertain": [*draft.get("uncertain", []), (AI_OFF if off else NOT_TRANSLATED)[target]]}
     call.tokens = tokens
     db.commit()
@@ -99,7 +98,7 @@ def _photo(url: str | None) -> str | None:
         return None
     try:
         return photos.store_photo(fetch.fetch(url, accept=IMAGE_TYPES).body)
-    except (fetch.FetchFailed, fetch.FetchRefused, HTTPException):
+    except (fetch.FetchFailed, fetch.FetchRefused, photos.PhotoUnreadable):
         return None
 
 
@@ -111,7 +110,7 @@ def _swissmilk_draft(page: fetch.Page) -> dict | None:
     image = draft.pop("image_url", None)
     try:
         draft["photo"] = photos.store_photo(swissmilk.original_photo(image)) if image else None
-    except (fetch.FetchFailed, fetch.FetchRefused, HTTPException):
+    except (fetch.FetchFailed, fetch.FetchRefused, photos.PhotoUnreadable):
         draft["photo"] = None
     return draft
 
@@ -147,13 +146,9 @@ def process(db, item: models.InboxItem, user: models.User) -> None:
     if item.kind == "url":
         links = [item.url]
     elif item.kind == "text":
-        from .inbox_api import raw_path
-
         content = mail.content(raw_path(item).read_bytes())
         links = []
     else:
-        from .inbox_api import raw_path
-
         content = mail.content(raw_path(item).read_bytes())
         links = [link for link in content.links if _followable(link)][:MAX_LINKS]
 

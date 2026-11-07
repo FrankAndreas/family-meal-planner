@@ -1,7 +1,7 @@
 import api from './api';
 import type { RecipeSummary } from './recipes';
 
-// Mirrors backend/app/use_up_api.py
+// Mirrors backend/app/use_up_api.py (the matching: use_up.py)
 export type UseUpMode = 'use_up' | 'cook_now';
 
 export interface UseUpResult extends RecipeSummary {
@@ -25,7 +25,7 @@ export interface UseUpState {
 const KEY = 'meals.useUp';
 // The most ingredients one search takes (backend/app/use_up_api.py)
 export const MAX_HAVE = 20;
-// "Jetzt kochen" shows recipes missing at most this many ingredients (MAX_MISSING there)
+// "Jetzt kochen" shows recipes missing at most this many ingredients (MAX_MISSING in backend/app/use_up.py)
 export const MAX_MISSING = 2;
 const EMPTY: UseUpState = { tab: 'search', have: [], mode: 'use_up' };
 

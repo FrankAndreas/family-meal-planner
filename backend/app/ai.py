@@ -16,18 +16,14 @@ from dataclasses import dataclass
 from datetime import timedelta
 from typing import Protocol
 
-from fastapi import APIRouter, Depends
 from PIL import Image, ImageOps
-from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from . import auth, categories, config, models, photos  # noqa: F401  (photos: HEIC opener)
-from .database import get_db
-from .errors import api_error
+from . import categories, config, models, photos  # noqa: F401  (photos: HEIC opener)
+from .errors import Refused
 from .timeutil import utcnow
 from .units import UNITS
 
-router = APIRouter(tags=["ai"])
 logger = logging.getLogger(__name__)
 
 DEFAULT_MODEL = "google/gemma-4-31B-it"
@@ -156,7 +152,23 @@ def client_for(settings: Settings) -> AiClient:
     return InfomaniakClient(settings)
 
 
-def _calls_last_hour(db: Session, user: models.User, now) -> list:
+class AiOff(Refused):
+    status = 503
+
+    def __init__(self) -> None:
+        super().__init__("ai_off")
+
+
+class AiLimit(Refused):
+    """The person's calls of the last hour are used up; `minutes` until the next one."""
+
+    status = 429
+
+    def __init__(self, minutes: int) -> None:
+        super().__init__("ai_limit", minutes=minutes)
+
+
+def calls_last_hour(db: Session, user: models.User, now) -> list:
     return (
         db.query(models.AiCall.at)
         .filter(models.AiCall.user_id == user.id, models.AiCall.at > now - timedelta(hours=1))
@@ -166,15 +178,15 @@ def _calls_last_hour(db: Session, user: models.User, now) -> list:
 
 
 def take_call(db: Session, user: models.User, purpose: str, item_id: int | None = None, recipe_id: int | None = None):
-    """Count one AI call for the person, or refuse: AI off (503), or the last hour's calls used up (429)."""
+    """Count one AI call for the person, or refuse: AiOff, or AiLimit when the last hour's calls are used up."""
     settings = Settings.from_env()
     if not settings.enabled:
-        raise api_error(503, "ai_off")
+        raise AiOff()
     now = utcnow()
-    calls = _calls_last_hour(db, user, now)
+    calls = calls_last_hour(db, user, now)
     if len(calls) >= settings.calls_per_hour:
         minutes = max(1, math.ceil((calls[0].at + timedelta(hours=1) - now).total_seconds() / 60))
-        raise api_error(429, "ai_limit", minutes=minutes)
+        raise AiLimit(minutes)
     call = models.AiCall(user_id=user.id, at=now, purpose=purpose, item_id=item_id, recipe_id=recipe_id)
     db.add(call)
     db.commit()
@@ -315,29 +327,6 @@ def recipe_from_ai(
             sent.append(position)
     answer = client.complete(content)
     return validate_draft(answer.text), answer.text, answer.tokens, sent
-
-
-@router.get("/ai/status")
-def ai_status(user: models.User = Depends(auth.get_current_user), db: Session = Depends(get_db)):
-    settings = Settings.from_env()
-    left = max(0, settings.calls_per_hour - len(_calls_last_hour(db, user, utcnow()))) if settings.enabled else 0
-    return {"enabled": settings.enabled, "calls_left_this_hour": left}
-
-
-@router.get("/ai/usage")
-def ai_usage(_parent: models.User = Depends(auth.require_parent), db: Session = Depends(get_db)):
-    """AI calls this month per person, and all calls ever (the costs themselves are in Infomaniak's manager)."""
-    now = utcnow()
-    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    rows = (
-        db.query(models.User.name, func.count(models.AiCall.id))
-        .join(models.User, models.User.id == models.AiCall.user_id)
-        .filter(models.AiCall.at >= month_start)
-        .group_by(models.User.name)
-        .order_by(models.User.name)
-        .all()
-    )
-    return {"month": [{"user_name": name, "calls": calls} for name, calls in rows], "total": db.query(models.AiCall).count()}
 
 
 TRANSLATE_PROMPT = """Übersetze dieses Kochrezept {into}.

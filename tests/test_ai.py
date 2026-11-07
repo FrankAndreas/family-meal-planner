@@ -4,7 +4,6 @@ import urllib.error
 from datetime import timedelta
 
 import pytest
-from fastapi import HTTPException
 
 from app import ai, models
 from app.categories import CATEGORIES
@@ -24,19 +23,18 @@ def _admin(db):
 
 
 def test_off_without_token(db):
-    with pytest.raises(HTTPException) as caught:
+    with pytest.raises(ai.AiOff) as caught:
         ai.take_call(db, _admin(db), "import")
-    assert caught.value.status_code == 503 and caught.value.detail == "ai_off"
+    assert caught.value.code == "ai_off"
 
 
 def test_hourly_limit(db, ai_on):
     admin = _admin(db)
     ai.take_call(db, admin, "import", item_id=1)
     ai.take_call(db, admin, "translate", recipe_id=2)
-    with pytest.raises(HTTPException) as caught:
+    with pytest.raises(ai.AiLimit) as caught:
         ai.take_call(db, admin, "import")
-    assert caught.value.status_code == 429
-    assert caught.value.detail["code"] == "ai_limit" and 1 <= caught.value.detail["minutes"] <= 60
+    assert caught.value.code == "ai_limit" and 1 <= caught.value.params["minutes"] <= 60
     assert db.query(models.AiCall).count() == 2
 
 
@@ -49,9 +47,8 @@ def test_old_calls_dont_count(db, ai_on):
 
 def test_zero_turns_it_off(db, ai_on, monkeypatch):
     monkeypatch.setenv("AI_CALLS_PER_HOUR", "0")
-    with pytest.raises(HTTPException) as caught:
+    with pytest.raises(ai.AiOff):
         ai.take_call(db, _admin(db), "import")
-    assert caught.value.detail == "ai_off"
 
 
 def test_status_and_usage(client, admin_headers, db, ai_on):

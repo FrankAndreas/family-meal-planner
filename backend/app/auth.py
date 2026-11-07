@@ -11,7 +11,7 @@ from fastapi.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
 
 from . import database, hub, hub_people, models
-from .errors import api_error
+from .http_errors import api_error
 
 logger = logging.getLogger(__name__)
 

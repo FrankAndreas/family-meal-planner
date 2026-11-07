@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from . import auth, config, hub, hub_people, models, schemas
 from .database import get_db
-from .errors import api_error
+from .http_errors import api_error
 
 router = APIRouter(tags=["users"])
 

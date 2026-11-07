@@ -6,8 +6,8 @@ from sqlalchemy.orm import Session
 
 from . import ai, auth, categories, models, schemas
 from .database import get_db
-from .errors import api_error
-from .recipes_api import get_recipe, live_recipes
+from .http_errors import api_error
+from .recipes import get_recipe, live_recipes
 from .timeutil import utcnow
 
 router = APIRouter(tags=["categories"])

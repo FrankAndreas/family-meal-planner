@@ -1,44 +1,17 @@
 import { parseISO } from 'date-fns';
 import api from './api';
+import type { Schemas } from './apiTypes';
 import type { RecipeSummary } from './recipes';
 import { WEEKDAYS } from './types';
 
-// Mirrors backend/app/schemas.py (EntryOut, WeekOut); slots in the order of a day
+// Slots in the order of a day (the backend's Slot)
 export const SLOTS = ['breakfast', 'snack', 'lunch', 'dinner'] as const;
 export type Slot = (typeof SLOTS)[number];
 export type SuggestionTab = 'favorites' | 'long_ago' | 'new' | 'again';
 
-export interface PlanEntry {
-    id: number;
-    date: string;
-    slot: Slot;
-    position: number;
-    recipe: RecipeSummary | null;
-    recipe_deleted: boolean;
-    note: string | null;
-    people: number | null;
-    eaten: boolean;
-}
-
-export interface Week {
-    start: string;
-    end: string;
-    days: string[];
-    today: string;
-    entries: PlanEntry[];
-    closed: boolean;
-    previous_needs_closing: boolean;
-    planned_slots: number;
-    total_slots: number;
-}
-
-export interface NewEntry {
-    date: string;
-    slot: Slot;
-    recipe_id?: number;
-    note?: string;
-    people?: number;
-}
+export type PlanEntry = Schemas['EntryOut'];
+export type Week = Schemas['WeekOut'];
+export type NewEntry = Schemas['EntryIn'];
 
 export const fetchWeek = async (start?: string | null) =>
     (await api.get<Week>('/api/plan', { params: start ? { start } : {} })).data;

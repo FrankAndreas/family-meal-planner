@@ -1,47 +1,16 @@
 import api from './api';
-import type { Slot } from './plan';
+import type { Schemas } from './apiTypes';
 
 export { formatSpec } from './shoppingSpec';
 
 // The shared shopping list (spec 2026-11-06): the parents' decisions, with the lines worked out from the plan
-export interface ShoppingMeal {
-    entry_id: number;
-    date: string;
-    slot: Slot;
-    title: string;
-    people: number | null;
-    ticked: boolean;
-}
-
-export interface ShoppingNote {
-    date: string;
-    slot: Slot;
-    note: string;
-}
-
+export type ShoppingMeal = Schemas['ShoppingMealOut'];
+export type ShoppingNote = Schemas['ShoppingNoteOut'];
 export type { ShoppingLine } from './shoppingSpec';
-import type { ShoppingLine } from './shoppingSpec';
+export type ShoppingExtra = Schemas['ShoppingExtraOut'];
+export type ShoppingList = Schemas['ShoppingOut'];
 
-export interface ShoppingExtra {
-    id: number;
-    name: string;
-    amount: string;
-}
-
-export interface ShoppingList {
-    week_start: string;
-    week_end: string;
-    started_by: string | null;
-    changed_by: string | null;
-    changed_at: string;
-    meals: ShoppingMeal[];
-    notes: ShoppingNote[];
-    lines: ShoppingLine[];
-    extras: ShoppingExtra[];
-    version: string;
-}
-
-export const fetchShopping = async () => (await api.get<{ list: ShoppingList | null }>('/api/shopping')).data.list;
+export const fetchShopping = async () => (await api.get<Schemas['ShoppingStateOut']>('/api/shopping')).data.list;
 
 export const startShopping = async (weekStart: string, replace = false) =>
     (await api.post<ShoppingList>('/api/shopping', { week_start: weekStart, replace })).data;
@@ -62,4 +31,4 @@ export const addExtra = async (name: string, amount: string) =>
 export const removeExtra = async (id: number) => (await api.delete<ShoppingList>(`/api/shopping/extras/${id}`)).data;
 
 export const sendShopping = async (version: string, specs: Record<string, string>) =>
-    (await api.post<{ sent: number; kept: boolean }>('/api/shopping/send', { version, specs })).data;
+    (await api.post<Schemas['ShoppingSentOut']>('/api/shopping/send', { version, specs })).data;

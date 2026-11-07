@@ -6,11 +6,14 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator, model_validator
 
 from .categories import Category, clean
-from .models import UserRole
+from .models import InboxKind, InboxStatus, UserRole
 from .units import UNITS
 
 Pin = Annotated[str, StringConstraints(pattern=r"^\d{4}$")]
 Name = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=50)]
+Language = Literal["de", "en"]
+# How a recipe came in: typed, or from the inbox (InboxKind)
+SourceKind = Literal["manual", "url", "mail", "scan", "text"]
 
 
 
@@ -24,7 +27,7 @@ class UserOut(BaseModel):
     name: str
     role: UserRole
     # The language the person sees: their own choice, or the default language
-    language: Literal["de", "en"]
+    language: Language
     language_chosen: bool
 
 
@@ -107,9 +110,9 @@ class RecipeIn(BaseModel):
     tags: Annotated[list[Annotated[str, StringConstraints(max_length=40)]], Field(max_length=20)] = []
     categories: Annotated[list[Category], Field(max_length=20)] = []
     notes: Annotated[str, StringConstraints(max_length=10_000)] = ""
-    source_kind: Literal["manual", "url", "mail", "scan", "text"] = "manual"
+    source_kind: SourceKind = "manual"
     source_url: Annotated[str, StringConstraints(strip_whitespace=True, max_length=1000)] | None = None
-    language: Literal["de", "en"] | None = None
+    language: Language | None = None
     # Saving a draft from the inbox: the item it came from (its photo is taken over, the item is done)
     inbox_item_id: int | None = None
 
@@ -162,7 +165,7 @@ class RecipeSummary(BaseModel):
     title: str
     photo_url: str | None
     tags: list[str]
-    categories: list[str]
+    categories: list[Category]
     servings: float
     servings_unit: str | None
     total_minutes: int | None
@@ -199,9 +202,25 @@ class SourceMail(BaseModel):
     """The mail or pasted link a recipe was saved from: who sent it, and when."""
 
     id: int
-    kind: str
+    kind: InboxKind
     user_name: str | None
     received_at: dt.datetime
+
+
+class OriginalIngredient(BaseModel):
+    name: str = ""
+    note: str = ""
+
+
+class Original(BaseModel):
+    """A recipe's text before an AI translation (amounts and units never change in one)."""
+
+    title: str = ""
+    ingredients: list[OriginalIngredient] = []
+    steps: list[str] = []
+    notes: str = ""
+    tags: list[str] = []
+    language: Language | None = None
 
 
 class RecipeOut(RecipeSummary):
@@ -209,9 +228,9 @@ class RecipeOut(RecipeSummary):
     cook_minutes: int | None
     steps: list[str]
     notes: str
-    source_kind: str
+    source_kind: SourceKind
     source_url: str | None
-    language: str | None
+    language: Language | None
     created_by_name: str | None
     deleted: bool
     ingredients: list[IngredientOut]
@@ -220,8 +239,8 @@ class RecipeOut(RecipeSummary):
     factor: float
     inbox_item_id: int | None
     source_mail: SourceMail | None
-    original: dict | None
-    translate_into: Literal["de", "en"] | None = None
+    original: Original | None
+    translate_into: Language | None
 
 
 class TagCount(BaseModel):
@@ -320,16 +339,25 @@ class EmailOut(BaseModel):
     address: str
 
 
+class Attachment(BaseModel):
+    """A part of a mail, from its MIME structure (not decoded)."""
+
+    index: int
+    name: str
+    type: str
+    size: int
+
+
 class InboxItemOut(BaseModel):
     id: int
-    kind: str
-    status: str
+    kind: InboxKind
+    status: InboxStatus
     user_name: str | None
     from_addr: str
     subject: str
     url: str | None
     received_at: dt.datetime
-    attachments: list[dict]
+    attachments: list[Attachment]
     error: str | None
     recipe_id: int | None
 
@@ -371,7 +399,7 @@ class InboxItemDetail(InboxItemOut):
     draft: dict | None
     ai_raw: str | None
     # A pasted text, as it was pasted
-    text: str | None = None
+    text: str | None
 
 
 class CategorizeIn(BaseModel):
@@ -495,3 +523,20 @@ class ShoppingSentOut(BaseModel):
     sent: int
     # The list changed while it was being sent: it stays, to check and send what's missing
     kept: bool
+
+
+class AiStatusOut(BaseModel):
+    enabled: bool
+    calls_left_this_hour: int
+
+
+class AiUsageRow(BaseModel):
+    user_name: str
+    calls: int
+
+
+class AiUsageOut(BaseModel):
+    """AI calls this month per person, and all calls ever."""
+
+    month: list[AiUsageRow]
+    total: int

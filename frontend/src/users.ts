@@ -1,13 +1,8 @@
 import api, { renewsAtHub } from './api';
+import type { Schemas } from './apiTypes';
 import type { User } from './types';
 
-// Mirrors backend/app/schemas.py (EmailOut)
-export interface MailAddress {
-    id: number;
-    user_id: number;
-    user_name: string;
-    address: string;
-}
+export type MailAddress = Schemas['EmailOut'];
 
 export const fetchMe = async () => (await api.get<User>('/api/me')).data;
 // Who is logged in, on loading the page; null while on the way through the hub, which renews a login in its last week

@@ -1,32 +1,13 @@
 import api, { fetchBlob } from './api';
+import type { Schemas } from './apiTypes';
 import type { Category } from './categories';
-import type { RecipeInput } from './recipes';
 
-// Mirrors backend/app/schemas.py (InboxItemOut, InboxItemDetail)
-export type InboxStatus = 'waiting' | 'processing' | 'draft' | 'failed' | 'done';
+export type InboxItem = Schemas['InboxItemOut'];
+export type InboxStatus = InboxItem['status'];
+export type Attachment = Schemas['Attachment'];
 
-export interface Attachment {
-    index: number;
-    name: string;
-    type: string;
-    size: number;
-}
-
-export interface InboxItem {
-    id: number;
-    kind: 'mail' | 'url' | 'scan' | 'text';
-    status: InboxStatus;
-    user_name: string | null;
-    from_addr: string;
-    subject: string;
-    url: string | null;
-    received_at: string;
-    attachments: Attachment[];
-    error: string | null;
-    recipe_id: number | null;
-}
-
-export type Draft = Omit<RecipeInput, 'ingredients' | 'categories'> & {
+// As the importer made it (jsonld.py, ai.py): never with a source_kind or an inbox item, maybe without times
+export type Draft = Omit<Schemas['RecipeIn'], 'ingredients' | 'categories' | 'source_kind' | 'inbox_item_id'> & {
     // Missing in drafts made before there were categories
     categories?: Category[];
     ingredients: { amount: number | null; unit: string | null; name: string; note: string }[];
@@ -35,12 +16,8 @@ export type Draft = Omit<RecipeInput, 'ingredients' | 'categories'> & {
     image_attachment?: number | null;
 };
 
-export interface InboxItemDetail extends InboxItem {
-    draft: Draft | null;
-    ai_raw: string | null;
-    // A pasted text, as it was pasted
-    text: string | null;
-}
+// The draft is kept as the importer made it (a JSON column), so the backend describes it only as an object
+export type InboxItemDetail = Omit<Schemas['InboxItemDetail'], 'draft'> & { draft: Draft | null };
 
 export const fetchInbox = async () => (await api.get<InboxItem[]>('/api/inbox')).data;
 export const fetchItem = async (id: number | string) => (await api.get<InboxItemDetail>(`/api/inbox/${id}`)).data;

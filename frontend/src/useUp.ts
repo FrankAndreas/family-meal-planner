@@ -1,13 +1,10 @@
 import api from './api';
-import type { RecipeSummary } from './recipes';
+import type { Schemas } from './apiTypes';
 
-// Mirrors backend/app/use_up_api.py (the matching: use_up.py)
+// The modes of backend/app/use_up_api.py (the matching: use_up.py)
 export type UseUpMode = 'use_up' | 'cook_now';
 
-export interface UseUpResult extends RecipeSummary {
-    used: string[];
-    missing: string[];
-}
+export type UseUpResult = Schemas['UseUpOut'];
 
 export const fetchUseUp = async (have: string[], mode: UseUpMode) =>
     (await api.get<UseUpResult[]>('/api/use-up', { params: { have, mode }, paramsSerializer: { indexes: null } })).data;
@@ -51,16 +48,8 @@ export function saveUseUp(state: UseUpState): void {
     }
 }
 
-// Mirrors backend/app/schemas.py SwissmilkResult; `photo` is an address on this app's own backend
-export interface SwissmilkResult {
-    title: string;
-    url: string;
-    photo: string | null;
-    used: string[];
-    missing: string[];
-    recipe_id: number | null;
-    waiting: boolean;
-}
+// `photo` is an address on this app's own backend
+export type SwissmilkResult = Schemas['SwissmilkResult'];
 
 export const fetchSwissmilk = async (have: string[], mode: UseUpMode) =>
     (await api.get<SwissmilkResult[]>('/api/use-up/swissmilk', { params: { have, mode }, paramsSerializer: { indexes: null } }))

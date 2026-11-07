@@ -2,9 +2,10 @@ from fastapi import APIRouter, Depends, Query, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
-from . import ai, auth, categories, config, fetch, inbox_files, jsonld, mail, models, photos, scaling, schemas
+from . import ai, auth, categories, config, fetch, inbox, inbox_files, jsonld, mail, models, photos, scaling, schemas
 from .database import get_db
 from .http_errors import api_error
+from .models import InboxKind
 from .recipes import Votes, filter_recipes, get_recipe, live_recipes, normalize_tags
 from .settings_store import get_settings
 from .text import sort_key
@@ -105,11 +106,8 @@ def create_recipe(
 ):
     item = None
     if body.inbox_item_id is not None:
-        item = db.get(models.InboxItem, body.inbox_item_id)
-        if item is None or (me.role != models.UserRole.PARENT and item.user_id != me.id):
-            raise api_error(404, "item_not_found")
-        if item.status != "draft":
-            raise api_error(400, "draft_not_ready")
+        item = inbox.visible(db, body.inbox_item_id, me)
+        inbox.check_draft(item)
     recipe = models.Recipe(created_by=me.id)
     _apply(db, recipe, body)
     if item is not None:
@@ -119,7 +117,7 @@ def create_recipe(
     db.add(recipe)
     db.flush()
     if item is not None:
-        item.status, item.recipe_id = "done", recipe.id
+        inbox.saved_as(item, recipe.id)
     db.commit()
     return recipe_out(db, recipe, me)
 
@@ -150,7 +148,7 @@ def _draft_photo(item: models.InboxItem) -> str | None:
     draft = item.draft or {}
     if draft.get("photo") and photos.photo_path(draft["photo"]):
         return draft["photo"]
-    if item.kind in ("mail", "scan") and draft.get("image_attachment") is not None:
+    if item.kind in (InboxKind.MAIL, InboxKind.SCAN) and draft.get("image_attachment") is not None:
         found = mail.attachment(inbox_files.raw_path(item).read_bytes(), draft["image_attachment"])
         if found and found[0].startswith("image/"):
             try:

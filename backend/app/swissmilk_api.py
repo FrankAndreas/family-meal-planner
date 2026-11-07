@@ -10,9 +10,10 @@ from fastapi import APIRouter, Depends, Query
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
-from . import auth, fetch, models, schemas, swissmilk
+from . import auth, fetch, inbox, models, schemas, swissmilk
 from .database import get_db
 from .http_errors import api_error
+from .models import InboxKind
 from .settings_store import get_settings
 from .use_up import MAX_MISSING, check, fit, typed_words
 
@@ -26,8 +27,6 @@ PHOTO_SECONDS = 10
 PARALLEL = 4
 # One Swissmilk search per person in this time
 SEARCH_GAP_SECONDS = 5
-# Inbox items that still count as "taken over": waiting for a parent, being read, or a draft to check
-OPEN_STATUSES = ("waiting", "processing", "draft")
 
 _last_search: dict[int, float] = {}
 _limit_lock = threading.Lock()
@@ -68,7 +67,7 @@ def _already(db: Session) -> tuple[dict[str, int], set[str]]:
     waiting = {
         number
         for (url,) in db.query(models.InboxItem.url).filter(
-            models.InboxItem.kind == "url", models.InboxItem.status.in_(OPEN_STATUSES)
+            models.InboxItem.kind == InboxKind.URL, models.InboxItem.status.in_(inbox.OPEN)
         )
         if url and (number := swissmilk.recipe_id(url))
     }

@@ -11,9 +11,10 @@ import logging
 import threading
 from urllib.parse import urlsplit
 
-from . import ai, config, database, fetch, jsonld, mail, microdata, models, photos, swissmilk
+from . import ai, config, database, fetch, inbox, jsonld, mail, microdata, models, photos, swissmilk
 from .errors import Refused
 from .inbox_files import raw_path
+from .models import InboxKind
 
 logger = logging.getLogger(__name__)
 
@@ -37,22 +38,12 @@ def run(item_id: int, user_id: int) -> None:
             process(db, item, user)
         except Refused as error:
             # e.g. ai_off or ai_limit from take_call
-            _fail(db, item, error.code)
+            inbox.fail(db, item, error.code)
         except ai.AiFailed:
-            _fail(db, item, "ai_failed")
+            inbox.fail(db, item, "ai_failed")
         except Exception:
             logger.exception("Processing inbox item %s failed", item_id)
-            _fail(db, item, "ai_failed")
-
-
-def _fail(db, item: models.InboxItem, code: str) -> None:
-    item.status, item.error, item.processing_since = "failed", code, None
-    db.commit()
-
-
-def _finish(db, item: models.InboxItem, draft: dict, raw: str | None = None) -> None:
-    item.status, item.error, item.draft, item.ai_raw, item.processing_since = "draft", None, draft, raw, None
-    db.commit()
+            inbox.fail(db, item, "ai_failed")
 
 
 # Said in the draft's "Bitte prüfen" when the translation didn't work: the Translate button can still do it later
@@ -143,9 +134,9 @@ def _ask_ai(db, item, user, text: str, images: list[bytes]) -> tuple[dict, str, 
 
 def process(db, item: models.InboxItem, user: models.User) -> None:
     content = None
-    if item.kind == "url":
+    if item.kind == InboxKind.URL:
         links = [item.url]
-    elif item.kind == "text":
+    elif item.kind == InboxKind.TEXT:
         content = mail.content(raw_path(item).read_bytes())
         links = []
     else:
@@ -159,7 +150,7 @@ def process(db, item: models.InboxItem, user: models.User) -> None:
             # Swissmilk: only its own hosts, only its structured data, never the AI (spec 2026-11-01)
             draft = _from_swissmilk(link)
             if draft:
-                _finish(db, item, draft)
+                inbox.finish(db, item, draft)
                 return
             swissmilk_unreadable = True
             continue
@@ -171,14 +162,14 @@ def process(db, item: models.InboxItem, user: models.User) -> None:
             # Reached by a redirect (a newsletter's click tracker): still Swissmilk, still never the AI
             draft = _swissmilk_draft(page)
             if draft:
-                _finish(db, item, draft)
+                inbox.finish(db, item, draft)
                 return
             swissmilk_unreadable = True
             continue
         draft = jsonld.recipe_from_html(page.text, page.url) or microdata.recipe_from_html(page.text, page.url)
         if draft:
             draft["photo"] = _photo(draft.pop("image_url", None))
-            _finish(db, item, _translated(db, item, user, draft))
+            inbox.finish(db, item, _translated(db, item, user, draft))
             return
         page_without_recipe = page_without_recipe or page
 
@@ -195,12 +186,12 @@ def process(db, item: models.InboxItem, user: models.User) -> None:
         else:
             draft.pop("image_index", None)
             draft["source_url"] = page_without_recipe.url
-            _finish(db, item, _translated(db, item, user, draft), raw)
+            inbox.finish(db, item, _translated(db, item, user, draft), raw)
             return
 
     if content is not None and (content.text.strip() or content.images):
         # A pasted text's subject is only its own first line
-        text = content.text if item.kind == "text" else f"Betreff: {item.subject}\n\n{content.text}"
+        text = content.text if item.kind == InboxKind.TEXT else f"Betreff: {item.subject}\n\n{content.text}"
         draft, raw, sent = _ask_ai(db, item, user, text, [data for _, data in content.images])
         index = draft.pop("image_index", None)
         # The picture the AI named (counted among those it got), else the first it got: as an attachment index,
@@ -208,8 +199,8 @@ def process(db, item: models.InboxItem, user: models.User) -> None:
         if sent:
             chosen = sent[index] if isinstance(index, int) and 0 <= index < len(sent) else sent[0]
             draft["image_attachment"] = content.images[chosen][0]
-        draft["source_url"] = item.url if item.kind == "text" else (links[0] if links else None)
-        _finish(db, item, _translated(db, item, user, draft), raw)
+        draft["source_url"] = item.url if item.kind == InboxKind.TEXT else (links[0] if links else None)
+        inbox.finish(db, item, _translated(db, item, user, draft), raw)
         return
 
-    _fail(db, item, "swissmilk_unreadable" if swissmilk_unreadable else "nothing_found")
+    inbox.fail(db, item, "swissmilk_unreadable" if swissmilk_unreadable else "nothing_found")

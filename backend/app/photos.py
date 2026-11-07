@@ -37,8 +37,8 @@ def photo_path(name: str) -> Path | None:
     return folder() / name
 
 
-def downscale(data: bytes, side: int = MAX_SIDE) -> bytes:
-    """Any picture as a JPEG of at most `side` pixels, without the original's metadata."""
+def downscale(data: bytes, side: int = MAX_SIDE, quality: int = 85) -> bytes:
+    """Any picture as a JPEG of at most `side` pixels, without the original's metadata (also for thumbnails)."""
     try:
         with Image.open(io.BytesIO(data)) as source:
             # Checked before decoding: the header tells the size
@@ -50,7 +50,7 @@ def downscale(data: bytes, side: int = MAX_SIDE) -> bytes:
     image.thumbnail((side, side))
     out = io.BytesIO()
     # Saved without exif=..., so nothing of the original's metadata is kept
-    image.save(out, "JPEG", quality=85)
+    image.save(out, "JPEG", quality=quality)
     return out.getvalue()
 
 

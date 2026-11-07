@@ -6,8 +6,11 @@ import email.policy
 import email.utils
 import hashlib
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from email.message import EmailMessage
+from email.utils import formatdate, make_msgid
 from html.parser import HTMLParser
 
 
@@ -167,3 +170,17 @@ def content(raw: bytes) -> MailContent:
         except Exception:
             continue
     return MailContent(text.strip(), links, images)
+
+
+def build(subject: str, domain: str, text: str = "", attachments: Sequence[tuple[bytes, str, str]] = ()) -> bytes:
+    """A mail made in the app (a scan's photos, a pasted text), so it is stored, processed and shown like one that
+    came in. `attachments` are (data, MIME type, file name); `domain` makes its Message-ID tell where it came from."""
+    message = EmailMessage()
+    message["Subject"] = subject
+    message["Date"] = formatdate()
+    message["Message-ID"] = make_msgid(domain=domain)
+    message.set_content(text)
+    for data, kind, filename in attachments:
+        maintype, subtype = kind.split("/")
+        message.add_attachment(data, maintype=maintype, subtype=subtype, filename=filename)
+    return message.as_bytes()

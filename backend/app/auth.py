@@ -96,6 +96,6 @@ async def get_current_user(request: Request, db: Session = Depends(database.get_
 
 
 def require_parent(user: models.User = Depends(get_current_user)) -> models.User:
-    if user.role != models.UserRole.PARENT:
+    if not user.is_parent:
         raise api_error(status.HTTP_403_FORBIDDEN, "parents_only")
     return user

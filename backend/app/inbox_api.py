@@ -1,24 +1,20 @@
-"""The recipe inbox: mails from the Cloudflare Email Worker and pasted links, waiting for a parent."""
+"""The recipe inbox: mails from the Cloudflare Email Worker, pasted links and texts, and scans, waiting for a parent.
+An item's life (statuses and the moves between them) is in inbox.py."""
 
 import hmac
-import io
 import logging
-from email.message import EmailMessage
-from email.utils import formatdate, make_msgid
+from datetime import datetime
 from urllib.parse import urlsplit
-
-from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, Request, Response, UploadFile
 from fastapi.responses import FileResponse
-from PIL import Image, ImageOps, UnidentifiedImageError
 from sqlalchemy.orm import Session
 
-from . import ai, auth, config, importer, mail, models, photos, schemas, swissmilk  # noqa: F401  (photos: HEIC opener)
+from . import ai, auth, config, importer, inbox, mail, models, photos, schemas, swissmilk
 from .database import get_db
 from .http_errors import api_error
 from .inbox_files import inbox_dir, raw_path
-from .timeutil import utcnow
+from .models import InboxKind, InboxStatus
 
 router = APIRouter(tags=["inbox"])
 logger = logging.getLogger(__name__)
@@ -27,8 +23,6 @@ MAX_BYTES = 25 * 1024 * 1024
 THUMB_SIDE = 320
 # Pictures only, never SVG: an SVG opened in a tab of its own could run script with the app's login
 RASTER_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp", "image/heic", "image/heif"}
-# Processing that never finished (e.g. the backend restarted meanwhile) counts as failed after this
-STUCK_AFTER = timedelta(minutes=10)
 
 
 def item_out(item: models.InboxItem) -> schemas.InboxItemOut:
@@ -47,22 +41,16 @@ def item_out(item: models.InboxItem) -> schemas.InboxItemOut:
     )
 
 
-def _unstick(db: Session) -> None:
-    stuck = db.query(models.InboxItem).filter(
-        models.InboxItem.status == "processing", models.InboxItem.processing_since < utcnow() - STUCK_AFTER
-    )
-    for item in stuck:
-        item.status, item.error, item.processing_since = "failed", "ai_failed", None
-    db.commit()
-
-
 def visible_item(db: Session, item_id: int, user: models.User) -> models.InboxItem:
-    """An item the person may see: parents all, children their own."""
-    _unstick(db)
-    item = db.get(models.InboxItem, item_id)
-    if item is None or (user.role != models.UserRole.PARENT and item.user_id != user.id):
-        raise api_error(404, "item_not_found")
-    return item
+    inbox.unstick(db)
+    return inbox.visible(db, item_id, user)
+
+
+def _add(db: Session, user: models.User, item: models.InboxItem, raw: bytes | None = None) -> schemas.InboxItemOut:
+    """A new item from someone in the family; a parent's is read right away."""
+    if inbox.add(db, user, item, raw):
+        importer.start(item.id, user.id)
+    return item_out(item)
 
 
 @router.post("/inbound")
@@ -97,7 +85,7 @@ async def receive_mail(request: Request, db: Session = Depends(get_db)):
     if db.query(models.InboxItem).filter(models.InboxItem.message_id == summary.message_id).first():
         return {"status": "duplicate"}
     item = models.InboxItem(
-        kind="mail",
+        kind=InboxKind.MAIL,
         user_id=sender.user_id,
         from_addr=summary.from_addr,
         subject=summary.subject,
@@ -115,9 +103,9 @@ async def receive_mail(request: Request, db: Session = Depends(get_db)):
 
 @router.get("/inbox", response_model=list[schemas.InboxItemOut])
 def list_items(user: models.User = Depends(auth.get_current_user), db: Session = Depends(get_db)):
-    _unstick(db)
-    query = db.query(models.InboxItem).filter(models.InboxItem.status != "done")
-    if user.role != models.UserRole.PARENT:
+    inbox.unstick(db)
+    query = db.query(models.InboxItem).filter(models.InboxItem.status != InboxStatus.DONE)
+    if not user.is_parent:
         query = query.filter(models.InboxItem.user_id == user.id)
     return [item_out(i) for i in query.order_by(models.InboxItem.received_at.desc(), models.InboxItem.id.desc())]
 
@@ -145,25 +133,11 @@ def add_url(body: schemas.UrlIn, user: models.User = Depends(auth.get_current_us
     number = swissmilk.recipe_id(body.url)
     if number:
         for open_item in db.query(models.InboxItem).filter(
-            models.InboxItem.kind == "url", models.InboxItem.status.in_(("waiting", "processing", "draft"))
+            models.InboxItem.kind == InboxKind.URL, models.InboxItem.status.in_(inbox.OPEN)
         ):
             if swissmilk.recipe_id(open_item.url or "") == number:
                 return item_out(open_item)
-    parent = user.role == models.UserRole.PARENT
-    item = models.InboxItem(
-        kind="url",
-        status="processing" if parent else "waiting",
-        user_id=user.id,
-        subject=urlsplit(body.url).hostname or body.url,
-        url=body.url,
-    )
-    if parent:
-        item.processing_since = utcnow()
-    db.add(item)
-    db.commit()
-    if parent:
-        importer.start(item.id, user.id)
-    return item_out(item)
+    return _add(db, user, models.InboxItem(kind=InboxKind.URL, subject=urlsplit(body.url).hostname or body.url, url=body.url))
 
 
 @router.post("/inbox/scans", response_model=schemas.InboxItemOut, status_code=201)
@@ -174,11 +148,7 @@ async def add_scan(
     attached, so it is processed and shown like one. A parent's scan is the release: it is read right away."""
     if len(files) > ai.MAX_IMAGES:
         raise api_error(400, "scan_too_many")
-    message = EmailMessage()
-    message["Subject"] = datetime.now().strftime("Scan %d.%m.%Y %H:%M")
-    message["Date"] = formatdate()
-    message["Message-ID"] = make_msgid(domain="scan.invalid")
-    message.set_content("")
+    pictures = []
     total = 0
     for number, file in enumerate(files, 1):
         kind = (file.content_type or "").lower()
@@ -188,29 +158,17 @@ async def add_scan(
         total += len(data)
         if total > MAX_BYTES:
             raise api_error(413, "scan_too_big")
-        maintype, subtype = kind.split("/")
-        message.add_attachment(data, maintype=maintype, subtype=subtype, filename=f"scan-{number}.{subtype}")
-    raw = message.as_bytes()
+        pictures.append((data, kind, f"scan-{number}.{kind.split('/')[1]}"))
+    raw = mail.build(datetime.now().strftime("Scan %d.%m.%Y %H:%M"), "scan.invalid", attachments=pictures)
     summary = mail.summarize(raw)
-    parent = user.role == models.UserRole.PARENT
     item = models.InboxItem(
-        kind="scan",
-        status="processing" if parent else "waiting",
-        user_id=user.id,
+        kind=InboxKind.SCAN,
         subject=summary.subject,
         message_id=summary.message_id,
         attachments=summary.attachments,
         size=len(raw),
     )
-    if parent:
-        item.processing_since = utcnow()
-    db.add(item)
-    db.flush()
-    raw_path(item).write_bytes(raw)
-    db.commit()
-    if parent:
-        importer.start(item.id, user.id)
-    return item_out(item)
+    return _add(db, user, item, raw)
 
 
 def _title(text: str) -> str:
@@ -224,40 +182,23 @@ def add_text(body: schemas.TextIn, user: models.User = Depends(auth.get_current_
     """A recipe's text pasted in (a Facebook post's caption), with the link it came from. Kept as a mail with only
     that text, so it is processed and shown like one; the link is never fetched (Facebook shows nothing without a
     login), only kept as the source. A parent's paste is the release: it is read right away."""
-    message = EmailMessage()
-    message["Subject"] = _title(body.text)
-    message["Date"] = formatdate()
-    message["Message-ID"] = make_msgid(domain="text.invalid")
-    message.set_content(body.text)
-    raw = message.as_bytes()
-    summary = mail.summarize(raw)
-    parent = user.role == models.UserRole.PARENT
+    raw = mail.build(_title(body.text), "text.invalid", text=body.text)
     item = models.InboxItem(
-        kind="text",
-        status="processing" if parent else "waiting",
-        user_id=user.id,
+        kind=InboxKind.TEXT,
         subject=_title(body.text),
         url=body.url,
-        message_id=summary.message_id,
+        message_id=mail.summarize(raw).message_id,
         attachments=[],
         size=len(raw),
     )
-    if parent:
-        item.processing_since = utcnow()
-    db.add(item)
-    db.flush()
-    raw_path(item).write_bytes(raw)
-    db.commit()
-    if parent:
-        importer.start(item.id, user.id)
-    return item_out(item)
+    return _add(db, user, item, raw)
 
 
 @router.get("/inbox/{item_id}", response_model=schemas.InboxItemDetail)
 def read_item(item_id: int, user: models.User = Depends(auth.get_current_user), db: Session = Depends(get_db)):
     item = visible_item(db, item_id, user)
     text = None
-    if item.kind == "text":
+    if item.kind == InboxKind.TEXT:
         # Its file gone (a database restored without the inbox folder): the item and its draft still open
         try:
             text = mail.content(raw_path(item).read_bytes()).text
@@ -270,17 +211,14 @@ def read_item(item_id: int, user: models.User = Depends(auth.get_current_user), 
 def process_item(item_id: int, parent: models.User = Depends(auth.require_parent), db: Session = Depends(get_db)):
     """The release: only now is the mail read, are links fetched and may the AI see it."""
     item = visible_item(db, item_id, parent)
-    if item.status in ("processing", "done"):
-        raise api_error(409, "item_busy")
-    item.status, item.error, item.processing_since = "processing", None, utcnow()
-    db.commit()
+    inbox.release(db, item)
     importer.start(item.id, parent.id)
     db.refresh(item)
     return item_out(item)
 
 
 def _image_attachment(item: models.InboxItem, index: int) -> tuple[str, bytes]:
-    found = mail.attachment(raw_path(item).read_bytes(), index) if item.kind in ("mail", "scan") else None
+    found = mail.attachment(raw_path(item).read_bytes(), index) if item.kind in (InboxKind.MAIL, InboxKind.SCAN) else None
     if found is None or found[0] not in RASTER_TYPES:
         raise api_error(404, "attachment_not_found")
     return found
@@ -304,13 +242,11 @@ def read_thumbnail(
     if not cached.is_file():
         _, data = _image_attachment(item, index)
         try:
-            with Image.open(io.BytesIO(data)) as source:
-                image = ImageOps.exif_transpose(source).convert("RGB")
-        except (UnidentifiedImageError, OSError, ValueError, Image.DecompressionBombError):
+            thumb = photos.downscale(data, THUMB_SIDE, quality=80)
+        except photos.PhotoUnreadable:
             raise api_error(404, "attachment_not_found")
-        image.thumbnail((THUMB_SIDE, THUMB_SIDE))
         cached.parent.mkdir(parents=True, exist_ok=True)
-        image.save(cached, "JPEG", quality=80)
+        cached.write_bytes(thumb)
     return FileResponse(cached, media_type="image/jpeg")
 
 
@@ -318,42 +254,6 @@ def read_thumbnail(
 def read_raw(item_id: int, parent: models.User = Depends(auth.require_parent), db: Session = Depends(get_db)):
     """The mail as it arrived (part of the original of an imported recipe)."""
     item = visible_item(db, item_id, parent)
-    if item.kind != "mail":
+    if item.kind != InboxKind.MAIL:
         raise api_error(404, "attachment_not_found")
     return FileResponse(raw_path(item), media_type="message/rfc822", filename=f"rezept-{item.id}.eml")
-
-
-def _email_out(entry: models.UserEmail) -> schemas.EmailOut:
-    return schemas.EmailOut(id=entry.id, user_id=entry.user_id, user_name=entry.user.name, address=entry.address)
-
-
-@router.get("/emails", response_model=list[schemas.EmailOut])
-def list_emails(all: bool = False, user: models.User = Depends(auth.get_current_user), db: Session = Depends(get_db)):
-    query = db.query(models.UserEmail)
-    if not (all and user.role == models.UserRole.PARENT):
-        query = query.filter(models.UserEmail.user_id == user.id)
-    return [_email_out(e) for e in query.order_by(models.UserEmail.address)]
-
-
-@router.post("/emails", response_model=schemas.EmailOut, status_code=201)
-def add_email(body: schemas.EmailIn, user: models.User = Depends(auth.get_current_user), db: Session = Depends(get_db)):
-    owner_id = body.user_id or user.id
-    if owner_id != user.id and user.role != models.UserRole.PARENT:
-        raise api_error(403, "parents_only")
-    if db.get(models.User, owner_id) is None:
-        raise api_error(404, "user_not_found")
-    if db.query(models.UserEmail).filter(models.UserEmail.address == body.address).first():
-        raise api_error(409, "email_taken")
-    entry = models.UserEmail(user_id=owner_id, address=body.address)
-    db.add(entry)
-    db.commit()
-    return _email_out(entry)
-
-
-@router.delete("/emails/{email_id}", status_code=204)
-def delete_email(email_id: int, user: models.User = Depends(auth.get_current_user), db: Session = Depends(get_db)):
-    entry = db.get(models.UserEmail, email_id)
-    if entry is None or (entry.user_id != user.id and user.role != models.UserRole.PARENT):
-        raise api_error(404, "email_not_found")
-    db.delete(entry)
-    db.commit()

@@ -7,7 +7,7 @@ import api, { errorMessage } from '../api';
 import NoteDialog from '../components/plan/NoteDialog';
 import Stars from '../components/recipes/Stars';
 import { addEntry, fetchWeek, type PlanEntry, updateEntry, type Week, weekdayKey } from '../plan';
-import { BUTTON, CARD, ERROR } from '../ui';
+import { BUTTON, CARD, ERROR, PAGE } from '../ui';
 
 export default function CloseWeek() {
     const { t, i18n } = useTranslation();
@@ -62,7 +62,7 @@ export default function CloseWeek() {
     if (!week) return error ? <p className={ERROR}>{error}</p> : <p className="text-slate-400">{t('common.loading')}</p>;
 
     return (
-        <div className="mx-auto max-w-3xl space-y-5">
+        <div className={`${PAGE} space-y-5`}>
             <div>
                 <h1 className="text-2xl">{t('close.title')}</h1>
                 <p className="text-slate-400">{t('close.intro')}</p>

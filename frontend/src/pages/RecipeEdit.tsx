@@ -19,7 +19,7 @@ import {
 import { isOtherLink, isWebLink } from "../links";
 import { CATEGORIES, inOrder, type Category } from "../categories";
 import { fetchRecipe, type Recipe, type RecipeInput } from "../recipes";
-import { BUTTON, BUTTON_SECONDARY, CARD, ERROR, FIELD, INPUT } from "../ui";
+import { BUTTON, BUTTON_SECONDARY, CARD, ERROR, FIELD, INPUT, PAGE } from "../ui";
 
 interface Form {
   title: string;
@@ -220,7 +220,7 @@ export default function RecipeEdit() {
 
   const label = "mb-1 block text-sm text-slate-300";
   return (
-    <form onSubmit={save} className="mx-auto max-w-4xl space-y-6">
+    <form onSubmit={save} className={`${PAGE} space-y-6`}>
       <h1 className="text-2xl">
         {id
           ? t("recipes.editTitle")

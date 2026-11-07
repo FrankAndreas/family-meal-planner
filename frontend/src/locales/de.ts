@@ -9,6 +9,7 @@ const de = {
         edit: 'Bearbeiten',
         add: 'Hinzufügen',
         saved: 'Gespeichert',
+        saving: 'Wird gespeichert…',
     },
     nav: {
         plan: 'Wochenplan',
@@ -104,7 +105,6 @@ const de = {
         staples: 'Immer im Haus',
         staplesHint: 'Wird nie als fehlend angezeigt, z. B. Salz und Pfeffer.',
         weekStart: 'Erster Tag der Woche',
-        saveFamily: 'Familien-Einstellungen speichern',
         members: 'Familienmitglieder',
         confirmDelete: 'Sterne, Favoriten und Mail-Adressen von {{name}} wirklich löschen?',
         inHub: 'Deine Sprache, deine PIN und das Abmelden auf allen Geräten sind im Familien-Hub.',
@@ -157,6 +157,10 @@ const de = {
         rate_one: '{{count}} Stern geben',
         rate_other: '{{count}} Sterne geben',
         ratingShown: '{{value}} von 5 Sternen',
+        familyAverage_one: 'Familie: {{value}} von 5 Sternen, 1 Bewertung',
+        familyAverage_other: 'Familie im Schnitt: {{value}} von 5 Sternen, {{count}} Bewertungen',
+        averageOf_one: '1 Bewertung',
+        averageOf_other: 'Ø aus {{count}}',
         ratingsBy: 'Bewertungen',
         favorite: 'Favorit',
         delete: 'Rezept löschen',
@@ -237,6 +241,10 @@ const de = {
     useUp: {
         tabs: { search: 'Suchen', use_up: '🧺 Was habe ich?' },
         modes: { use_up: 'Aufbrauchen', cook_now: 'Jetzt kochen' },
+        explain: {
+            use_up: 'Rezepte, die möglichst viel davon brauchen, auch wenn noch etwas fehlt.',
+            cook_now: 'Rezepte, für die höchstens {{max}} Zutaten fehlen: kochen ohne grossen Einkauf. Was immer im Haus ist, zählt nicht als fehlend.',
+        },
         ingredient: 'Was hast du zu Hause?',
         placeholder: 'z. B. Kartoffeln',
         hint: 'Gib ein, was du zu Hause hast, z. B. was bald weg muss.',
@@ -294,7 +302,7 @@ const de = {
         slots: { breakfast: 'Zmorge', snack: 'Znüni & Zvieri', lunch: 'Zmittag', dinner: 'Znacht' },
         suggestFor: 'Für',
         allSlots: 'Alle',
-        tabs: { favorites: '★ Favoriten', long_ago: 'Lange her', new: 'Neu', again: 'Nochmals planen?' },
+        tabs: { favorites: '★ Favoriten', long_ago: 'Lange her', new: 'Neu', again: 'Ausgelassen' },
         empty: {
             favorites: 'Noch keine Favoriten. Markiere Rezepte mit ♥.',
             long_ago: 'Hier erscheint, was ihr länger nicht mehr gegessen habt.',
@@ -331,6 +339,7 @@ const de = {
     },
     history: {
         none: 'Noch keine vergangenen Wochen.',
+        howTo: 'Geplante Wochen erscheinen hier, sobald sie vorbei sind. Schliesst ihr eine Woche ab, steht hier auch, was ihr wirklich gegessen habt.',
         closed: 'abgeschlossen',
         older: 'Ältere Wochen laden',
     },

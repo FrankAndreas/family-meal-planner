@@ -36,7 +36,7 @@ test('close a week, then find it in the history', async ({ page, request }) => {
     await expect(page.getByTestId('week-range')).toBeVisible();
     await expect(page.getByRole('link', { name: 'Close the week' })).toHaveCount(0);
 
-    await page.getByRole('tab', { name: 'Plan again?' }).click();
+    await page.getByRole('tab', { name: 'Skipped' }).click();
     await expect(page.getByRole('complementary').getByRole('button', { name: skipped.title })).toBeVisible();
 
     await page.getByRole('link', { name: 'History' }).first().click();

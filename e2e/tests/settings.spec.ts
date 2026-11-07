@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { API, addToHub, giveAccess, login, newPerson, uniqueName } from './helpers';
+import { API, addToHub, call, giveAccess, login, newPerson, uniqueName } from './helpers';
 
 test('a parent sets the first day of the week and the family size', async ({ page, request }) => {
     const parent = await newPerson(request);
@@ -7,7 +7,8 @@ test('a parent sets the first day of the week and the family size', async ({ pag
     await page.goto('/einstellungen');
     await page.getByLabel('First day of the week').selectOption({ label: 'Monday' });
     await page.getByLabel('People at the table').fill('5');
-    await page.getByRole('button', { name: 'Save family settings' }).click();
+    // Saved as soon as it changes, like the mail addresses and Bring! (UX review 2026-11-06)
+    await expect(page.getByRole('button', { name: /Save/ })).toHaveCount(0);
     await expect(page.getByText('Saved')).toBeVisible();
     await page.reload();
     await expect(page.getByLabel('First day of the week')).toHaveValue('0');
@@ -57,4 +58,46 @@ test('a new mail address belongs to me unless I choose someone', async ({ page, 
     await page.goto('/einstellungen');
     const owner = page.getByRole('combobox', { name: 'Belongs to' });
     await expect(owner.locator('option:checked')).toHaveText('Me');
+});
+
+// Review of round 3: saving on change must never save a half-typed size, nor lose a change whose save failed
+test('a size typed out of range is not saved, not even the half typed before it', async ({ page, request }) => {
+    const parent = await newPerson(request);
+    const before = (await call(request, parent, 'GET', '/settings')).family_size;
+    const errors = await login(page, parent.name);
+    await page.goto('/einstellungen');
+    const size = page.getByLabel('People at the table');
+    await size.fill('');
+    await size.pressSequentially('25');
+    await size.blur();
+    await expect(size).toHaveValue(String(before));
+    await page.waitForTimeout(1000);
+    expect((await call(request, parent, 'GET', '/settings')).family_size).toBe(before);
+    expect(errors).toEqual([]);
+});
+
+test('a change whose save failed is saved with the next one', async ({ page, request }) => {
+    const parent = await newPerson(request);
+    const before = await call(request, parent, 'GET', '/settings');
+    await login(page, parent.name);
+    await page.goto('/einstellungen');
+    let failed = false;
+    await page.route('**/api/settings', (route) => {
+        if (route.request().method() !== 'PATCH' || failed) return route.continue();
+        failed = true;
+        return route.fulfill({ status: 500, json: { detail: 'Kaputt' } });
+    });
+    try {
+        await page.getByLabel('First day of the week').selectOption({ label: before.week_start === 0 ? 'Tuesday' : 'Monday' });
+        await expect(page.getByRole('alert')).toBeVisible();
+        await expect(page.getByText('Saved')).toHaveCount(0);
+        await page.getByLabel('People at the table').fill(String(before.family_size === 5 ? 6 : 5));
+        await expect(page.getByText('Saved')).toBeVisible();
+        await expect(page.getByRole('alert')).toHaveCount(0);
+        const after = await call(request, parent, 'GET', '/settings');
+        expect(after.week_start).toBe(before.week_start === 0 ? 1 : 0);
+        expect(after.family_size).toBe(before.family_size === 5 ? 6 : 5);
+    } finally {
+        await call(request, parent, 'PATCH', '/settings', { family_size: before.family_size, week_start: before.week_start });
+    }
 });

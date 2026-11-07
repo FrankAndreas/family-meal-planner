@@ -6,7 +6,7 @@ import InboxItemCard from '../components/inbox/InboxItemCard';
 import PasteText from '../components/inbox/PasteText';
 import UrlPaste from '../components/inbox/UrlPaste';
 import { discardItem, fetchInbox, type InboxItem, processItem } from '../inbox';
-import { BUTTON_SECONDARY, ERROR } from '../ui';
+import { BUTTON_SECONDARY, ERROR, PAGE } from '../ui';
 
 const POLL_MS = 2000;
 
@@ -56,7 +56,7 @@ export default function Inbox() {
     };
 
     return (
-        <div className="mx-auto max-w-4xl space-y-5">
+        <div className={`${PAGE} space-y-5`}>
             <div>
                 <h1 className="text-2xl">{t('nav.inbox')}</h1>
                 <p className="text-sm text-slate-400">{parent ? t('inbox.introParent') : t('inbox.introChild')}</p>

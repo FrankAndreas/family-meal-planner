@@ -16,8 +16,13 @@ BACKEND = Path(__file__).resolve().parents[1] / "backend"
 
 def test_importing_the_app_touches_no_database(tmp_path):
     folder = tmp_path / "not-yet"
-    env = {**os.environ, "DATABASE_URL": f"sqlite:///{folder}/meals.db", "DATA_DIR": str(tmp_path)}
-    subprocess.run([sys.executable, "-c", "import app.main"], cwd=BACKEND, env=env, check=True)
+    env = {
+        **os.environ,
+        "DATABASE_URL": f"sqlite:///{folder}/meals.db",
+        "DATA_DIR": str(tmp_path),
+        "PYTHONPATH": str(BACKEND),
+    }
+    subprocess.run([sys.executable, "-c", "import app.main"], cwd=BACKEND, env=env, check=True, timeout=60)
     assert not folder.exists()
 
 
@@ -28,6 +33,7 @@ def test_start_creates_the_schema_and_the_settings(tmp_path):
     with Session(engine) as db:
         settings = settings_store.get_settings(db)
         assert (settings.family_size, settings.week_start) == (4, 5) and db.query(models.Settings).count() == 1
+    engine.dispose()
 
 
 def test_reading_the_settings_writes_nothing(tmp_path):
@@ -37,3 +43,4 @@ def test_reading_the_settings_writes_nothing(tmp_path):
         with pytest.raises(LookupError):
             settings_store.get_settings(db)
         assert db.query(models.Settings).count() == 0
+    engine.dispose()

@@ -1,15 +1,16 @@
 import os
 
 from sqlalchemy import MetaData, create_engine, event
-from sqlalchemy.engine import Engine, make_url
+from sqlalchemy.engine import URL, Engine, make_url
 from sqlalchemy.orm import declarative_base, sessionmaker
 
 SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./data/meals.db")
 
 
-def ensure_sqlite_folder(url: str) -> None:
+def ensure_sqlite_folder(url: str | URL) -> None:
     """SQLite creates the database file but not its folder (e.g. backend/data in a fresh clone)."""
-    database = make_url(url).database if url.startswith("sqlite") else None
+    url = make_url(url)
+    database = url.database if url.get_backend_name() == "sqlite" else None
     if database and database != ":memory:":
         os.makedirs(os.path.dirname(os.path.abspath(database)), exist_ok=True)
 

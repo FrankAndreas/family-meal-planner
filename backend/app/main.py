@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 def start(engine: Engine) -> None:
     """On start, not on import: the database's folder, its schema (Alembic migrations in app/migrations) and, in a
     fresh one, the settings row; the people come from the family hub."""
-    database.ensure_sqlite_folder(engine.url.render_as_string(hide_password=False))
+    database.ensure_sqlite_folder(engine.url)
     database_setup.setup(engine)
     with Session(engine) as db:
         ensure_settings(db)

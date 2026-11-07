@@ -10,7 +10,8 @@ from sqlalchemy.orm import Session
 from . import auth, models, schemas, timeutil
 from .categories import slot_group
 from .database import get_db
-from .recipes_api import Votes, filter_recipes, live_recipes, sort_key
+from .recipes import Votes, filter_recipes, live_recipes
+from .text import sort_key
 
 router = APIRouter(tags=["suggestions"])
 

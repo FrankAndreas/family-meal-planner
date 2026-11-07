@@ -69,9 +69,9 @@ def test_blank_link_is_no_link(client, admin_headers, started):
 
 
 def test_item_still_opens_without_its_file(client, admin_headers, started):
-    from app import inbox_api, models
+    from app import inbox_files, models
 
     item = client.post("/api/inbox/texts", json={"text": "Brownies"}, headers=admin_headers).json()
-    inbox_api.raw_path(models.InboxItem(id=item["id"])).unlink()
+    inbox_files.raw_path(models.InboxItem(id=item["id"])).unlink()
     response = client.get(f"/api/inbox/{item['id']}", headers=admin_headers)
     assert response.status_code == 200 and response.json()["text"] is None

@@ -2,35 +2,17 @@ from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import Session
 
 from . import auth, models, schemas, stats, timeutil
 from .database import get_db
 from .errors import api_error
-from .recipes_api import Votes, get_recipe
+from .plan import SLOTS, entries_between
+from .recipes import Votes, get_recipe
 from .settings_store import get_settings
 from .weeks import week_days, week_start_of
 
 router = APIRouter(tags=["plan"])
-
-SLOTS = ("breakfast", "snack", "lunch", "dinner")
-
-
-def _entries(db: Session, first: date, last: date) -> list[models.PlanEntry]:
-    entries = (
-        db.query(models.PlanEntry)
-        .filter(models.PlanEntry.date >= first, models.PlanEntry.date <= last)
-        .options(selectinload(models.PlanEntry.recipe))
-        .all()
-    )
-    entries.sort(key=lambda e: (e.date, SLOTS.index(e.slot), e.position, e.id))
-    return entries
-
-
-def entries_in_week(db: Session, start: date) -> list[models.PlanEntry]:
-    """The entries of the week starting on `start`, in plan order."""
-    return _entries(db, start, start + timedelta(days=6))
-
 
 def _leave_shopping_list(db: Session, entry: models.PlanEntry) -> None:
     """An entry moved out of the open shopping list's week loses its tick, so it comes back unticked (spec 2026-11-06)."""
@@ -100,7 +82,7 @@ def counted_slots(db: Session, start: date) -> tuple[str, ...]:
 
 def week_out(db: Session, start: date, me: models.User) -> schemas.WeekOut:
     days = week_days(start)
-    entries = _entries(db, days[0], days[-1])
+    entries = entries_between(db, days[0], days[-1])
     counted = counted_slots(db, days[0])
     return schemas.WeekOut(
         start=days[0],

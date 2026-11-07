@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from . import (
     ai,
+    ai_api,
     categorize_api,
     config,
     database,
@@ -23,6 +24,7 @@ from . import (
     use_up_api,
     users_api,
 )
+from .errors import Refused, detail
 from .settings_store import get_settings
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -50,6 +52,12 @@ async def validation_error(_request: Request, exc: RequestValidationError) -> JS
     return JSONResponse(status_code=422, content={"detail": jsonable_encoder(errors)})
 
 
+@app.exception_handler(Refused)
+async def refused(_request: Request, exc: Refused) -> JSONResponse:
+    """A rule outside the routes said no: answered like the routes' own errors (api_error)."""
+    return JSONResponse(status_code=exc.status, content={"detail": detail(exc.code, **exc.params)})
+
+
 app.include_router(users_api.router, prefix="/api")
 app.include_router(settings_api.router, prefix="/api")
 # Before recipes_api: its /recipes/{recipe_id} would catch /recipes/categorize
@@ -61,7 +69,7 @@ app.include_router(suggestions_api.router, prefix="/api")
 app.include_router(use_up_api.router, prefix="/api")
 app.include_router(swissmilk_api.router, prefix="/api")
 app.include_router(inbox_api.router, prefix="/api")
-app.include_router(ai.router, prefix="/api")
+app.include_router(ai_api.router, prefix="/api")
 
 # Only the browser tests need this (their frontend runs on a port of its own); in Docker, nginx serves both
 if config.env("CORS_ORIGINS"):

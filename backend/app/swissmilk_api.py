@@ -14,7 +14,7 @@ from . import auth, fetch, models, schemas, swissmilk
 from .database import get_db
 from .errors import api_error
 from .settings_store import get_settings
-from .use_up_api import MAX_MISSING, _typed, check, fit
+from .pantry import MAX_MISSING, check, fit, typed_words
 
 router = APIRouter(tags=["swissmilk"])
 
@@ -82,7 +82,7 @@ def search(
     me: models.User = Depends(auth.get_current_user),
     db: Session = Depends(get_db),
 ):
-    typed = _typed(have)
+    typed = typed_words(have)
     if not typed:
         return []
     _take_turn(me.id)

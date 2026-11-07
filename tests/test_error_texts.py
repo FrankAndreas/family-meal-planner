@@ -12,6 +12,9 @@ def _codes() -> set[str]:
     for source in (ROOT / "backend" / "app").glob("*.py"):
         codes |= set(re.findall(r'api_error\(\s*[\w.]+,\s*"(\w+)"', source.read_text()))
         codes |= set(re.findall(r'ValueError\("(\w+)"\)', source.read_text()))
+        # Refused and its kinds: raised directly, or by a subclass's __init__
+        codes |= set(re.findall(r'(?:Refused|NotFound)\(\s*"(\w+)"', source.read_text()))
+        codes |= set(re.findall(r'super\(\).__init__\(\s*"(\w+)"', source.read_text()))
     return codes
 
 
@@ -22,7 +25,7 @@ def _locale_errors(name: str) -> set[str]:
 
 
 def test_codes_found():
-    assert {"no_access", "recipe_not_found", "entry_not_found"} <= _codes()
+    assert {"no_access", "recipe_not_found", "entry_not_found", "ai_off", "ai_limit", "photo_unreadable"} <= _codes()
 
 
 def test_every_code_has_a_text():

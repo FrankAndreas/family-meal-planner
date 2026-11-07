@@ -12,9 +12,9 @@ from sqlalchemy.orm import Session
 
 from . import auth, fetch, models, schemas, swissmilk
 from .database import get_db
-from .errors import api_error
+from .http_errors import api_error
 from .settings_store import get_settings
-from .pantry import MAX_MISSING, check, fit, typed_words
+from .use_up import MAX_MISSING, check, fit, typed_words
 
 router = APIRouter(tags=["swissmilk"])
 

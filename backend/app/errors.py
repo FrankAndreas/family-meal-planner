@@ -1,6 +1,3 @@
-from fastapi import HTTPException
-
-
 class Refused(Exception):
     """A rule said no, anywhere: also outside a request (the importer runs in a thread of its own), so this knows
     nothing of HTTP. `code` names the text the person sees (errors.<code> in the locales), `params` the values it
@@ -21,8 +18,3 @@ class NotFound(Refused):
 def detail(code: str, **params) -> str | dict:
     """The answer's `detail`: the code alone, or with the values the text needs as extra fields."""
     return {"code": code, **params} if params else code
-
-
-def api_error(status: int, code: str, **params) -> HTTPException:
-    """An error the frontend shows in the person's language, raised by a route (see Refused for anything else)."""
-    return HTTPException(status, detail(code, **params))

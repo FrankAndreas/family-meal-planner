@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from . import auth, models, schemas, stats, timeutil
 from .database import get_db
-from .errors import api_error
+from .http_errors import api_error
 from .plan import SLOTS, entries_between
 from .recipes import Votes, get_recipe
 from .settings_store import get_settings

@@ -14,7 +14,7 @@ def _codes() -> set[str]:
         codes |= set(re.findall(r'ValueError\("(\w+)"\)', source.read_text()))
         # Refused and its kinds: raised directly, or by a subclass's __init__
         codes |= set(re.findall(r'(?:Refused|NotFound)\(\s*"(\w+)"', source.read_text()))
-        codes |= set(re.findall(r'super\(\).__init__\(\s*"(\w+)"', source.read_text()))
+        codes |= set(re.findall(r'super\(\)\.__init__\(\s*"(\w+)"', source.read_text()))
     return codes
 
 

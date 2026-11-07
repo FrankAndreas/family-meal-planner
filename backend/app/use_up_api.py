@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from . import auth, models, schemas
 from .database import get_db
-from .pantry import MAX_MISSING, check, fit, typed_words
+from .use_up import MAX_MISSING, check, fit, typed_words
 from .recipes import Votes, live_recipes
 from .settings_store import get_settings
 from .text import sort_key

@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from . import ai, auth, categories, config, fetch, inbox_files, jsonld, mail, models, photos, scaling, schemas
 from .database import get_db
-from .errors import api_error
+from .http_errors import api_error
 from .recipes import Votes, filter_recipes, get_recipe, live_recipes, normalize_tags
 from .settings_store import get_settings
 from .text import sort_key

@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 
 from . import ai, auth, config, importer, mail, models, photos, schemas, swissmilk  # noqa: F401  (photos: HEIC opener)
 from .database import get_db
-from .errors import api_error
+from .http_errors import api_error
 from .inbox_files import inbox_dir, raw_path
 from .timeutil import utcnow
 

@@ -12,6 +12,7 @@ import threading
 from urllib.parse import urlsplit
 
 from . import ai, config, database, fetch, jsonld, mail, microdata, models, photos, swissmilk
+from .errors import Refused
 from .inbox_files import raw_path
 
 logger = logging.getLogger(__name__)
@@ -34,7 +35,8 @@ def run(item_id: int, user_id: int) -> None:
             return
         try:
             process(db, item, user)
-        except (ai.AiOff, ai.AiLimit) as error:
+        except Refused as error:
+            # e.g. ai_off or ai_limit from take_call
             _fail(db, item, error.code)
         except ai.AiFailed:
             _fail(db, item, "ai_failed")

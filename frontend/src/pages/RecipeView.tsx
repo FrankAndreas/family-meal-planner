@@ -114,6 +114,7 @@ export default function RecipeView() {
       <div className={`${CARD} grid gap-5 md:grid-cols-[16rem_1fr]`}>
         <RecipeThumb
           recipe={recipe}
+          full
           className="h-56 w-full rounded-xl md:h-64"
         />
         <div className="space-y-3">

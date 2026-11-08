@@ -1,3 +1,5 @@
+from typing import Literal
+
 from fastapi import APIRouter, Depends, Query, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
@@ -293,8 +295,9 @@ def remove_photo(recipe_id: int, me: models.User = Depends(auth.get_current_user
 # Without login: <img> can't send the token. The names are random (unguessable); from outside Cloudflare Access lets
 # only the family through
 @router.get("/photos/{name}")
-def read_photo(name: str):
-    path = photos.photo_path(name)
+def read_photo(name: str, size: Literal["full", "card"] = "full"):
+    """`size=card`: the small version recipe cards show."""
+    path = photos.card_path(name) if size == "card" else photos.photo_path(name)
     if path is None or not path.is_file():
         raise api_error(404, "photo_not_found")
     return FileResponse(path, media_type="image/jpeg", headers={"Cache-Control": "public, max-age=31536000, immutable"})

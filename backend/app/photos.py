@@ -15,6 +15,8 @@ pillow_heif.register_heif_opener()  # HEIC photos from iPhones
 
 MAX_BYTES = 25 * 1024 * 1024
 MAX_SIDE = 1600
+# The version recipe cards show (lists, suggestions): about twice their largest size on screen, sharp on a phone
+CARD_SIDE = 480
 # A picture is decoded only up to this size (48 MP phone photos fit): a small file can unpack into a giant one
 # (a decompression bomb)
 MAX_PIXELS = 64_000_000
@@ -62,7 +64,24 @@ def store_photo(data: bytes) -> str:
     return name
 
 
+def card_path(name: str) -> Path | None:
+    """The card version of a stored photo, made on first use and kept (performance review 2026-11-08): a list of
+    recipes loads 480 px pictures, not 1600 px ones."""
+    path = photo_path(name)
+    if path is None or not path.is_file():
+        return None
+    card = folder() / "cards" / name
+    if not card.is_file():
+        card.parent.mkdir(parents=True, exist_ok=True)
+        # Written under another name first: a request at the same moment never serves half a file
+        partial = card.with_suffix(f".{uuid.uuid4().hex}.part")
+        partial.write_bytes(downscale(path.read_bytes(), CARD_SIDE, quality=80))
+        partial.replace(card)
+    return card
+
+
 def delete_photo(name: str | None) -> None:
     path = photo_path(name) if name else None
     if path is not None:
         path.unlink(missing_ok=True)
+        (folder() / "cards" / path.name).unlink(missing_ok=True)

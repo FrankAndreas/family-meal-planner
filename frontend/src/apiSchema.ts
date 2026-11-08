@@ -312,7 +312,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Read Photo */
+        /**
+         * Read Photo
+         * @description `size=card`: the small version recipe cards show.
+         */
         get: operations["read_photo_api_photos__name__get"];
         put?: never;
         post?: never;
@@ -2479,7 +2482,9 @@ export interface operations {
     };
     read_photo_api_photos__name__get: {
         parameters: {
-            query?: never;
+            query?: {
+                size?: "full" | "card";
+            };
             header?: never;
             path: {
                 name: string;

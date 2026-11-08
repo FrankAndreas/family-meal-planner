@@ -205,3 +205,34 @@ def test_big_phone_photos_still_fit():
     from app import photos
 
     assert photos.MAX_PIXELS >= 8064 * 6048
+
+
+# Performance review (2026-11-08): recipe cards load a small version, not the 1600 px photo
+def test_a_card_gets_a_small_version_of_the_photo(client, admin_headers):
+    r = create_recipe(client, admin_headers)
+    url = _upload(client, admin_headers, r["id"], _jpeg()).json()["photo_url"]
+    full = client.get(url)
+    card = client.get(f"{url}?size=card")
+    assert card.status_code == 200 and card.headers["content-type"] == "image/jpeg"
+    with Image.open(io.BytesIO(card.content)) as image:
+        assert max(image.size) == photos.CARD_SIDE
+    assert len(card.content) < len(full.content) / 3
+    assert "immutable" in card.headers["cache-control"]
+    # Made once, then served from the file
+    assert client.get(f"{url}?size=card").content == card.content
+
+
+def test_the_small_version_goes_with_the_photo(client, admin_headers):
+    r = create_recipe(client, admin_headers)
+    url = _upload(client, admin_headers, r["id"], _jpeg()).json()["photo_url"]
+    client.get(f"{url}?size=card")
+    client.delete(f"/api/recipes/{r['id']}/photo", headers=admin_headers)
+    assert client.get(f"{url}?size=card").status_code == 404
+    assert not any((config.data_dir() / "photos" / "cards").iterdir())
+
+
+def test_only_known_sizes(client, admin_headers):
+    r = create_recipe(client, admin_headers)
+    url = _upload(client, admin_headers, r["id"], _jpeg()).json()["photo_url"]
+    assert client.get(f"{url}?size=huge").status_code == 422
+    assert client.get(f"/api/photos/{'0' * 32}.jpg?size=card").status_code == 404

@@ -112,7 +112,7 @@ def web(monkeypatch):
     dns = {"public.example": ["93.184.216.34"], "nas.local": ["192.168.1.10"]}
     monkeypatch.setattr(fetch, "_resolve", lambda host, port: dns.get(host, [host]))
 
-    def _open(scheme, host, port, target, ip, timeout):
+    def _open(scheme, host, port, target, ip, timeout, deadline=None):
         opened.append((host, target))
         return pages.get((host, target), (404, {}, b""))
 

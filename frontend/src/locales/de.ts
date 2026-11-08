@@ -416,6 +416,7 @@ const de = {
         already_categorized: 'Das Rezept hat schon Kategorien.',
         categorize_failed: 'Die KI konnte die Rezepte nicht einordnen. Versuche es später nochmals.',
         bring_login_failed: 'Bring! hat die E-Mail oder das Passwort nicht angenommen.',
+        bring_login_expired: 'Bring! hat die Anmeldung beendet (z. B. nach einer Passwortänderung). Melde dich in den Einstellungen bei Bring! neu an.',
         bring_failed: 'Bring! ist gerade nicht erreichbar oder hat nicht wie erwartet geantwortet. Die Liste bleibt hier; versuche es später nochmals.',
         bring_not_set_up: 'Bring! ist noch nicht eingerichtet: in den Einstellungen anmelden und eine Liste wählen.',
         bring_unknown_list: 'Diese Bring!-Liste gibt es in diesem Konto nicht.',

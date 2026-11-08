@@ -156,3 +156,17 @@ def test_reading_the_inbox_writes_nothing(client, admin_headers, db):
     assert client.get(f"/api/inbox/{item.id}", headers=admin_headers).json()["status"] == "failed"
     db.expire_all()
     assert db.get(models.InboxItem, item.id).status == InboxStatus.PROCESSING
+
+
+def test_an_inbox_id_is_never_used_twice(db):
+    """The files of an item (its mail, cached thumbnails) are named by its id: a new item must never get the id of one
+    discarded before, or it could show that item's files."""
+    parent, _ = _people(db)
+    first = models.InboxItem(kind=InboxKind.URL, subject="a", url="https://example.ch/")
+    inbox.add(db, parent, first)
+    gone = first.id
+    db.delete(first)
+    db.commit()
+    second = models.InboxItem(kind=InboxKind.URL, subject="b", url="https://example.ch/")
+    inbox.add(db, parent, second)
+    assert second.id > gone

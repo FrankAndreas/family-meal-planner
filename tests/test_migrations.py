@@ -82,7 +82,7 @@ SHOPPING_TABLES = {
     "shopping_meals": {"list_id", "entry_id"},
     "shopping_choices": {"list_id", "key", "buy"},
     "shopping_extras": {"id", "list_id", "name", "amount", "position"},
-    "bring_login": {"id", "email", "password", "list_uuid", "list_name"},
+    "bring_login": {"id", "email", "password", "list_uuid", "list_name", "uuid", "public_uuid", "access_token", "refresh_token", "expires_at"},
 }
 
 
@@ -144,3 +144,44 @@ def test_0009_keeps_one_list(tmp_path):
         raise AssertionError("a second list was accepted")
     except IntegrityError:
         pass
+
+
+def test_0010_keeps_a_login_from_before(tmp_path):
+    """A Bring! login stored with its password survives; its first use turns it into a session (shopping_api)."""
+    from alembic import command
+
+    engine = create_engine(f"sqlite:///{tmp_path}/m.db")
+    database_setup.run(engine, command.upgrade, "0009")
+    with engine.begin() as conn:
+        conn.exec_driver_sql(
+            "INSERT INTO bring_login (id, email, password, list_uuid, list_name) VALUES (1, 'a@b.ch', 'geheim', 'l', 'Zuhause')"
+        )
+    database_setup.setup(engine)
+    with engine.begin() as conn:
+        row = conn.exec_driver_sql("SELECT email, password, list_uuid, access_token FROM bring_login").one()
+        assert tuple(row) == ("a@b.ch", "geheim", "l", None)
+        # Once a session is kept, the password may be gone
+        conn.exec_driver_sql("UPDATE bring_login SET password = NULL, access_token = 'Bearer x'")
+
+
+def test_0011_inbox_ids_never_reused(tmp_path):
+    """The rows keep their ids; after the newest is deleted, the next item still gets a new one."""
+    from alembic import command
+
+    engine = create_engine(f"sqlite:///{tmp_path}/m.db")
+    database_setup.run(engine, command.upgrade, "0010")
+    with engine.begin() as conn:
+        for n in (1, 2):
+            conn.exec_driver_sql(
+                "INSERT INTO inbox_items (id, kind, status, from_addr, subject, received_at, attachments, size) "
+                f"VALUES ({n}, 'url', 'waiting', '', 'x', '2026-11-01', '[]', 0)"
+            )
+    database_setup.setup(engine)
+    with engine.begin() as conn:
+        assert [r[0] for r in conn.exec_driver_sql("SELECT id FROM inbox_items ORDER BY id")] == [1, 2]
+        conn.exec_driver_sql("DELETE FROM inbox_items WHERE id = 2")
+        conn.exec_driver_sql(
+            "INSERT INTO inbox_items (kind, status, from_addr, subject, received_at, attachments, size) "
+            "VALUES ('url', 'waiting', '', 'y', '2026-11-02', '[]', 0)"
+        )
+        assert conn.exec_driver_sql("SELECT MAX(id) FROM inbox_items").scalar() == 3

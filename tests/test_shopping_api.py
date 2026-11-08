@@ -355,15 +355,86 @@ def test_send_failure_keeps_list(client, admin_headers, week, fake_bring):
     assert [name for name, _ in fake_bring[-1][1]] == ["Hörnli"]
 
 
-def test_send_with_wrong_password_keeps_list(client, admin_headers, week, db):
+def _stored(db):
+    from app import models
+
+    db.expire_all()
+    return db.get(models.BringLogin, 1)
+
+
+def test_the_password_is_never_stored(client, admin_headers, db):
+    """Only Bring!'s session (its tokens) is kept: a copy of the database or a backup gives away no password."""
+    _setup_bring(client, admin_headers)
+    login = _stored(db)
+    assert login.password is None and login.access_token and login.refresh_token and login.uuid == "fake-user"
+
+
+def test_a_stored_password_becomes_a_session_on_first_use(client, admin_headers, week, db, fake_bring):
+    """A login from before: its password logs in once, then only the session is kept."""
+    _setup_bring(client, admin_headers)
+    login = _stored(db)
+    login.password, login.access_token, login.refresh_token, login.expires_at = "geheim", None, None, None
+    db.commit()
+    assert _send(client, admin_headers, _start(client, admin_headers).json()).status_code == 200
+    login = _stored(db)
+    assert login.password is None and login.access_token and fake_bring
+
+
+def test_an_expired_session_is_renewed(client, admin_headers, week, db, fake_bring):
+    _setup_bring(client, admin_headers)
+    login = _stored(db)
+    login.expires_at = 0
+    db.commit()
+    assert _send(client, admin_headers, _start(client, admin_headers).json()).status_code == 200
+    assert _stored(db).access_token == "Bearer fake-renewed" and fake_bring
+
+
+def test_a_session_bring_ended_early_is_renewed_and_tried_again(client, admin_headers, week, db, fake_bring):
+    _setup_bring(client, admin_headers)
+    login = _stored(db)
+    login.access_token = "Bearer stale"
+    db.commit()
+    assert _send(client, admin_headers, _start(client, admin_headers).json()).status_code == 200
+    assert _stored(db).access_token == "Bearer fake-renewed" and fake_bring
+
+
+def test_a_session_renewed_meanwhile_is_not_renewed_again(client, admin_headers, week, db, monkeypatch, fake_bring):
+    """Bring! refuses the token (401) because another request renewed the session meanwhile: the renewed one is used,
+    without renewing it a second time (with a rotating refresh token that second renewal would fail)."""
     from app import models
 
     _setup_bring(client, admin_headers)
-    db.get(models.BringLogin, 1).password = "wrong"
+    refreshed: list = []
+    real_add, real_refresh = bring.FakeBring.add, bring.FakeBring.refresh
+
+    def add(self, session, list_uuid, items):
+        if session.token == "Bearer fake":
+            # Another request renews the session while this one is under way
+            with type(db)(bind=db.get_bind()) as other:
+                other.get(models.BringLogin, 1).access_token = "Bearer other"
+                other.commit()
+            raise bring.BringFailed("bring_failed", "HTTP 401", 401)
+        return real_add(self, session, list_uuid, items)
+
+    def refresh(self, session):
+        refreshed.append(session.token)
+        return real_refresh(self, session)
+
+    monkeypatch.setattr(bring.FakeBring, "add", add)
+    monkeypatch.setattr(bring.FakeBring, "refresh", refresh)
+    assert _send(client, admin_headers, _start(client, admin_headers).json()).status_code == 200
+    assert refreshed == [] and fake_bring
+
+
+def test_send_after_bring_ended_the_login_keeps_list(client, admin_headers, week, db):
+    """Bring! refuses to renew the session (password changed there): log in again in the settings."""
+    _setup_bring(client, admin_headers)
+    login = _stored(db)
+    login.refresh_token, login.expires_at = "revoked", 0
     db.commit()
     shopping = _start(client, admin_headers).json()
     response = _send(client, admin_headers, shopping)
-    assert response.status_code == 502 and response.json()["detail"] == "bring_login_failed"
+    assert response.status_code == 400 and response.json()["detail"] == "bring_login_expired"
     assert _get(client, admin_headers) is not None
 
 

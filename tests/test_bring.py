@@ -36,7 +36,9 @@ def network(monkeypatch):
     return calls, answers
 
 
-AUTH = json.dumps({"uuid": "u-1", "publicUuid": "p-1", "access_token": "tok", "token_type": "Bearer"}).encode()
+AUTH = json.dumps(
+    {"uuid": "u-1", "publicUuid": "p-1", "access_token": "tok", "token_type": "Bearer", "refresh_token": "ref", "expires_in": 604800}
+).encode()
 
 
 def _http_error(code):
@@ -129,3 +131,33 @@ def test_list_gone_is_its_own_failure(network):
     with pytest.raises(bring.BringFailed) as failed:
         client.add(client.login("a@b.ch", "geheim"), "l-weg", [("Milch", "")])
     assert failed.value.code == "bring_list_gone"
+
+
+def test_login_keeps_the_refresh_token_and_when_it_ends(network):
+    import time
+
+    network[1].append(AUTH)
+    session = bring.HttpBring().login("a@b.ch", "geheim")
+    assert session.refresh_token == "ref" and abs(session.expires_at - (time.time() + 604800)) < 5
+
+
+def test_refresh_asks_for_a_new_token(network):
+    calls, answers = network
+    answers.append(json.dumps({"access_token": "new", "token_type": "Bearer", "expires_in": 3600}).encode())
+    old = bring.Session(uuid="u-1", public_uuid="p-1", token="Bearer tok", refresh_token="ref", expires_at=0)
+    session = bring.HttpBring().refresh(old)
+    assert (session.uuid, session.token, session.refresh_token) == ("u-1", "Bearer new", "ref")
+    request = calls[0]
+    assert request.full_url == "https://api.getbring.com/rest/v2/bringauth/token" and request.get_method() == "POST"
+    # As the Bring! apps (bring-api) renew: with the session's headers
+    assert request.get_header("Authorization") == "Bearer tok" and request.get_header("X-bring-user-uuid") == "u-1"
+    assert urllib.parse.parse_qs(request.data.decode()) == {"grant_type": ["refresh_token"], "refresh_token": ["ref"]}
+
+
+@pytest.mark.parametrize("code", [400, 401])
+def test_refresh_refused_is_login_expired(network, code):
+    network[1].append(_http_error(code))
+    old = bring.Session(uuid="u-1", public_uuid="p-1", token="Bearer tok", refresh_token="ref", expires_at=0)
+    with pytest.raises(bring.BringFailed) as caught:
+        bring.HttpBring().refresh(old)
+    assert caught.value.code == "bring_login_expired"

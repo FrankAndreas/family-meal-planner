@@ -51,13 +51,18 @@ test('someone removed in the hub is deleted here by a parent', async ({ page, re
     await expect(page.getByRole('button', { name: `Delete data of ${name}` })).toHaveCount(0);
 });
 
-// UX review (2026-11-06): the owner of a new mail address defaults to the parent adding it, and says so
-test('a new mail address belongs to me unless I choose someone', async ({ page, request }) => {
-    const parent = await newPerson(request);
+// Security review (2026-11-08): recipe mails come from the address confirmed in the family hub, shown here
+test('the mail addresses are the ones confirmed in the hub', async ({ page, request }) => {
+    const address = `${uniqueName('p')}@example.ch`;
+    const parent = await newPerson(request, 'PARENT', address);
+    const child = await newPerson(request, 'CHILD');
     await login(page, parent.name);
     await page.goto('/einstellungen');
-    const owner = page.getByRole('combobox', { name: 'Belongs to' });
-    await expect(owner.locator('option:checked')).toHaveText('Me');
+    await expect(page.getByText(`Your address: ${address}`)).toBeVisible();
+    // Everyone's, in the family members
+    await expect(page.getByRole('listitem').filter({ hasText: parent.name })).toContainText(address);
+    await expect(page.getByRole('listitem').filter({ hasText: child.name })).toContainText('no mail address');
+    await expect(page.getByLabel('New mail address')).toHaveCount(0);
 });
 
 // Review of round 3: saving on change must never save a half-typed size, nor lose a change whose save failed

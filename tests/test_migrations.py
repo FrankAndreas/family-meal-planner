@@ -185,3 +185,22 @@ def test_0011_inbox_ids_never_reused(tmp_path):
             "VALUES ('url', 'waiting', '', 'y', '2026-11-02', '[]', 0)"
         )
         assert conn.exec_driver_sql("SELECT MAX(id) FROM inbox_items").scalar() == 3
+
+
+def test_0012_typed_addresses_give_way_to_the_hubs(tmp_path):
+    """The typed addresses are dropped; each person gets the hub's address at the next sync of the people."""
+    from alembic import command
+    from sqlalchemy import inspect as inspect_
+
+    engine = create_engine(f"sqlite:///{tmp_path}/m.db")
+    database_setup.run(engine, command.upgrade, "0011")
+    with engine.begin() as conn:
+        conn.exec_driver_sql("INSERT INTO users (id, name, name_key, role, is_active, created_at) VALUES (1, 'A', 'a', 'PARENT', 1, '2026-01-01')")
+        conn.exec_driver_sql("INSERT INTO user_emails (user_id, address) VALUES (1, 'typed@example.ch')")
+    database_setup.setup(engine)
+    inspector = inspect_(engine)
+    assert "user_emails" not in inspector.get_table_names()
+    with engine.begin() as conn:
+        assert conn.exec_driver_sql("SELECT email FROM users").scalar() is None
+    database_setup.run(engine, command.downgrade, "0011")
+    assert "user_emails" in inspect_(engine).get_table_names()

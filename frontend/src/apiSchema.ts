@@ -958,41 +958,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/emails": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List Emails */
-        get: operations["list_emails_api_emails_get"];
-        put?: never;
-        /** Add Email */
-        post: operations["add_email_api_emails_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/emails/{email_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /** Delete Email */
-        delete: operations["delete_email_api_emails__email_id__delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/ai/status": {
         parameters: {
             query?: never;
@@ -1156,24 +1121,6 @@ export interface components {
              * Format: date
              */
             start: string;
-        };
-        /** EmailIn */
-        EmailIn: {
-            /** Address */
-            address: string;
-            /** User Id */
-            user_id?: number | null;
-        };
-        /** EmailOut */
-        EmailOut: {
-            /** Id */
-            id: number;
-            /** User Id */
-            user_id: number;
-            /** User Name */
-            user_name: string;
-            /** Address */
-            address: string;
         };
         /** EntryIn */
         EntryIn: {
@@ -1860,6 +1807,8 @@ export interface components {
             language: "de" | "en";
             /** Language Chosen */
             language_chosen: boolean;
+            /** Email */
+            email: string | null;
         };
         /**
          * UserRole
@@ -3699,99 +3648,6 @@ export interface operations {
                 content: {
                     "application/json": unknown;
                 };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    list_emails_api_emails_get: {
-        parameters: {
-            query?: {
-                all?: boolean;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["EmailOut"][];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    add_email_api_emails_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["EmailIn"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["EmailOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    delete_email_api_emails__email_id__delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                email_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
             };
             /** @description Validation Error */
             422: {

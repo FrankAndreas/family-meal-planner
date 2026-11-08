@@ -8,7 +8,7 @@ from app import ai, config, fetch, importer, models
 
 REAL_FETCH = fetch.fetch
 from app.timeutil import utcnow
-from helpers import create_recipe, create_user, login
+from helpers import ADMIN, confirm_email, create_recipe, create_user, login
 from mails import build_mail, png
 
 PAGES = Path(__file__).parent / "pages"
@@ -67,7 +67,7 @@ def _jpeg():
 
 
 def _mail(client, headers, **kwargs):
-    client.post("/api/emails", json={"address": "papa@example.ch"}, headers=headers)
+    confirm_email(client, ADMIN, "papa@example.ch")
     response = client.post("/api/inbound", content=build_mail(**kwargs), headers={"X-Inbound-Secret": "s"})
     return response.json()["id"]
 

@@ -1,44 +1,20 @@
 from app import config, models
-from helpers import create_user, login
+from helpers import ADMIN, confirm_email, create_user, login
 from mails import build_mail
 
 
-def _mail_for(client, monkeypatch, headers, address, user_id=None):
+def _mail_for(client, monkeypatch, headers, address, name=ADMIN):
+    """A mail from `address`, the one `name` confirmed in the family hub."""
     monkeypatch.setenv("INBOUND_SECRET", "s")
-    body = {"address": address, **({"user_id": user_id} if user_id else {})}
-    client.post("/api/emails", json=body, headers=headers)
+    confirm_email(client, name, address)
     response = client.post("/api/inbound", content=build_mail(from_addr=address), headers={"X-Inbound-Secret": "s"})
     return response.json()["id"]
-
-
-def test_emails_parent_adds_for_child(client, admin_headers):
-    lena = create_user(client, admin_headers, "Lena")
-    added = client.post("/api/emails", json={"address": "lena@x.ch", "user_id": lena["id"]}, headers=admin_headers)
-    assert added.status_code == 201 and added.json()["user_name"] == "Lena"
-    taken = client.post("/api/emails", json={"address": "LENA@x.ch"}, headers=admin_headers)
-    assert taken.status_code == 409 and taken.json()["detail"] == "email_taken"
-    invalid = client.post("/api/emails", json={"address": "nope"}, headers=admin_headers)
-    assert invalid.status_code == 422 and "invalid_email" in invalid.text
-
-
-def test_emails_child_only_own(client, admin_headers):
-    create_user(client, admin_headers, "Lena")
-    kid = login(client, "Lena", "5678")
-    own = client.post("/api/emails", json={"address": "lena@x.ch"}, headers=kid)
-    assert own.status_code == 201
-    admin_id = client.get("/api/me", headers=admin_headers).json()["id"]
-    other = client.post("/api/emails", json={"address": "a@x.ch", "user_id": admin_id}, headers=kid)
-    assert other.status_code == 403
-    assert [e["address"] for e in client.get("/api/emails", headers=kid).json()] == ["lena@x.ch"]
-    client.post("/api/emails", json={"address": "papa@x.ch"}, headers=admin_headers)
-    assert len(client.get("/api/emails?all=1", headers=admin_headers).json()) == 2
-    assert client.delete(f"/api/emails/{own.json()['id']}", headers=kid).status_code == 204
 
 
 def test_child_sees_own_items_only_and_cannot_discard(client, admin_headers, monkeypatch):
     lena = create_user(client, admin_headers, "Lena")
     kid = login(client, "Lena", "5678")
-    mine = _mail_for(client, monkeypatch, admin_headers, "lena@x.ch", lena["id"])
+    mine = _mail_for(client, monkeypatch, admin_headers, "lena@x.ch", "Lena")
     _mail_for(client, monkeypatch, admin_headers, "papa@x.ch")
     assert [i["id"] for i in client.get("/api/inbox", headers=kid).json()] == [mine]
     assert len(client.get("/api/inbox", headers=admin_headers).json()) == 2
@@ -85,12 +61,11 @@ def test_only_web_links(client, admin_headers):
     assert response.status_code == 422 and "not_a_web_link" in response.text
 
 
-def _image_mail(client, monkeypatch, headers, address="papa@x.ch", user_id=None):
+def _image_mail(client, monkeypatch, headers, address="papa@x.ch", name=ADMIN):
     from mails import build_mail, png
 
     monkeypatch.setenv("INBOUND_SECRET", "s")
-    body = {"address": address, **({"user_id": user_id} if user_id else {})}
-    client.post("/api/emails", json=body, headers=headers)
+    confirm_email(client, name, address)
     raw = build_mail(from_addr=address, images=[("a.png", png(size=(1200, 800)))], attachments=[("r.pdf", b"%PDF-1", "application/pdf")])
     return client.post("/api/inbound", content=raw, headers={"X-Inbound-Secret": "s"}).json()["id"]
 
@@ -141,7 +116,7 @@ def test_svg_attachment_not_served(client, admin_headers, monkeypatch):
     from mails import build_mail
 
     monkeypatch.setenv("INBOUND_SECRET", "s")
-    client.post("/api/emails", json={"address": "papa@x.ch"}, headers=admin_headers)
+    confirm_email(client, ADMIN, "papa@x.ch")
     svg = b'<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>'
     raw = build_mail(from_addr="papa@x.ch", attachments=[("x.svg", svg, "image/svg+xml")])
     item = client.post("/api/inbound", content=raw, headers={"X-Inbound-Secret": "s"}).json()["id"]

@@ -16,7 +16,6 @@ from . import (
     config,
     database,
     database_setup,
-    emails_api,
     hub,
     inbox_api,
     plan_api,
@@ -82,7 +81,6 @@ app.include_router(suggestions_api.router, prefix="/api")
 app.include_router(use_up_api.router, prefix="/api")
 app.include_router(swissmilk_api.router, prefix="/api")
 app.include_router(inbox_api.router, prefix="/api")
-app.include_router(emails_api.router, prefix="/api")
 app.include_router(ai_api.router, prefix="/api")
 
 # Only the browser tests need this (their frontend runs on a port of its own); in Docker, nginx serves both

@@ -65,15 +65,14 @@ async def receive_mail(request: Request, db: Session = Depends(get_db)):
     if len(raw) > MAX_BYTES:
         raise api_error(413, "inbound_too_big")
     summary = mail.summarize(raw)
-    sender = (
-        db.query(models.UserEmail)
-        .join(models.User)
-        # A person the family hub no longer lists sends nothing in (their address stays until their data is deleted)
-        .filter(models.UserEmail.address == summary.from_addr, models.User.is_active.is_(True))
-        .first()
+    # The address the person confirmed in the family hub, and only theirs: one that two people have is nobody's. A
+    # person the hub no longer lists sends nothing in
+    senders = (
+        db.query(models.User).filter(models.User.email == summary.from_addr, models.User.is_active.is_(True)).all()
         if summary.from_addr
-        else None
+        else []
     )
+    sender = senders[0] if len(senders) == 1 else None
     if sender is None:
         # Neither the sender nor the content goes into the log
         logger.warning("/inbound: mail from an unregistered address refused")
@@ -82,7 +81,7 @@ async def receive_mail(request: Request, db: Session = Depends(get_db)):
         return {"status": "duplicate"}
     item = models.InboxItem(
         kind=InboxKind.MAIL,
-        user_id=sender.user_id,
+        user_id=sender.id,
         from_addr=summary.from_addr,
         subject=summary.subject,
         message_id=summary.message_id,

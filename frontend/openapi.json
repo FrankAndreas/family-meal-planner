@@ -2492,127 +2492,6 @@
         }
       }
     },
-    "/api/emails": {
-      "get": {
-        "tags": [
-          "emails"
-        ],
-        "summary": "List Emails",
-        "operationId": "list_emails_api_emails_get",
-        "parameters": [
-          {
-            "name": "all",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "boolean",
-              "default": false,
-              "title": "All"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EmailOut"
-                  },
-                  "title": "Response List Emails Api Emails Get"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "tags": [
-          "emails"
-        ],
-        "summary": "Add Email",
-        "operationId": "add_email_api_emails_post",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/EmailIn"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/EmailOut"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/emails/{email_id}": {
-      "delete": {
-        "tags": [
-          "emails"
-        ],
-        "summary": "Delete Email",
-        "operationId": "delete_email_api_emails__email_id__delete",
-        "parameters": [
-          {
-            "name": "email_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Email Id"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Successful Response"
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/ai/status": {
       "get": {
         "tags": [
@@ -2969,59 +2848,6 @@
           "start"
         ],
         "title": "CloseIn"
-      },
-      "EmailIn": {
-        "properties": {
-          "address": {
-            "type": "string",
-            "maxLength": 200,
-            "title": "Address"
-          },
-          "user_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "User Id"
-          }
-        },
-        "type": "object",
-        "required": [
-          "address"
-        ],
-        "title": "EmailIn"
-      },
-      "EmailOut": {
-        "properties": {
-          "id": {
-            "type": "integer",
-            "title": "Id"
-          },
-          "user_id": {
-            "type": "integer",
-            "title": "User Id"
-          },
-          "user_name": {
-            "type": "string",
-            "title": "User Name"
-          },
-          "address": {
-            "type": "string",
-            "title": "Address"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "user_id",
-          "user_name",
-          "address"
-        ],
-        "title": "EmailOut"
       },
       "EntryIn": {
         "properties": {
@@ -5251,6 +5077,17 @@
           "language_chosen": {
             "type": "boolean",
             "title": "Language Chosen"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
           }
         },
         "type": "object",
@@ -5259,7 +5096,8 @@
           "name",
           "role",
           "language",
-          "language_chosen"
+          "language_chosen",
+          "email"
         ],
         "title": "UserOut"
       },

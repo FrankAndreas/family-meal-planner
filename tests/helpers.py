@@ -54,3 +54,17 @@ def plan(client, headers, day, slot="dinner", **fields) -> dict:
     response = client.post("/api/plan/entries", json={"date": str(day), "slot": slot, **fields}, headers=headers)
     assert response.status_code == 201, response.text
     return response.json()
+
+
+def confirm_email(client, name: str, address: str) -> None:
+    """The person confirmed `address` in the (fake) hub, which shares the addresses with the planner: recipe mails
+    from it are theirs (security review 2026-11-08)."""
+    import fake_hub
+    from app import hub, hub_people
+
+    fake_hub.current.share_email = True
+    fake_hub.current.emails[name] = address
+    # Taken over at the next sync of the people: now
+    hub.client.forget()
+    hub_people.forget()
+    login(client, name)

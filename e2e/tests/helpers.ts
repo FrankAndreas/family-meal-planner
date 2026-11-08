@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import path from 'node:path';
 import { expect, request as playwrightRequest, type APIRequestContext, type Locator, type Page } from '@playwright/test';
 
@@ -16,6 +17,9 @@ const HUB_HEADERS = { 'X-Requested-With': 'hub' };
 
 // token: the hub login the planner gets (hub_session, also as Bearer); hubCookies: what the hub needs for a change
 export interface Person { name: string; token: string; hubCookies: string }
+
+// The hub writes its mails here in the tests (MAIL_OUTBOX, inside the hub's data, which every run starts afresh)
+export const HUB_OUTBOX = path.resolve(__dirname, '..', '.tmp', 'hub', 'outbox.jsonl');
 
 export const uniqueName = (prefix: string) => `${prefix}${Date.now().toString(36).slice(-4)}${Math.random().toString(36).slice(2, 5)}`;
 
@@ -55,9 +59,39 @@ export async function giveAccess(request: APIRequestContext, personId: number, a
     await asHubAdmin(request, 'PATCH', `/api/tiles/${tile!.id}`, { people });
 }
 
-// A person added in the hub, with access to the planner unless access=false
-export async function addToHub(request: APIRequestContext, name: string, role: 'PARENT' | 'CHILD', access = true): Promise<number> {
-    const person = await asHubAdmin<{ id: number }>(request, 'POST', '/api/people', { name, pin: PIN, role });
+// The token of the hub's last confirmation mail to this address (the hub sends in the background: waited for)
+async function confirmToken(address: string): Promise<string> {
+    let token: string | undefined;
+    await expect.poll(() => {
+        const lines = fs.existsSync(HUB_OUTBOX) ? fs.readFileSync(HUB_OUTBOX, 'utf-8').trim().split('\n').filter(Boolean) : [];
+        const mails = lines.map(line => JSON.parse(line) as { to: string[]; text: string }).reverse();
+        token = mails.map(m => m.to.includes(address) ? m.text.match(/confirm-email#token=([^\s]+)/)?.[1] : undefined).find(Boolean);
+        return token;
+    }, { message: `a confirmation mail to ${address}` }).toBeTruthy();
+    return token!;
+}
+
+// The address given when the person was added, confirmed with the link of the hub's mail, and the planner's tile
+// sharing the addresses: recipe mails from it are the person's (security review 2026-11-08)
+async function confirmAddress(request: APIRequestContext, address: string): Promise<void> {
+    const response = await request.post(`${HUB}/api/email-confirm`, { data: { token: await confirmToken(address) }, headers: HUB_HEADERS });
+    expect(response.ok(), await response.text()).toBeTruthy();
+    const tiles = await asHubAdmin<{ id: number; app_key: string | null; share_email: boolean }[]>(request, 'GET', '/api/tiles/manage');
+    const tile = tiles.find(t => t.app_key === 'meals')!;
+    if (!tile.share_email) await asHubAdmin(request, 'PATCH', `/api/tiles/${tile.id}`, { share_email: true });
+}
+
+// A person added in the hub, with access to the planner unless access=false. With an address, it is confirmed before
+// the planner gets access: so the planner knows it from the person's very first sync
+export async function addToHub(
+    request: APIRequestContext, name: string, role: 'PARENT' | 'CHILD', access = true, address?: string,
+): Promise<number> {
+    const person = await asHubAdmin<{ id: number }>(request, 'POST', '/api/people', { name, pin: PIN, role, email: address });
+    if (address) {
+        // The planner's tile exists before its sharing is switched on
+        await giveAccess(request, person.id, false);
+        await confirmAddress(request, address);
+    }
     if (access) await giveAccess(request, person.id, true);
     return person.id;
 }
@@ -73,10 +107,16 @@ export async function token(_request: APIRequestContext, name: string, pin?: str
 }
 
 // A person of the test's own, added in the hub with access to the planner, and logged in there
-export async function newPerson(request: APIRequestContext, role: 'PARENT' | 'CHILD' = 'PARENT'): Promise<Person> {
+// `address`: the person's mail address, confirmed in the hub (recipe mails come only from such addresses)
+export async function newPerson(
+    request: APIRequestContext, role: 'PARENT' | 'CHILD' = 'PARENT', address?: string,
+): Promise<Person> {
     const name = uniqueName(role === 'PARENT' ? 'P' : 'K');
-    await addToHub(request, name, role);
-    return hubLogin(name);
+    await addToHub(request, name, role, true, address);
+    const person = await hubLogin(name);
+    // The planner knows people from the hub once someone uses it (then every minute): mails from the address count now
+    if (address) await call(request, person, 'GET', '/me');
+    return person;
 }
 
 const pageErrors = new WeakMap<Page, string[]>();

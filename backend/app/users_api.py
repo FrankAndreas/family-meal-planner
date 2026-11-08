@@ -18,6 +18,7 @@ def user_out(user: models.User) -> schemas.UserOut:
         role=user.role,
         language=user.language or config.default_language(),
         language_chosen=user.language is not None,
+        email=user.email,
     )
 
 

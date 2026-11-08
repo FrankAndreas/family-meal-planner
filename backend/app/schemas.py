@@ -29,6 +29,8 @@ class UserOut(BaseModel):
     # The language the person sees: their own choice, or the default language
     language: Language
     language_chosen: bool
+    # Confirmed in the family hub and shared with the planner: recipe mails come from it
+    email: str | None
 
 
 
@@ -318,25 +320,6 @@ class WeekOut(BaseModel):
 
 class CloseIn(BaseModel):
     start: dt.date
-
-
-class EmailIn(BaseModel):
-    address: Annotated[str, StringConstraints(strip_whitespace=True, to_lower=True, max_length=200)]
-    user_id: int | None = None
-
-    @field_validator("address")
-    @classmethod
-    def looks_like_mail(cls, address: str) -> str:
-        if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", address):
-            raise ValueError("invalid_email")
-        return address
-
-
-class EmailOut(BaseModel):
-    id: int
-    user_id: int
-    user_name: str
-    address: str
 
 
 class Attachment(BaseModel):

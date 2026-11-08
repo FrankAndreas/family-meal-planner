@@ -1,7 +1,7 @@
 import pytest
 
 from app import config, inbox_api
-from helpers import create_user
+from helpers import ADMIN, confirm_email, create_user, login, remove_from_hub
 from mails import build_mail, png
 
 SECRET = "test-inbound-secret"
@@ -17,11 +17,9 @@ def inbound(monkeypatch, client):
     return post
 
 
-def _register(client, headers, address="Papa@Example.ch", user_id=None):
-    body = {"address": address, **({"user_id": user_id} if user_id else {})}
-    response = client.post("/api/emails", json=body, headers=headers)
-    assert response.status_code == 201, response.text
-    return response.json()
+def _register(client, headers, address="Papa@Example.ch", name=ADMIN):
+    """The address the person confirmed in the family hub (the only addresses recipe mails come from)."""
+    confirm_email(client, name, address)
 
 
 def test_off_without_secret(client):
@@ -68,7 +66,56 @@ def test_too_big(inbound, admin_headers, client, monkeypatch):
 
 
 def test_mail_of_a_child_belongs_to_the_child(inbound, admin_headers, client):
-    lena = create_user(client, admin_headers, "Lena")
-    _register(client, admin_headers, "lena@example.ch", user_id=lena["id"])
+    create_user(client, admin_headers, "Lena")
+    _register(client, admin_headers, "lena@example.ch", name="Lena")
     inbound(build_mail(from_addr="lena@example.ch"))
     assert client.get("/api/inbox", headers=admin_headers).json()[0]["user_name"] == "Lena"
+
+
+def test_an_address_the_hub_does_not_share_is_refused(inbound, admin_headers, client):
+    """Confirmed in the hub, but the planner's tile doesn't share the addresses: the planner knows none."""
+    import fake_hub
+
+    _register(client, admin_headers)
+    fake_hub.current.share_email = False
+    from app import hub, hub_people
+
+    hub.client.forget()
+    hub_people.forget()
+    login(client)
+    response = inbound(build_mail())
+    assert response.status_code == 403 and response.json()["detail"] == "inbound_sender_unknown"
+
+
+def test_an_address_two_people_have_is_refused(inbound, admin_headers, client):
+    """Whose would it be? Neither: the hub should know each address once."""
+    create_user(client, admin_headers, "Lena")
+    _register(client, admin_headers, "family@example.ch")
+    _register(client, admin_headers, "family@example.ch", name="Lena")
+    response = inbound(build_mail(from_addr="family@example.ch"))
+    assert response.status_code == 403 and response.json()["detail"] == "inbound_sender_unknown"
+
+
+def test_a_person_the_hub_no_longer_lists_sends_nothing(inbound, admin_headers, client):
+    create_user(client, admin_headers, "Lena")
+    _register(client, admin_headers, "lena@example.ch", name="Lena")
+    remove_from_hub("Lena")
+    from app import hub, hub_people
+
+    hub.client.forget()
+    hub_people.forget()
+    login(client)
+    response = inbound(build_mail(from_addr="lena@example.ch"))
+    assert response.status_code == 403
+
+
+def test_the_person_and_the_family_see_the_hubs_address(admin_headers, client):
+    lena = create_user(client, admin_headers, "Lena")
+    _register(client, admin_headers, "Lena@Example.ch", name="Lena")
+    assert client.get("/api/me", headers=login(client, "Lena")).json()["email"] == "lena@example.ch"
+    people = {u["name"]: u["email"] for u in client.get("/api/users", headers=admin_headers).json()}
+    assert people == {"Admin": None, "Lena": "lena@example.ch"} and lena["id"]
+
+
+def test_addresses_are_no_longer_typed_in(client, admin_headers):
+    assert client.post("/api/emails", json={"address": "x@example.ch"}, headers=admin_headers).status_code in (404, 405)

@@ -49,7 +49,7 @@ export default function FamilyMembers() {
                         <span className="font-semibold">{u.name}</span>
                         <span className="rounded-full bg-white/10 px-2 py-0.5 text-xs text-slate-300">{t(`roles.${u.role}`)}</span>
                         {/* The address recipe mails come from: the one confirmed in the hub */}
-                        <span className={`text-sm ${u.email ? 'text-slate-300' : 'text-slate-500'}`}>
+                        <span className={`text-sm ${u.email ? 'text-slate-300' : 'text-slate-400'}`}>
                             {u.email ?? t('settings.memberNoMail')}
                         </span>
                     </li>

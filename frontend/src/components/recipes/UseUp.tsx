@@ -124,7 +124,7 @@ export default function UseUp({ have, mode, onChange }: UseUpProps) {
                                                     {t('useUp.missing', { names: recipe.missing.join(', ') })}
                                                 </div>
                                             )}
-                                            <div className="text-xs text-slate-500">
+                                            <div className="text-xs text-slate-400">
                                                 {recipe.last_eaten
                                                     ? t('recipes.lastEaten', { when: sinceText(recipe.last_eaten) })
                                                     : t('recipes.neverEaten')}

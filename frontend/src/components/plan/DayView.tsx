@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { type PlanEntry, SLOTS, type Slot, type Week, weekdayKey } from '../../plan';
 import type { RecipeSummary } from '../../recipes';
 import { BUTTON_SECONDARY, CARD } from '../../ui';
+import Modal from '../Modal';
 import EntryChip from './EntryChip';
 import SuggestionPanel from './SuggestionPanel';
 
@@ -68,41 +69,39 @@ export default function DayView({ week, familySize, version, onPlan, onNote, onO
                 </section>
             ))}
             {adding && (
-                <div className="fixed inset-0 z-30 flex items-end bg-black/50" onClick={() => setAdding(null)}>
-                    <div
-                        role="dialog"
-                        aria-label={place(adding)}
-                        onClick={(e) => e.stopPropagation()}
-                        className="flex h-[80vh] w-full flex-col gap-2 rounded-t-2xl bg-slate-900 p-3"
-                    >
-                        <div className="flex items-center gap-2">
-                            <h2 className="mr-auto text-base">{place(adding)}</h2>
-                            <button
-                                type="button"
-                                className={BUTTON_SECONDARY}
-                                onClick={() => {
-                                    const slot = adding;
-                                    setAdding(null);
-                                    onNote(shown, slot);
-                                }}
-                            >
-                                {t('plan.addNote')}
-                            </button>
-                        </div>
-                        <div className="min-h-0 flex-1">
-                            <SuggestionPanel
-                                slot={adding}
-                                selectedId={null}
-                                version={version}
-                                onPick={(recipe) => {
-                                    const slot = adding;
-                                    setAdding(null);
-                                    onPlan(shown, slot, recipe);
-                                }}
-                            />
-                        </div>
+                <Modal
+                    label={place(adding)}
+                    onClose={() => setAdding(null)}
+                    overlayClassName="fixed inset-0 z-30 flex items-end bg-black/50"
+                    className="flex h-[80vh] w-full flex-col gap-2 rounded-t-2xl bg-slate-900 p-3"
+                >
+                    <div className="flex items-center gap-2">
+                        <h2 className="mr-auto text-base">{place(adding)}</h2>
+                        <button
+                            type="button"
+                            className={BUTTON_SECONDARY}
+                            onClick={() => {
+                                const slot = adding;
+                                setAdding(null);
+                                onNote(shown, slot);
+                            }}
+                        >
+                            {t('plan.addNote')}
+                        </button>
                     </div>
-                </div>
+                    <div className="min-h-0 flex-1">
+                        <SuggestionPanel
+                            slot={adding}
+                            selectedId={null}
+                            version={version}
+                            onPick={(recipe) => {
+                                const slot = adding;
+                                setAdding(null);
+                                onPlan(shown, slot, recipe);
+                            }}
+                        />
+                    </div>
+                </Modal>
             )}
         </div>
     );

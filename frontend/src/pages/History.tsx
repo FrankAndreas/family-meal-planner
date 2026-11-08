@@ -17,7 +17,7 @@ function Entry({ entry }: { entry: PlanEntry }) {
         </Link>
     );
     // Not eaten: struck through, and announced as such
-    return entry.eaten ? link : <del className="text-slate-500">{link}</del>;
+    return entry.eaten ? link : <del className="text-slate-400">{link}</del>;
 }
 
 export default function History() {

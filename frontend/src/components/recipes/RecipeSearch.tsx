@@ -79,7 +79,7 @@ export default function RecipeSearch({ search }: { search: ReturnType<typeof use
                             className={chip(tag === item.name)}
                             onClick={() => change({ tag: tag === item.name ? '' : item.name })}
                         >
-                            {item.name} <span className="text-slate-500">{item.count}</span>
+                            {item.name} <span className="text-slate-400">{item.count}</span>
                         </button>
                     ))}
                 </div>

@@ -12,6 +12,16 @@ const NAV = [
     { to: '/einstellungen', key: 'nav.settings', icon: '⚙️', end: false },
 ] as const;
 
+// The browser tab's (and a screen reader's) name of each part of the app, by the start of its address
+const TITLES = [
+    ['/einkaufsliste', 'shopping.title'],
+    ['/woche-abschliessen', 'close.title'],
+    ['/rezepte', 'nav.recipes'],
+    ['/posteingang', 'nav.inbox'],
+    ['/verlauf', 'nav.history'],
+    ['/einstellungen', 'nav.settings'],
+] as const;
+
 const topLink = ({ isActive }: { isActive: boolean }) =>
     `rounded-lg px-3 py-2 text-sm font-medium ${
         isActive ? 'bg-white/10 text-white' : 'text-slate-300 hover:bg-white/5 hover:text-white'
@@ -25,6 +35,12 @@ export default function Layout() {
     const { user, logout } = useAuth();
     const location = useLocation();
     const [waiting, setWaiting] = useState(0);
+
+    // Each page its own title, so tabs and screen readers tell them apart (accessibility review 2026-11-08)
+    useEffect(() => {
+        const part = TITLES.find(([start]) => location.pathname.startsWith(start))?.[1] ?? 'nav.plan';
+        document.title = `${t(part)} · ${t('common.appName')}`;
+    }, [location.pathname, t]);
 
     // The inbox badge, looked at again whenever the page changes
     useEffect(() => {
@@ -44,10 +60,21 @@ export default function Layout() {
 
     return (
         <div className="min-h-screen pb-20 sm:pb-0">
+            {/* The first thing a keyboard reaches: past the navigation to the page (shown only while focused) */}
+            <a
+                href="#main"
+                onClick={(e) => {
+                    e.preventDefault();
+                    document.getElementById('main')?.focus();
+                }}
+                className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-50 focus:rounded-lg focus:bg-slate-900 focus:px-3 focus:py-2 focus:text-white"
+            >
+                {t('nav.skipToContent')}
+            </a>
             <header className="sticky top-0 z-10 border-b border-white/10 bg-slate-900/70 backdrop-blur-md">
                 <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3">
                     <span className="mr-auto text-lg font-bold">
-                        🍽️ <span className="bg-gradient-to-r from-cyan-300 to-fuchsia-300 bg-clip-text text-transparent">{t('common.appName')}</span>
+                        <span aria-hidden>🍽️</span> <span className="bg-gradient-to-r from-cyan-300 to-fuchsia-300 bg-clip-text text-transparent">{t('common.appName')}</span>
                     </span>
                     <nav className="hidden gap-1 sm:flex">
                         {NAV.map((item) => (
@@ -63,7 +90,7 @@ export default function Layout() {
                     </button>
                 </div>
             </header>
-            <main className="mx-auto max-w-7xl px-4 py-6">
+            <main id="main" tabIndex={-1} className="mx-auto max-w-7xl px-4 py-6 focus:outline-none">
                 <Outlet />
             </main>
             {/* Phones: the navigation sits at the bottom, within reach of the thumb */}

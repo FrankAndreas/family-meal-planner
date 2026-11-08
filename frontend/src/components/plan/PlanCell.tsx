@@ -47,7 +47,7 @@ export default function PlanCell({ day, slot, entries, mode, past, familySize, f
                 aria-label={label}
                 onClick={onTap}
                 className={`min-h-6 flex-1 rounded text-xs ${
-                    target ? 'text-cyan-300 hover:bg-cyan-400/10' : 'text-transparent hover:bg-white/5 hover:text-slate-500'
+                    target ? 'text-cyan-300 hover:bg-cyan-400/10' : 'text-transparent hover:bg-white/5 hover:text-slate-400'
                 }`}
             >
                 {mode === 'plan' ? t('plan.planHere') : mode === 'move' ? t('plan.moveHere') : '+'}

@@ -26,7 +26,7 @@ import {
   translateRecipe,
 } from "../recipes";
 import { withOriginal } from "../recipeView";
-import { BUTTON, BUTTON_SECONDARY, CARD, ERROR, PAGE } from "../ui";
+import { BUTTON, BUTTON_SECONDARY, CARD, ERROR, ICON_OFF, PAGE } from "../ui";
 
 export default function RecipeView() {
   const { t } = useTranslation();
@@ -135,7 +135,7 @@ export default function RecipeView() {
                 onClick={() =>
                   change(() => favoriteRecipe(recipe.id, !recipe.my_favorite))
                 }
-                className={`text-3xl ${recipe.my_favorite ? "text-fuchsia-300" : "text-slate-600 hover:text-fuchsia-200"}`}
+                className={`text-3xl ${recipe.my_favorite ? "text-fuchsia-300" : `${ICON_OFF} hover:text-fuchsia-200`}`}
               >
                 ♥
               </button>

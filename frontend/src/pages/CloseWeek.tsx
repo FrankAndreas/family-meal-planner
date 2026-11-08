@@ -90,7 +90,7 @@ export default function CloseWeek() {
                                                     onChange={(e) => setEaten(entry, e.target.checked)}
                                                     className="h-5 w-5"
                                                 />
-                                                <span className={entry.eaten ? '' : 'text-slate-500 line-through'}>
+                                                <span className={entry.eaten ? '' : 'text-slate-400 line-through'}>
                                                     {entry.recipe.title}
                                                 </span>
                                             </label>

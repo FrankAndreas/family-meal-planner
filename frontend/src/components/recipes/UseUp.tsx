@@ -99,7 +99,7 @@ export default function UseUp({ have, mode, onChange }: UseUpProps) {
                     {t(`useUp.explain.${key}`, { max: MAX_MISSING })}
                 </p>
             ))}
-            {error && <p className={ERROR}>{error}</p>}
+            {error && <p role="alert" className={ERROR}>{error}</p>}
             {!have.length ? (
                 <p className="text-slate-400">{t('useUp.hint')}</p>
             ) : (

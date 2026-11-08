@@ -222,7 +222,7 @@ export default function PlanRecipeDialog({ recipeId, title, people: initialPeopl
                 </p>
             )}
             <PeopleStepper value={people} onChange={setPeople} />
-            {error && <p className={ERROR}>{error}</p>}
+            {error && <p role="alert" className={ERROR}>{error}</p>}
             <div className="flex flex-wrap gap-2">
                 <button type="button" className={BUTTON} disabled={!picked || saving || loading} onClick={save}>
                     {picked ? t('plan.planOn', { place: place(picked) }) : t('plan.pickPlace')}

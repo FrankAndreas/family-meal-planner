@@ -60,7 +60,7 @@ export default function CloseWeek() {
         }
     };
 
-    if (!week) return error ? <p className={ERROR}>{error}</p> : <p className="text-slate-400">{t('common.loading')}</p>;
+    if (!week) return error ? <p role="alert" className={ERROR}>{error}</p> : <p className="text-slate-400">{t('common.loading')}</p>;
 
     return (
         <div className={`${PAGE} space-y-5`}>
@@ -117,7 +117,7 @@ export default function CloseWeek() {
                     </section>
                 );
             })}
-            {error && <p className={ERROR}>{error}</p>}
+            {error && <p role="alert" className={ERROR}>{error}</p>}
             <button type="button" className={BUTTON} onClick={close}>
                 {t('plan.closeWeek')}
             </button>

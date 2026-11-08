@@ -97,7 +97,7 @@ export default function RecipeView() {
 
   if (!recipe)
     return error ? (
-      <p className={ERROR}>{error}</p>
+      <p role="alert" className={ERROR}>{error}</p>
     ) : (
       <p className="text-slate-400">{t("common.loading")}</p>
     );
@@ -110,7 +110,7 @@ export default function RecipeView() {
 
   return (
     <article className={`${PAGE} space-y-6`}>
-      {recipe.deleted && <p className={ERROR}>{t("recipes.deletedBanner")}</p>}
+      {recipe.deleted && <p role="status" className={ERROR}>{t("recipes.deletedBanner")}</p>}
       <div className={`${CARD} grid gap-5 md:grid-cols-[16rem_1fr]`}>
         <RecipeThumb
           recipe={recipe}
@@ -227,7 +227,7 @@ export default function RecipeView() {
           </p>
         )}
       </div>
-      {error && <p className={ERROR}>{error}</p>}
+      {error && <p role="alert" className={ERROR}>{error}</p>}
       {planning && people !== null && (
         <PlanRecipeDialog
           recipeId={recipe.id}

@@ -27,3 +27,15 @@ describe('contrast', () => {
         expect(dim).toEqual([]);
     });
 });
+
+describe('errors', () => {
+    it('every error paragraph is announced when it appears (role="alert"), not only shown', () => {
+        const silent = Object.entries(SOURCES).flatMap(([path, text]) =>
+            text
+                .split('\n')
+                .map((line, n) => (line.includes('className={ERROR}') && !/role="(alert|status)"/.test(line) ? `${path}:${n + 1}` : null))
+                .filter(Boolean),
+        );
+        expect(silent).toEqual([]);
+    });
+});

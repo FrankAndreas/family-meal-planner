@@ -47,7 +47,7 @@ export default function AiUsage() {
                     <p className="text-xs text-slate-400">{t('settings.aiTotal', { count: usage.total })}</p>
                 </>
             )}
-            {error && <p className={ERROR}>{error}</p>}
+            {error && <p role="alert" className={ERROR}>{error}</p>}
         </section>
     );
 }

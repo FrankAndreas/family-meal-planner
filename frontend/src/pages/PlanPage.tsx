@@ -72,7 +72,8 @@ export default function PlanPage() {
 
     useEffect(() => {
         const cancel = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') {
+            // Escape in a dialog closes the dialog, nothing more
+            if (e.key === 'Escape' && !e.defaultPrevented) {
                 setPicked(null);
                 setMoving(null);
             }
@@ -126,7 +127,7 @@ export default function PlanPage() {
         else run(() => updateEntry(Number(key), { date: day, slot }));
     };
 
-    if (!week) return error ? <p className={ERROR}>{error}</p> : <p className="text-slate-400">{t('common.loading')}</p>;
+    if (!week) return error ? <p role="alert" className={ERROR}>{error}</p> : <p className="text-slate-400">{t('common.loading')}</p>;
 
     const mode = moving ? 'move' : picked ? 'plan' : 'idle';
     const place = (day: string, slot: Slot) =>
@@ -135,7 +136,7 @@ export default function PlanPage() {
     return (
         <div className="space-y-4">
             <WeekHeader week={week} onWeek={(start) => setSearch({ woche: start })} />
-            {error && <p className={ERROR}>{error}</p>}
+            {error && <p role="alert" className={ERROR}>{error}</p>}
             {moving && (
                 <p className="text-sm text-cyan-300">
                     {t('plan.movingHint', { title: moving.recipe?.title ?? moving.note })}{' '}

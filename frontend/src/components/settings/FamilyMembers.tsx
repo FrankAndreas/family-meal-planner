@@ -71,7 +71,7 @@ export default function FamilyMembers() {
                     </ul>
                 </div>
             )}
-            {error && <p className={ERROR}>{error}</p>}
+            {error && <p role="alert" className={ERROR}>{error}</p>}
         </section>
     );
 }

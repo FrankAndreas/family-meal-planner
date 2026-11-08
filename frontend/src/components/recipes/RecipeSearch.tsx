@@ -84,7 +84,7 @@ export default function RecipeSearch({ search }: { search: ReturnType<typeof use
                     ))}
                 </div>
             )}
-            {error && <p className={ERROR}>{error}</p>}
+            {error && <p role="alert" className={ERROR}>{error}</p>}
             {recipes && recipes.length === 0 && <p className="text-slate-400">{t('recipes.none')}</p>}
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
                 {recipes?.map((recipe) => (

@@ -39,7 +39,7 @@ export default function InboxItemPage() {
         }
     };
 
-    if (!item) return error ? <p className={ERROR}>{error}</p> : <p className="text-slate-400">{t('common.loading')}</p>;
+    if (!item) return error ? <p role="alert" className={ERROR}>{error}</p> : <p className="text-slate-400">{t('common.loading')}</p>;
 
     return (
         <div className={`${PAGE} space-y-5`}>
@@ -81,7 +81,7 @@ export default function InboxItemPage() {
                     <pre className="mt-2 overflow-x-auto whitespace-pre-wrap text-xs text-slate-400">{item.ai_raw}</pre>
                 </details>
             )}
-            {error && <p className={ERROR}>{error}</p>}
+            {error && <p role="alert" className={ERROR}>{error}</p>}
         </div>
     );
 }

@@ -86,7 +86,7 @@ export default function ScanRecipe({ onDone }: { onDone: () => void }) {
                     {sending ? t('recipes.scanSending') : t('recipes.scanSend', { count: shots.length })}
                 </button>
             </div>
-            {error && <p className={ERROR}>{error}</p>}
+            {error && <p role="alert" className={ERROR}>{error}</p>}
         </section>
     );
 }

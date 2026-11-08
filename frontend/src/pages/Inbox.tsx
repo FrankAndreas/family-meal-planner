@@ -73,7 +73,7 @@ export default function Inbox() {
                     }}
                 />
             )}
-            {error && <p className={ERROR}>{error}</p>}
+            {error && <p role="alert" className={ERROR}>{error}</p>}
             {items?.length === 0 && <p className="text-slate-400">{t('inbox.empty')}</p>}
             {items?.map((item) => (
                 <InboxItemCard

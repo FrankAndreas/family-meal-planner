@@ -50,7 +50,7 @@ export default function NoteDialog({ place, onAdd, onClose }: NoteDialogProps) {
                 maxLength={200}
                 value={text}
                 onChange={(e) => setText(e.target.value)}
-                autoFocus
+                data-autofocus
             />
             <div className="flex gap-2">
                 <button type="submit" className={BUTTON} disabled={!text.trim()}>

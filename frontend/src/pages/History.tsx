@@ -60,7 +60,7 @@ export default function History() {
     return (
         <div className={`${PAGE} space-y-5`}>
             <h1 className="text-2xl">{t('nav.history')}</h1>
-            {error && <p className={ERROR}>{error}</p>}
+            {error && <p role="alert" className={ERROR}>{error}</p>}
             {loaded && weeks.length === 0 && (
                 <div className="space-y-1 text-slate-400">
                     <p>{t('history.none')}</p>

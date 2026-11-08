@@ -26,11 +26,30 @@ test('a dialog is modal: Escape closes it, Tab stays in it, and focus goes back 
     await expect(menu).toHaveCount(0);
     await expect(chip).toBeFocused();
 
-    await page.getByRole('button', { name: 'Add to Sunday, Lunch' }).click();
+    // The note's input takes focus as it opens; closing still gives it back to the cell that opened it
+    const cell = page.getByRole('button', { name: 'Add to Sunday, Lunch' });
+    await cell.click();
     const note = page.getByRole('dialog', { name: 'Add a note' });
     await expect(note).toHaveAttribute('aria-modal', 'true');
+    await expect(note.getByLabel('Note')).toBeFocused();
     await page.keyboard.press('Escape');
     await expect(note).toHaveCount(0);
+    await expect(cell).toBeFocused();
+});
+
+test('Shift+Tab from a dialog\'s heading stays in the dialog', async ({ page, request }) => {
+    const parent = await newPerson(request);
+    const recipe = await createRecipe(request, parent);
+    await login(page, parent.name);
+    await page.goto(`/rezepte/${recipe.id}`);
+    await page.getByRole('button', { name: '📅 Plan' }).click();
+    const dialog = page.getByRole('dialog', { name: /Plan/ });
+    // The dialog starts on its heading (not tabbable itself)
+    await expect.poll(() => dialog.evaluate((d) => d.contains(document.activeElement))).toBe(true);
+    for (let n = 0; n < 3; n++) {
+        await page.keyboard.press('Shift+Tab');
+        expect(await dialog.evaluate((d) => d.contains(document.activeElement))).toBe(true);
+    }
 });
 
 test('each page has its own title', async ({ page, request }) => {

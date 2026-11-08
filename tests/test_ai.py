@@ -159,3 +159,15 @@ def test_draft_categories_cleaned():
 def test_prompt_lists_every_category():
     assert [line.split(":")[0].lstrip("- ") for line in ai.CATEGORY_GLOSSES.splitlines()] == list(CATEGORIES)
     assert "{glosses}" in ai.RECIPE_PROMPT
+
+
+@pytest.mark.parametrize("trouble", [urllib.error.URLError("no route"), TimeoutError(), ConnectionResetError()])
+def test_unreachable_service_is_ai_failed(monkeypatch, ai_on, trouble):
+    """No answer at all (network, timeout) is the same failure as a refused call: the draft says the AI didn't work."""
+
+    def unreachable(request, timeout):
+        raise trouble
+
+    monkeypatch.setattr(ai.urllib.request, "urlopen", unreachable)
+    with pytest.raises(ai.AiFailed):
+        ai.InfomaniakClient(ai.Settings.from_env()).complete([{"type": "text", "text": "hi"}])

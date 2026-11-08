@@ -16,6 +16,11 @@ MAX_BYTES = 3 * 1024 * 1024
 MAX_REDIRECTS = 5
 CHUNK = 64 * 1024
 TIMEOUT = 10
+# The whole fetch (redirects and reading included) ends by then at the latest, also when the caller sets no deadline:
+# a server trickling a byte every few seconds can't hold a request or an import
+TOTAL_SECONDS = 30
+# NAT64 (RFC 6052): IPv6 addresses standing for an IPv4 address, which a NAT64 gateway at home would reach
+NAT64 = ipaddress.ip_network("64:ff9b::/96")
 USER_AGENT = "Mozilla/5.0 (Menüplaner; family use)"
 PAGE_TYPES = ("text/html", "application/ld+json", "application/xhtml+xml")
 
@@ -43,6 +48,17 @@ class Page:
             return self.body.decode(charset, "replace")
         except LookupError:
             return self.body.decode("utf-8", "replace")
+
+
+def _public(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
+    """A public address, also when it is an IPv6 form of an IPv4 address (NAT64, or the old IPv4-compatible
+    ::a.b.c.d): then the IPv4 address it stands for must be public too. IPv4-mapped (::ffff:a.b.c.d) is checked by
+    is_global itself."""
+    if not ip.is_global:
+        return False
+    if ip.version == 6 and (ip in NAT64 or int(ip) >> 32 == 0):
+        return ipaddress.IPv4Address(int(ip) & 0xFFFFFFFF).is_global
+    return True
 
 
 def _resolve(host: str, port: int) -> list[str]:
@@ -136,7 +152,7 @@ def _checked(url: str) -> tuple[str, str, int, str, str]:
             ip = ipaddress.ip_address(address.split("%")[0])
         except ValueError:
             raise FetchRefused(url)
-        if not ip.is_global:
+        if not _public(ip):
             raise FetchRefused(url)
     target = (parts.path or "/") + (f"?{parts.query}" if parts.query else "")
     return scheme, host, port, target, addresses[0]
@@ -160,18 +176,18 @@ def fetch(
     allowed_hosts: frozenset[str] | None = None,
     deadline: float | None = None,
 ) -> Page:
-    """`deadline` (time.monotonic()): the whole fetch, redirects and reading included, ends by then."""
+    """`deadline` (time.monotonic()): the whole fetch, redirects and reading included, ends by then; at the latest
+    TOTAL_SECONDS from now."""
+    latest = time.monotonic() + TOTAL_SECONDS
+    deadline = latest if deadline is None else min(deadline, latest)
     for _ in range(MAX_REDIRECTS + 1):
         if allowed_hosts is not None:
             _allowed(url, allowed_hosts)
-        if deadline is not None and deadline <= time.monotonic():
+        if deadline <= time.monotonic():
             raise FetchFailed("deadline")
         scheme, host, port, target, ip = _checked(url)
-        if deadline is None:
-            status, headers, body = _open(scheme, host, port, target, ip, TIMEOUT)
-        else:
-            timeout = max(0.1, min(TIMEOUT, deadline - time.monotonic()))
-            status, headers, body = _open(scheme, host, port, target, ip, timeout, deadline=deadline)
+        timeout = max(0.1, min(TIMEOUT, deadline - time.monotonic()))
+        status, headers, body = _open(scheme, host, port, target, ip, timeout, deadline=deadline)
         if status in (301, 302, 303, 307, 308) and headers.get("location"):
             url = urljoin(url, headers["location"])
             continue

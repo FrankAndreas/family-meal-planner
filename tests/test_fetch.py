@@ -6,17 +6,27 @@ from app import fetch
 @pytest.fixture
 def net(monkeypatch):
     """Fake DNS and HTTP: names map to addresses, (ip, path) to (status, headers, body)."""
-    dns = {"public.example": ["93.184.216.34"], "inside.example": ["10.1.1.1"], "nas.local": ["192.168.1.10"]}
+    dns = {
+        "public.example": ["93.184.216.34"],
+        "inside.example": ["10.1.1.1"],
+        "nas.local": ["192.168.1.10"],
+        # NAT64: an IPv6 name for the home network's 192.168.1.10
+        "nat64.example": ["64:ff9b::c0a8:10a"],
+    }
     pages: dict = {}
     opened = []
+    # The deadline each opening got (fetch._deadlines, for test_every_fetch_has_a_deadline)
+    deadlines: list = []
 
     monkeypatch.setattr(fetch, "_resolve", lambda host, port: dns.get(host, [host]))
 
-    def _open(scheme, host, port, target, ip, timeout):
+    def _open(scheme, host, port, target, ip, timeout, deadline=None):
         opened.append((host, ip, target))
+        deadlines.append(deadline)
         return pages.get((host, target), (404, {}, b""))
 
     monkeypatch.setattr(fetch, "_open", _open)
+    monkeypatch.setattr(fetch, "_deadlines", deadlines, raising=False)
     return dns, pages, opened
 
 
@@ -32,6 +42,12 @@ HTML = {"content-type": "text/html; charset=utf-8"}
         "http://169.254.169.254/latest/meta-data",
         "http://[::1]/",
         "http://[fd00::1]/",
+        # IPv6 forms of an IPv4 address inside: NAT64 (well-known and local prefix) and the old IPv4-compatible form
+        "http://[64:ff9b::7f00:1]/",
+        "http://[64:ff9b::c0a8:10a]/",
+        "http://[64:ff9b:1::a00:5]/",
+        "http://[::127.0.0.1]/",
+        "http://nat64.example/",
         "http://inside.example/",
         "http://nas.local/",
         "http://public.example:8080/",
@@ -152,6 +168,26 @@ def test_deadline_ends_a_slow_trickle():
         fetch._open("http", "127.0.0.1", server.getsockname()[1], "/", "127.0.0.1", 10, deadline=started + 0.6)
     assert time.monotonic() - started < 1.5
     server.close()
+
+
+def test_public_ipv4_behind_nat64_is_allowed(net):
+    dns, pages, opened = net
+    dns["v6.example"] = ["64:ff9b::808:808"]
+    pages[("v6.example", "/")] = (200, HTML, b"<html></html>")
+    assert fetch.fetch("https://v6.example/").url == "https://v6.example/"
+
+
+def test_every_fetch_has_a_deadline(net):
+    """Without a deadline from the caller a slow server could hold the request or the import for hours: the whole
+    fetch ends after TOTAL_SECONDS."""
+    import time
+
+    _, pages, _ = net
+    pages[("public.example", "/")] = (200, HTML, b"<html></html>")
+    before = time.monotonic()
+    fetch.fetch("https://public.example/")
+    (deadline,) = fetch._deadlines
+    assert deadline is not None and before + fetch.TOTAL_SECONDS - 1 <= deadline <= time.monotonic() + fetch.TOTAL_SECONDS
 
 
 def test_deadline_passed_opens_nothing(net):

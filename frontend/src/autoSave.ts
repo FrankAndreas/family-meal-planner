@@ -110,7 +110,12 @@ export class AutoSaver<T extends object> {
         this.report.error(null);
         // Only "saved" once nothing else waits
         if (!this.waiting()) this.report.status('saved');
-        // After the bookkeeping, so a caller's mistake here can't count a save twice
-        this.options().onSaved?.(saved, fields, (key) => this.versions.get(key) !== sentAt.get(key));
+        // After the bookkeeping, so a caller's mistake here can't count a save twice; and caught, so it can't stop the
+        // saves queued after this one (the save itself worked: only the page's update of what it shows failed)
+        try {
+            this.options().onSaved?.(saved, fields, (key) => this.versions.get(key) !== sentAt.get(key));
+        } catch (error) {
+            this.report.error(error);
+        }
     }
 }

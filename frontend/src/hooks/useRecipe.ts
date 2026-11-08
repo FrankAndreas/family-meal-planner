@@ -10,9 +10,13 @@ export function useRecipe(id: string, initialPeople: number | null) {
     const [recipe, setRecipe] = useState<Recipe | null>(null);
     const [people, setPeople] = useState<number | null>(initialPeople);
     const [error, setError] = useState('');
+    // Each load of the recipe is numbered when it starts: only the newest may show its answer, so an older one that
+    // comes back later (the untranslated recipe for new people, say) never replaces a newer one
+    const newestLoad = useRef(0);
 
     useEffect(() => {
         let current = true;
+        const mine = ++newestLoad.current;
         const load = async () => {
             let wanted = people;
             if (wanted === null) {
@@ -22,7 +26,7 @@ export function useRecipe(id: string, initialPeople: number | null) {
                 setPeople(wanted);
             }
             const scaled = await fetchRecipe(id, wanted);
-            if (current) setRecipe(scaled);
+            if (current && mine === newestLoad.current) setRecipe(scaled);
         };
         load().catch((err) => current && setError(errorMessage(err)));
         return () => {
@@ -36,13 +40,13 @@ export function useRecipe(id: string, initialPeople: number | null) {
         shownPeople.current = people;
     }, [people]);
 
-    // Loaded again (after the AI changed it), for the people shown now: they may have changed while the AI worked. If
-    // they change again during this load, the load for that number (the effect above) comes after and brings the change
-    // too, so this answer is dropped instead of showing other amounts
+    // Loaded again (after the AI changed it), for the people shown now: they may have changed while the AI worked. A
+    // load for new people still under way is older and is dropped; if people change again during this one, the load
+    // for them (the effect above) is newer and brings the change too
     const reload = useCallback(async () => {
-        const asked = shownPeople.current;
-        const loaded = await fetchRecipe(id, asked);
-        if (shownPeople.current === asked) setRecipe(loaded);
+        const mine = ++newestLoad.current;
+        const loaded = await fetchRecipe(id, shownPeople.current);
+        if (mine === newestLoad.current) setRecipe(loaded);
     }, [id]);
 
     // A change whose answer is the recipe, unscaled: the amounts of whatever people the view shows by now are kept

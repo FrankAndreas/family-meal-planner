@@ -151,4 +151,54 @@ describe('AutoSaver', () => {
         engine.leave();
         expect(kept).toHaveLength(1);
     });
+
+    it('a mistake in onSaved does not stop the saves after it', async () => {
+        const { engine, server, statuses } = saver({
+            onSaved: () => {
+                throw new Error('a bug in the page');
+            },
+        });
+        engine.change({ day: 1 });
+        await settled();
+        server.calls[0].resolve(SAVED);
+        await settled();
+        engine.change({ day: 2 });
+        await settled();
+        expect(server.calls.map((c) => c.fields)).toEqual([{ day: 1 }, { day: 2 }]);
+        server.calls[1].resolve(SAVED);
+        await settled();
+        expect(statuses.at(-1)).toBe('saved');
+    });
+
+    it('a save sent while leaving that fails is kept, to go with the next change', async () => {
+        const { engine, server, statuses } = saver({ saveOnLeave: () => Promise.reject(new Error('gone')) });
+        engine.change({ size: 5 }, 600);
+        engine.leave();
+        await settled();
+        expect(statuses.at(-1)).toBe('idle');
+        engine.change({ day: 2 });
+        await settled();
+        expect(server.calls.map((c) => c.fields)).toEqual([{ size: 5, day: 2 }]);
+    });
+
+    it('without a way to save while leaving, leaving does nothing: the change goes as usual', async () => {
+        const { engine, server } = saver();
+        engine.change({ size: 5 }, 600);
+        engine.leave();
+        expect(server.calls).toEqual([]);
+        await settled();
+        expect(server.calls.map((c) => c.fields)).toEqual([{ size: 5 }]);
+    });
+
+    it('dropping a change while a save is on the way still says saving, until that save is done', async () => {
+        const { engine, server, statuses } = saver();
+        engine.change({ day: 1 });
+        await settled();
+        engine.change({ size: 2 }, 600);
+        engine.drop('size');
+        expect(statuses.at(-1)).toBe('saving');
+        server.calls[0].resolve(SAVED);
+        await settled();
+        expect(statuses.at(-1)).toBe('saved');
+    });
 });

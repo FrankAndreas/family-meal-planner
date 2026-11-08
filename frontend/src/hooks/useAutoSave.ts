@@ -39,7 +39,7 @@ export function useAutoSave<T extends object>(options: AutoSaveOptions<T>) {
         };
     }, [saver]);
 
-    const change = (fields: Partial<T>, wait = 0) => saver().change(fields, wait);
-    const drop = (key: keyof T) => saver().drop(key);
+    const change = useCallback((fields: Partial<T>, wait = 0) => saver().change(fields, wait), [saver]);
+    const drop = useCallback((key: keyof T) => saver().drop(key), [saver]);
     return { status, error, setError, change, drop };
 }

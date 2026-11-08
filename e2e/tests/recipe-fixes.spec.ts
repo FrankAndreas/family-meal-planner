@@ -75,3 +75,42 @@ test('the people chosen during a translation stay, with their amounts', async ({
     await expect(page.getByRole('heading', { name: `EN ${title}` })).toBeVisible();
     await expect(ingredients).toContainText('500 g');
 });
+
+// Review of the test gaps: the load for the new people, sent before the translation was done, comes back last; it must
+// not replace the translated recipe
+test('a load for new people that comes back after the translation does not undo it', async ({ page, request }) => {
+    const parent = await newPerson(request);
+    const title = uniqueName('Teig ');
+    const recipe = await createRecipe(request, parent, {
+        title, language: 'de', servings: 4, ingredients: [{ amount: 400, unit: 'g', name: 'Mehl', note: '', group: null }],
+    });
+    await login(page, parent.name);
+    let releaseTranslation = () => {};
+    const translation = new Promise<void>((resolve) => { releaseTranslation = resolve; });
+    await page.route('**/api/recipes/*/translate', async (route) => {
+        await translation;
+        await route.continue();
+    });
+    // The first load for 5 people: answered now (untranslated), handed to the page only when released
+    let releaseOldLoad = () => {};
+    const oldLoad = new Promise<void>((resolve) => { releaseOldLoad = resolve; });
+    let loadsFor5 = 0;
+    await page.route(/\/api\/recipes\/\d+\?people=5$/, async (route) => {
+        loadsFor5 += 1;
+        if (loadsFor5 > 1) return route.continue();
+        const response = await route.fetch();
+        await oldLoad;
+        await route.fulfill({ response });
+    });
+    await page.goto(`/rezepte/${recipe.id}`);
+    await page.getByRole('button', { name: 'Translate into English' }).click();
+    await page.getByRole('button', { name: 'More people' }).click();
+    await expect.poll(() => loadsFor5).toBe(1);
+    releaseTranslation();
+    await expect(page.getByRole('heading', { name: `EN ${title}` })).toBeVisible();
+    releaseOldLoad();
+    // Give the old answer time to arrive, then the translation is still there, with the amounts for 5
+    await page.waitForTimeout(500);
+    await expect(page.getByRole('heading', { name: `EN ${title}` })).toBeVisible();
+    await expect(page.getByRole('list', { name: 'Ingredients' })).toContainText('500 g');
+});

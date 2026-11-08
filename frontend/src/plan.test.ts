@@ -8,6 +8,10 @@ beforeAll(async () => {
 });
 
 describe('addDays', () => {
+    it('runs where summer time exists (npm test sets Europe/Zurich), or the cases below would test nothing', () => {
+        expect(new Date(2026, 6, 1).getTimezoneOffset()).not.toBe(new Date(2026, 0, 1).getTimezoneOffset());
+    });
+
     it('crosses months, years and the switch to and from summer time', () => {
         expect(plan.addDays('2026-10-31', 1)).toBe('2026-11-01');
         expect(plan.addDays('2026-12-31', 1)).toBe('2027-01-01');

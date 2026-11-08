@@ -1,5 +1,6 @@
 import { AxiosError, AxiosHeaders } from 'axios';
 import { beforeAll, describe, expect, it } from 'vitest';
+import en from './locales/en';
 import { stubBrowser } from './browserStubs.test-helper';
 
 stubBrowser('en');
@@ -20,7 +21,7 @@ const answer = (status: number, data: unknown) =>
 
 describe('errorMessage', () => {
     it('shows the text of the code the backend sent', () => {
-        expect(api.errorMessage(answer(404, { detail: 'recipe_not_found' }))).toBe('This recipe doesn’t exist.');
+        expect(api.errorMessage(answer(404, { detail: 'recipe_not_found' }))).toBe(en.errors.recipe_not_found);
     });
 
     it('fills in the values that come with the code', () => {
@@ -29,13 +30,14 @@ describe('errorMessage', () => {
 
     it('finds the code of a check of ours in a validation error (422)', () => {
         const detail = [{ msg: 'Value error, not_a_web_link', loc: ['body', 'url'] }];
-        expect(api.errorMessage(answer(422, { detail }))).toBe(api.errorMessage(answer(400, { detail: 'not_a_web_link' })));
+        expect(api.errorMessage(answer(422, { detail }))).toBe(en.errors.not_a_web_link);
     });
 
     it('says the network failed when no answer came, and something generic for anything else', () => {
         const offline = new AxiosError('Network Error', 'ERR_NETWORK');
-        expect(api.errorMessage(offline)).not.toBe(api.errorMessage(new Error('x')));
-        expect(api.errorMessage(answer(500, { detail: 'no_such_code_here' }))).toBe(api.errorMessage(new Error('x')));
+        expect(api.errorMessage(offline)).toBe(en.errors.network);
+        expect(api.errorMessage(new Error('x'))).toBe(en.errors.generic);
+        expect(api.errorMessage(answer(500, { detail: 'no_such_code_here' }))).toBe(en.errors.generic);
     });
 });
 

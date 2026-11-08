@@ -147,9 +147,20 @@ mails", with these names (Cloudflare renames dashboard menus from time to time):
    Optional: `FALLBACK_ADDRESS` (a verified Email Routing destination outside the domain) gets a mail the app can't
    take (NAS down) instead of a bounce.
 7. **Route the address** `rezepte` to the worker `meals-inbound` (**Email → Email Routing → Routing rules**).
-8. **Register the addresses** everyone shares from in **Einstellungen → Mail-Adressen**.
-9. **Test:** share a recipe from a registered mailbox to `rezepte@<domain>`; it shows in the Posteingang within
-   seconds. A mail from an unregistered address must bounce.
+8. **The senders' addresses come from the family hub:** each person confirms their address there, and a parent turns on
+   **share e-mail addresses** for the Menüplaner tile. The planner takes the addresses over when it next syncs the
+   people (when someone uses it, at most once a minute; Einstellungen shows each person's). Mail from any other
+   address is refused, even one only typed into the hub and not yet confirmed.
+9. **Test:** share a recipe from a confirmed address to `rezepte@<domain>`; it shows in the Posteingang within
+   seconds. A mail from any other address must bounce.
+
+**Upgrading from a version with Einstellungen → Mail-Adressen:** the addresses typed in there are dropped (migration
+0012). Until step 8 is done in the hub, every recipe mail bounces. The hub must be a version that shares addresses
+with apps.
+
+A changed or removed address in the hub reaches the planner at its next sync of the people, so after such a change
+(or after turning sharing off) open the planner once. Until then the old address still counts; its mails only wait in
+the Posteingang for a parent.
 
 Mails wait in `data/inbox/`; part of the `data/` backup.
 

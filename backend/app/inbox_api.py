@@ -75,7 +75,7 @@ async def receive_mail(request: Request, db: Session = Depends(get_db)):
     sender = senders[0] if len(senders) == 1 else None
     if sender is None:
         # Neither the sender nor the content goes into the log
-        logger.warning("/inbound: mail from an unregistered address refused")
+        logger.warning("/inbound: mail from an address no one confirmed in the family hub refused")
         raise api_error(403, "inbound_sender_unknown")
     if db.query(models.InboxItem).filter(models.InboxItem.message_id == summary.message_id).first():
         return {"status": "duplicate"}

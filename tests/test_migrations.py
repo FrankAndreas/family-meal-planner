@@ -202,5 +202,9 @@ def test_0012_typed_addresses_give_way_to_the_hubs(tmp_path):
     assert "user_emails" not in inspector.get_table_names()
     with engine.begin() as conn:
         assert conn.exec_driver_sql("SELECT email FROM users").scalar() is None
+    # A downgrade keeps the hub's addresses as typed ones
+    with engine.begin() as conn:
+        conn.exec_driver_sql("UPDATE users SET email = 'a@example.ch'")
     database_setup.run(engine, command.downgrade, "0011")
-    assert "user_emails" in inspect_(engine).get_table_names()
+    with engine.begin() as conn:
+        assert conn.exec_driver_sql("SELECT user_id, address FROM user_emails").all() == [(1, "a@example.ch")]

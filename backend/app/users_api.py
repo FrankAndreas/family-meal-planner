@@ -73,7 +73,7 @@ def removed_users(
 
 @router.delete("/users/{user_id}", status_code=204)
 def delete_user(user_id: int, _parent: models.User = Depends(auth.require_parent), db: Session = Depends(get_db)):
-    """Deletes a removed person's stars, favourites and sender addresses; their recipes and inbox items stay."""
+    """Deletes a removed person's stars and favourites; their recipes and inbox items stay."""
     user = db.get(models.User, user_id)
     if user is None:
         raise api_error(404, "user_not_found")

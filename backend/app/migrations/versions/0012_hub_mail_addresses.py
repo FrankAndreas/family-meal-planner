@@ -12,7 +12,7 @@ depends_on = None
 
 def upgrade() -> None:
     with op.batch_alter_table("users") as batch:
-        batch.add_column(sa.Column("email", sa.String(200)))
+        batch.add_column(sa.Column("email", sa.String(254)))
     op.drop_table("user_emails")
 
 

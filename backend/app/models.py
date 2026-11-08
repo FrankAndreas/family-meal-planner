@@ -53,7 +53,7 @@ class User(Base):
     is_active = Column(Boolean, default=True, nullable=False)
     # The address the person confirmed in the hub (lowercase), if the hub shares it with the planner: recipe mails
     # come only from such addresses (security review 2026-11-08)
-    email = Column(String(200))
+    email = Column(String(254))
     created_at = Column(DateTime, default=utcnow, nullable=False)
 
     @property

@@ -119,3 +119,17 @@ def test_the_person_and_the_family_see_the_hubs_address(admin_headers, client):
 
 def test_addresses_are_no_longer_typed_in(client, admin_headers):
     assert client.post("/api/emails", json={"address": "x@example.ch"}, headers=admin_headers).status_code in (404, 405)
+
+
+def test_a_person_the_hub_no_longer_lists_keeps_no_address(admin_headers, client):
+    """Hidden with their data, but their address isn't the hub's to share any more."""
+    create_user(client, admin_headers, "Lena")
+    _register(client, admin_headers, "lena@example.ch", name="Lena")
+    remove_from_hub("Lena")
+    from app import hub, hub_people
+
+    hub.client.forget()
+    hub_people.forget()
+    login(client)
+    removed = client.get("/api/users/removed", headers=admin_headers).json()
+    assert [(u["name"], u["email"]) for u in removed] == [("Lena", None)]

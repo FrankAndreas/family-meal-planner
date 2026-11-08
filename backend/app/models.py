@@ -205,6 +205,8 @@ class InboxItem(Base):
     processes it."""
 
     __tablename__ = "inbox_items"
+    # Never reuse ids: an item's files (its mail, cached thumbnails) are named by its id
+    __table_args__ = {"sqlite_autoincrement": True}
 
     id = Column(Integer, primary_key=True)
     # An InboxKind

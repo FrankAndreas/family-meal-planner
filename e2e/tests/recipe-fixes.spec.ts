@@ -50,3 +50,28 @@ test('the editor of a recipe that did not load cannot save over it', async ({ pa
     await expect(page.getByText('Something went wrong')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Save recipe' })).toHaveCount(0);
 });
+
+// Test gaps (2026-11-08): changing the people while the AI translates must not bring back the old amounts afterwards
+test('the people chosen during a translation stay, with their amounts', async ({ page, request }) => {
+    const parent = await newPerson(request);
+    const title = uniqueName('Teig ');
+    const recipe = await createRecipe(request, parent, {
+        title, language: 'de', servings: 4, ingredients: [{ amount: 400, unit: 'g', name: 'Mehl', note: '', group: null }],
+    });
+    await login(page, parent.name);
+    let release = () => {};
+    const held = new Promise<void>((resolve) => { release = resolve; });
+    await page.route('**/api/recipes/*/translate', async (route) => {
+        await held;
+        await route.continue();
+    });
+    await page.goto(`/rezepte/${recipe.id}`);
+    const ingredients = page.getByRole('list', { name: 'Ingredients' });
+    await expect(ingredients).toContainText('400 g');
+    await page.getByRole('button', { name: 'Translate into English' }).click();
+    await page.getByRole('button', { name: 'More people' }).click();
+    await expect(ingredients).toContainText('500 g');
+    release();
+    await expect(page.getByRole('heading', { name: `EN ${title}` })).toBeVisible();
+    await expect(ingredients).toContainText('500 g');
+});

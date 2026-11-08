@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { errorMessage } from '../api';
 import type { Slot } from '../plan';
 import { defaultPeople, fetchEatenOn, fetchPlannedFor, fetchRecipe, type Recipe } from '../recipes';
@@ -30,8 +30,20 @@ export function useRecipe(id: string, initialPeople: number | null) {
         };
     }, [id, people]);
 
-    // Loaded again as shown (after the AI changed it)
-    const reload = useCallback(async () => setRecipe(await fetchRecipe(id, people)), [id, people]);
+    // The people shown now: a reload asked for others is out of date when it comes back
+    const shownPeople = useRef(people);
+    useEffect(() => {
+        shownPeople.current = people;
+    }, [people]);
+
+    // Loaded again (after the AI changed it), for the people shown now: they may have changed while the AI worked. If
+    // they change again during this load, the load for that number (the effect above) comes after and brings the change
+    // too, so this answer is dropped instead of showing other amounts
+    const reload = useCallback(async () => {
+        const asked = shownPeople.current;
+        const loaded = await fetchRecipe(id, asked);
+        if (shownPeople.current === asked) setRecipe(loaded);
+    }, [id]);
 
     // A change whose answer is the recipe, unscaled: the amounts of whatever people the view shows by now are kept
     const change = useCallback(async (action: () => Promise<{ data: Recipe }>) => {

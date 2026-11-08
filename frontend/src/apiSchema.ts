@@ -115,7 +115,7 @@ export interface paths {
         post?: never;
         /**
          * Delete User
-         * @description Deletes a removed person's stars, favourites and sender addresses; their recipes and inbox items stay.
+         * @description Deletes a removed person's stars and favourites; their recipes and inbox items stay.
          */
         delete: operations["delete_user_api_users__user_id__delete"];
         options?: never;

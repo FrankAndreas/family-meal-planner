@@ -64,7 +64,10 @@ async function confirmToken(address: string): Promise<string> {
     let token: string | undefined;
     await expect.poll(() => {
         const lines = fs.existsSync(HUB_OUTBOX) ? fs.readFileSync(HUB_OUTBOX, 'utf-8').trim().split('\n').filter(Boolean) : [];
-        const mails = lines.map(line => JSON.parse(line) as { to: string[]; text: string }).reverse();
+        const mails = lines.flatMap(line => {
+            // A line the hub is still writing is read again at the next poll
+            try { return [JSON.parse(line) as { to: string[]; text: string }]; } catch { return []; }
+        }).reverse();
         token = mails.map(m => m.to.includes(address) ? m.text.match(/confirm-email#token=([^\s]+)/)?.[1] : undefined).find(Boolean);
         return token;
     }, { message: `a confirmation mail to ${address}` }).toBeTruthy();

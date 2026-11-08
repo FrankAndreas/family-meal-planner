@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { apiUrl } from '../../api';
 import { sinceText } from '../../lastEaten';
+import { photoSrc } from '../../photoUrl';
 import type { RecipeSummary } from '../../recipes';
 import Stars from './Stars';
 
@@ -14,8 +15,18 @@ interface RecipeCardProps {
     selected?: boolean;
 }
 
-export function RecipeThumb({ recipe, className }: { recipe: RecipeSummary; className: string }) {
-    if (recipe.photo_url) return <img src={apiUrl(recipe.photo_url)} alt="" className={`${className} object-cover`} />;
+// `full`: the whole photo (a recipe's own page); else the small version, loaded only once it is near the screen
+export function RecipeThumb({ recipe, className, full = false }: { recipe: RecipeSummary; className: string; full?: boolean }) {
+    if (recipe.photo_url)
+        return (
+            <img
+                src={photoSrc(apiUrl(recipe.photo_url), full ? 'full' : 'card')}
+                alt=""
+                loading={full ? 'eager' : 'lazy'}
+                decoding="async"
+                className={`${className} object-cover`}
+            />
+        );
     // No photo: a gradient with the first letter, so cards still differ at a glance
     return (
         <div

@@ -835,6 +835,7 @@
           "recipes"
         ],
         "summary": "Read Photo",
+        "description": "`size=card`: the small version recipe cards show.",
         "operationId": "read_photo_api_photos__name__get",
         "parameters": [
           {
@@ -844,6 +845,20 @@
             "schema": {
               "type": "string",
               "title": "Name"
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "full",
+                "card"
+              ],
+              "type": "string",
+              "default": "full",
+              "title": "Size"
             }
           }
         ],

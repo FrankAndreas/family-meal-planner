@@ -1,5 +1,5 @@
 import { format, parseISO } from 'date-fns';
-import { useState } from 'react';
+import { type KeyboardEvent, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { type PlanEntry, SLOTS, type Slot, type Week, weekdayKey } from '../../plan';
 import type { RecipeSummary } from '../../recipes';
@@ -26,24 +26,37 @@ export default function DayView({ week, familySize, version, onPlan, onNote, onO
     const [day, setDay] = useState(week.days.includes(week.today) ? week.today : week.days[0]);
     const [adding, setAdding] = useState<Slot | null>(null);
     const shown = week.days.includes(day) ? day : week.days[0];
+    // Arrow keys move between the days, as in any tab list; only the day shown is a Tab stop (accessibility review
+    // 2026-11-08)
+    const onDayKey = (e: KeyboardEvent<HTMLDivElement>) => {
+        if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+        e.preventDefault();
+        const at = week.days.indexOf(shown);
+        const next = week.days[(at + (e.key === 'ArrowRight' ? 1 : week.days.length - 1)) % week.days.length];
+        setDay(next);
+        document.getElementById(`day-tab-${next}`)?.focus();
+    };
     const place = (slot: Slot) => t('plan.place', { day: t(`weekdays.${weekdayKey(shown)}`), slot: t(`plan.slots.${slot}`) });
 
     return (
         <div className="space-y-3">
-            <div role="tablist" className="grid grid-cols-7 gap-1">
+            <div role="tablist" className="grid grid-cols-7 gap-1" onKeyDown={onDayKey}>
                 {week.days.map((d) => (
                     <button
                         key={d}
+                        id={`day-tab-${d}`}
                         type="button"
                         role="tab"
                         aria-selected={d === shown}
-                        aria-label={t(`weekdays.${weekdayKey(d)}`)}
+                        tabIndex={d === shown ? 0 : -1}
                         onClick={() => setDay(d)}
                         className={`rounded-lg py-1.5 text-center ${
                             d === shown ? 'bg-cyan-400/20 text-cyan-100' : d === week.today ? 'text-cyan-300' : 'text-slate-400'
                         }`}
                     >
-                        <div className="text-sm font-semibold">{t(`weekdays.${weekdayKey(d)}`).slice(0, 2)}</div>
+                        {/* The name is the whole weekday and the date (the two letters are for the eye) */}
+                        <div className="text-sm font-semibold" aria-hidden="true">{t(`weekdays.${weekdayKey(d)}`).slice(0, 2)}</div>
+                        <span className="sr-only">{t(`weekdays.${weekdayKey(d)}`)} </span>
                         <div className="text-xs">{format(parseISO(d), 'd.M.')}</div>
                     </button>
                 ))}

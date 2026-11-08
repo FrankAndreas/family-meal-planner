@@ -91,6 +91,13 @@ updates:
       - "FrankAndreas"
 
   # Cloudflare email worker npm dependencies
+    groups:
+      # playwright-core is pinned to @playwright/test's version, so axe uses the same Playwright
+      playwright:
+        patterns:
+          - "@playwright/test"
+          - "playwright-core"
+
   - package-ecosystem: "npm"
     directory: "/cloudflare/email-worker"
     schedule:

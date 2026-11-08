@@ -270,3 +270,28 @@ def test_a_new_persons_requests_at_the_same_moment(client, family_hub):
         assert me(client, bearer(fake_hub.token("Mia"))).status_code == 200
     finally:
         other.join()
+
+
+def test_a_hub_that_doesnt_answer_is_asked_again_only_after_a_pause(client, family_hub, monkeypatch):
+    """Requests go on with the people kept here instead of each waiting for a hub that is down."""
+    asked: list = []
+    now = [1000.0]
+
+    def people_down(path, headers):
+        if path.endswith("/people"):
+            asked.append(path)
+            raise hub.HubUnavailable("down")
+        return family_hub(path, headers)
+
+    monkeypatch.setattr(hub.client, "transport", people_down)
+    monkeypatch.setattr(hub_people.time, "monotonic", lambda: now[0])
+    login = hub.Login(fake_hub.token(ADMIN))
+    with database.SessionLocal() as db:
+        with pytest.raises(hub.HubUnavailable):
+            hub_people.refresh(db, login)
+        hub_people.refresh(db, login)
+        assert len(asked) == 1
+        now[0] += hub_people.BACKOFF_SECONDS + 1
+        with pytest.raises(hub.HubUnavailable):
+            hub_people.refresh(db, login)
+        assert len(asked) == 2

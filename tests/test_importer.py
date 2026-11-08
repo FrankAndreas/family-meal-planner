@@ -557,3 +557,35 @@ def test_translated_import_keeps_categories(client, admin_headers, bilingual, mo
     draft = _item(client, admin_headers, _paste(client, admin_headers))["draft"]
     assert draft["language"] == "de" and draft["categories"] == ["dessert"]
     assert "categories" not in calls[1][0]["text"].split(ai.TRANSLATE_MARKER, 1)[1]
+
+
+@pytest.mark.parametrize(
+    "trouble, logged",
+    [(ai.AiFailed("x"), False), (RuntimeError("a bug"), True)],
+)
+def test_an_import_that_breaks_ends_failed_never_stuck(client, admin_headers, world, monkeypatch, caplog, trouble, logged):
+    """Whatever goes wrong while processing, the item ends as failed (to try again), not processing for ever; an
+    unexpected error is logged for whoever looks into it."""
+    import logging
+
+    def broken(db, item, user):
+        raise trouble
+
+    monkeypatch.setattr(importer, "process", broken)
+    item = _mail(client, admin_headers, text="Rezept")
+    with caplog.at_level(logging.ERROR):
+        assert client.post(f"/api/inbox/{item}/process", headers=admin_headers).status_code == 202
+    got = _item(client, admin_headers, item)
+    assert got["status"] == "failed" and got["error"] == "ai_failed"
+    assert ("Processing inbox item" in caplog.text) == logged
+
+
+def test_an_import_of_an_item_discarded_meanwhile_does_nothing(client, admin_headers, world, db, monkeypatch):
+    """Discarded while its import was starting: the import finds nothing to do and touches nothing."""
+    monkeypatch.setattr(importer, "start", lambda item_id, user_id: None)
+    item = _mail(client, admin_headers, text="Rezept")
+    client.post(f"/api/inbox/{item}/process", headers=admin_headers)
+    assert client.delete(f"/api/inbox/{item}", headers=admin_headers).status_code == 204
+    admin = db.query(models.User).filter_by(name="Admin").one()
+    importer.run(item, admin.id)
+    assert db.query(models.InboxItem).count() == 0 and db.query(models.AiCall).count() == 0

@@ -307,13 +307,20 @@ class ShoppingExtra(Base):
 
 
 class BringLogin(Base):
-    """The Bring! account the planner logs in with (single row, id 1). The password stays on the NAS: it is never
-    sent back to a browser."""
+    """The Bring! account the planner logs in with (single row, id 1): its session, never the password (a copy of
+    the database or a backup gives no password away). Nothing of it but the e-mail goes to a browser."""
 
     __tablename__ = "bring_login"
 
     id = Column(Integer, primary_key=True)
     email = Column(String(200), nullable=False)
-    password = Column(String(200), nullable=False)
+    # Only a login from before sessions were kept: used once to log in, then removed (shopping_api._session)
+    password = Column(String(200))
+    uuid = Column(String(64))
+    public_uuid = Column(String(64))
+    # The Authorization header's value ("Bearer …"), renewed with refresh_token once it ends (expires_at, time.time())
+    access_token = Column(String(2000))
+    refresh_token = Column(String(2000))
+    expires_at = Column(Float)
     list_uuid = Column(String(64))
     list_name = Column(String(100))

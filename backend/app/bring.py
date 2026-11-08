@@ -6,6 +6,7 @@ with "bring_failed" and the list in the planner stays."""
 import http.client
 import json
 import logging
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -23,8 +24,9 @@ TIMEOUT_SECONDS = 20
 
 
 class BringFailed(Exception):
-    """code: "bring_login_failed" (email or password refused), "bring_list_gone" (the chosen list isn't there any
-    more) or "bring_failed" (anything else)."""
+    """code: "bring_login_failed" (email or password refused), "bring_login_expired" (Bring! won't renew the session,
+    e.g. the password was changed there: log in again), "bring_list_gone" (the chosen list isn't there any more) or
+    "bring_failed" (anything else)."""
 
     def __init__(self, code: str, reason: str = "", status: int | None = None):
         super().__init__(reason or code)
@@ -34,13 +36,20 @@ class BringFailed(Exception):
 
 @dataclass
 class Session:
+    """A Bring! login: what the planner keeps instead of the password. `token` is the Authorization header's value;
+    `refresh_token` renews it once it ends (`expires_at`, time.time())."""
+
     uuid: str
     public_uuid: str
     token: str
+    refresh_token: str = ""
+    expires_at: float = 0.0
 
 
 class BringClient(Protocol):
     def login(self, email: str, password: str) -> Session: ...
+
+    def refresh(self, session: Session) -> Session: ...
 
     def lists(self, session: Session) -> list[tuple[str, str]]: ...
 
@@ -96,9 +105,32 @@ class HttpBring:
                 uuid=str(data["uuid"]),
                 public_uuid=str(data.get("publicUuid", "")),
                 token=f"{data.get('token_type', 'Bearer')} {data['access_token']}",
+                refresh_token=str(data.get("refresh_token", "")),
+                expires_at=time.time() + _seconds(data.get("expires_in")),
             )
         except KeyError as error:
             raise BringFailed("bring_failed", "unreadable login answer") from error
+
+    def refresh(self, session: Session) -> Session:
+        """A new token for the session, as the Bring! apps renew theirs (bring-api's retrieve_new_access_token)."""
+        form = {"grant_type": "refresh_token", "refresh_token": session.refresh_token}
+        try:
+            data = self._json(self._call("POST", "v2/bringauth/token", form=form))
+        except BringFailed as failed:
+            if failed.code == "bring_login_failed":
+                raise BringFailed("bring_login_expired", str(failed)) from failed
+            raise
+        try:
+            token = f"{data.get('token_type', 'Bearer')} {data['access_token']}"
+        except KeyError as error:
+            raise BringFailed("bring_failed", "unreadable token answer") from error
+        return Session(
+            uuid=session.uuid,
+            public_uuid=session.public_uuid,
+            token=token,
+            refresh_token=str(data.get("refresh_token") or session.refresh_token),
+            expires_at=time.time() + _seconds(data.get("expires_in")),
+        )
 
     def lists(self, session: Session) -> list[tuple[str, str]]:
         data = self._json(self._call("GET", f"bringusers/{session.uuid}/lists", session))
@@ -121,20 +153,47 @@ class HttpBring:
             raise
 
 
+def _seconds(value) -> float:
+    """expires_in of an answer; without one the token counts as ended, so it is renewed before the next use."""
+    try:
+        return max(0.0, float(value))
+    except (TypeError, ValueError):
+        return 0.0
+
+
 class FakeBring:
-    """For tests and e2e (BRING_FAKE=1): the password "wrong" is refused, an item named "FAIL" fails the send."""
+    """For tests and e2e (BRING_FAKE=1): the password "wrong" is refused, an item named "FAIL" fails the send, the
+    refresh token "revoked" isn't renewed and the token "Bearer stale" is refused as Bring! ending a session early."""
 
     sent: ClassVar[list[tuple[str, list[tuple[str, str]]]]] = []
 
     def login(self, email: str, password: str) -> Session:
         if password == "wrong":
             raise BringFailed("bring_login_failed")
-        return Session(uuid="fake-user", public_uuid="fake-public", token="Bearer fake")
+        return Session(
+            uuid="fake-user", public_uuid="fake-public", token="Bearer fake", refresh_token="fake-refresh",
+            expires_at=time.time() + 3600,
+        )
+
+    def refresh(self, session: Session) -> Session:
+        if session.refresh_token == "revoked":
+            raise BringFailed("bring_login_expired")
+        return Session(
+            uuid=session.uuid, public_uuid=session.public_uuid, token="Bearer fake-renewed",
+            refresh_token=session.refresh_token, expires_at=time.time() + 3600,
+        )
+
+    @staticmethod
+    def _check(session: Session) -> None:
+        if session.token == "Bearer stale":
+            raise BringFailed("bring_failed", "HTTP 401", 401)
 
     def lists(self, session: Session) -> list[tuple[str, str]]:
+        self._check(session)
         return [("fake-home", "Zuhause"), ("fake-office", "Büro")]
 
     def add(self, session: Session, list_uuid: str, items: list[tuple[str, str]]) -> None:
+        self._check(session)
         if any(name == "FAIL" for name, _ in items):
             raise BringFailed("bring_failed")
         FakeBring.sent.append((list_uuid, list(items)))

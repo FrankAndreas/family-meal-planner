@@ -417,6 +417,7 @@ const en: typeof de = {
         already_categorized: 'The recipe already has categories.',
         categorize_failed: 'The AI couldn’t sort the recipes. Try again later.',
         bring_login_failed: 'Bring! didn’t accept the email or the password.',
+        bring_login_expired: 'Bring! ended the login (for example after a password change). Log in to Bring! again in the settings.',
         bring_failed: 'Bring! can’t be reached right now or didn’t answer as expected. The list stays here; try again later.',
         bring_not_set_up: 'Bring! isn’t set up yet: sign in and choose a list in the settings.',
         bring_unknown_list: 'This account has no such Bring! list.',

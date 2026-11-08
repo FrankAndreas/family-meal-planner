@@ -82,7 +82,7 @@ SHOPPING_TABLES = {
     "shopping_meals": {"list_id", "entry_id"},
     "shopping_choices": {"list_id", "key", "buy"},
     "shopping_extras": {"id", "list_id", "name", "amount", "position"},
-    "bring_login": {"id", "email", "password", "list_uuid", "list_name"},
+    "bring_login": {"id", "email", "password", "list_uuid", "list_name", "uuid", "public_uuid", "access_token", "refresh_token", "expires_at"},
 }
 
 
@@ -144,3 +144,21 @@ def test_0009_keeps_one_list(tmp_path):
         raise AssertionError("a second list was accepted")
     except IntegrityError:
         pass
+
+
+def test_0010_keeps_a_login_from_before(tmp_path):
+    """A Bring! login stored with its password survives; its first use turns it into a session (shopping_api)."""
+    from alembic import command
+
+    engine = create_engine(f"sqlite:///{tmp_path}/m.db")
+    database_setup.run(engine, command.upgrade, "0009")
+    with engine.begin() as conn:
+        conn.exec_driver_sql(
+            "INSERT INTO bring_login (id, email, password, list_uuid, list_name) VALUES (1, 'a@b.ch', 'geheim', 'l', 'Zuhause')"
+        )
+    database_setup.setup(engine)
+    with engine.begin() as conn:
+        row = conn.exec_driver_sql("SELECT email, password, list_uuid, access_token FROM bring_login").one()
+        assert tuple(row) == ("a@b.ch", "geheim", "l", None)
+        # Once a session is kept, the password may be gone
+        conn.exec_driver_sql("UPDATE bring_login SET password = NULL, access_token = 'Bearer x'")

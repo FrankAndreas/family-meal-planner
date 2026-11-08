@@ -104,7 +104,7 @@ export default function SuggestionPanel({ selectedId, onPick, version, slot: ope
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
             />
-            {error && <p className={ERROR}>{error}</p>}
+            {error && <p role="alert" className={ERROR}>{error}</p>}
             <div className="flex-1 space-y-2 overflow-y-auto pr-1">
                 {recipes?.length === 0 && <p className="p-2 text-sm text-slate-400">{t(`plan.empty.${tab}`)}</p>}
                 {recipes?.map((recipe) => (

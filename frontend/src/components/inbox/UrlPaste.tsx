@@ -35,7 +35,7 @@ export default function UrlPaste({ onAdded }: { onAdded: () => void }) {
                     {t('inbox.addLink')}
                 </button>
             </div>
-            {error && <p className={ERROR}>{error}</p>}
+            {error && <p role="alert" className={ERROR}>{error}</p>}
         </form>
     );
 }

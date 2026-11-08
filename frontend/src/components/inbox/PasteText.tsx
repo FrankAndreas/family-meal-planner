@@ -50,11 +50,11 @@ export default function PasteText({ onAdded }: { onAdded: () => void }) {
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
             />
-            {tooLong && <p className={ERROR}>{t('inbox.textTooLong', { max: MAX_CHARS.toLocaleString() })}</p>}
+            {tooLong && <p role="alert" className={ERROR}>{t('inbox.textTooLong', { max: MAX_CHARS.toLocaleString() })}</p>}
             <button type="submit" className={BUTTON} disabled={!text.trim() || tooLong || sending}>
                 {t('inbox.sendText')}
             </button>
-            {error && <p className={ERROR}>{error}</p>}
+            {error && <p role="alert" className={ERROR}>{error}</p>}
         </form>
     );
 }

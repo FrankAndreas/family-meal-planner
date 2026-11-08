@@ -98,7 +98,7 @@ export default function RecipeEdit() {
   // Editing a recipe that didn't load would save an empty one over it
   if ((id && !original) || (draftId && !draftItem))
     return error ? (
-      <p className={ERROR}>{error}</p>
+      <p role="alert" className={ERROR}>{error}</p>
     ) : (
       <p className="text-slate-400">{t("common.loading")}</p>
     );
@@ -273,7 +273,7 @@ export default function RecipeEdit() {
           onChange={set("notes")}
         />
       </section>
-      {error && <p className={ERROR}>{error}</p>}
+      {error && <p role="alert" className={ERROR}>{error}</p>}
       <div className="flex gap-3">
         <button type="submit" className={BUTTON} disabled={invalid || busy}>
           {t("recipes.save")}

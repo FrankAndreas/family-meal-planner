@@ -26,7 +26,7 @@ import {
   translateRecipe,
 } from "../recipes";
 import { withOriginal } from "../recipeView";
-import { BUTTON, BUTTON_SECONDARY, CARD, ERROR, PAGE } from "../ui";
+import { BUTTON, BUTTON_SECONDARY, CARD, ERROR, ICON_OFF, PAGE } from "../ui";
 
 export default function RecipeView() {
   const { t } = useTranslation();
@@ -97,7 +97,7 @@ export default function RecipeView() {
 
   if (!recipe)
     return error ? (
-      <p className={ERROR}>{error}</p>
+      <p role="alert" className={ERROR}>{error}</p>
     ) : (
       <p className="text-slate-400">{t("common.loading")}</p>
     );
@@ -110,7 +110,7 @@ export default function RecipeView() {
 
   return (
     <article className={`${PAGE} space-y-6`}>
-      {recipe.deleted && <p className={ERROR}>{t("recipes.deletedBanner")}</p>}
+      {recipe.deleted && <p role="status" className={ERROR}>{t("recipes.deletedBanner")}</p>}
       <div className={`${CARD} grid gap-5 md:grid-cols-[16rem_1fr]`}>
         <RecipeThumb
           recipe={recipe}
@@ -135,7 +135,7 @@ export default function RecipeView() {
                 onClick={() =>
                   change(() => favoriteRecipe(recipe.id, !recipe.my_favorite))
                 }
-                className={`text-3xl ${recipe.my_favorite ? "text-fuchsia-300" : "text-slate-600 hover:text-fuchsia-200"}`}
+                className={`text-3xl ${recipe.my_favorite ? "text-fuchsia-300" : `${ICON_OFF} hover:text-fuchsia-200`}`}
               >
                 ♥
               </button>
@@ -227,7 +227,7 @@ export default function RecipeView() {
           </p>
         )}
       </div>
-      {error && <p className={ERROR}>{error}</p>}
+      {error && <p role="alert" className={ERROR}>{error}</p>}
       {planning && people !== null && (
         <PlanRecipeDialog
           recipeId={recipe.id}

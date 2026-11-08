@@ -79,12 +79,12 @@ export default function RecipeSearch({ search }: { search: ReturnType<typeof use
                             className={chip(tag === item.name)}
                             onClick={() => change({ tag: tag === item.name ? '' : item.name })}
                         >
-                            {item.name} <span className="text-slate-500">{item.count}</span>
+                            {item.name} <span className="text-slate-400">{item.count}</span>
                         </button>
                     ))}
                 </div>
             )}
-            {error && <p className={ERROR}>{error}</p>}
+            {error && <p role="alert" className={ERROR}>{error}</p>}
             {recipes && recipes.length === 0 && <p className="text-slate-400">{t('recipes.none')}</p>}
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
                 {recipes?.map((recipe) => (

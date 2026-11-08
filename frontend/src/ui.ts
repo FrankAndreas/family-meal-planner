@@ -11,3 +11,7 @@ export const CARD = 'glass-card p-5';
 // Every page that is no grid (the week plan and the recipe list use the whole width) has this one width
 export const PAGE = 'mx-auto max-w-4xl';
 export const ERROR = 'rounded-lg border border-red-400/30 bg-red-900/30 p-3 text-sm text-red-200';
+
+// An icon that is "off" (an empty star, a heart not given): 3.75:1 on the dark background, as an icon needs (3:1); text
+// uses slate-400 or brighter (a11y.test.ts)
+export const ICON_OFF = 'text-slate-500';

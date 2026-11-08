@@ -18,6 +18,7 @@ const de = {
         history: 'Verlauf',
         settings: 'Einstellungen',
         logout: 'Abmelden',
+        skipToContent: 'Zum Inhalt springen',
     },
     roles: { PARENT: 'Elternteil', CHILD: 'Kind' },
     // In the order of Python's weekday numbers (0 = Monday): see WEEKDAYS in types.ts

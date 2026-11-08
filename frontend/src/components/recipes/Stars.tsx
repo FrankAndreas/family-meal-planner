@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { ICON_OFF } from '../../ui';
 
 interface StarsProps {
     value: number | null;
@@ -17,7 +18,7 @@ export default function Stars({ value, onChange, size = 'sm', label }: StarsProp
         return (
             <span role="img" className={`${text} tracking-tight text-amber-300`} aria-label={label ?? t('recipes.ratingShown', { value: value ?? 0 })}>
                 {[1, 2, 3, 4, 5].map((n) => (
-                    <span key={n} className={n <= filled ? '' : 'text-slate-600'}>
+                    <span key={n} className={n <= filled ? '' : ICON_OFF}>
                         ★
                     </span>
                 ))}
@@ -32,7 +33,7 @@ export default function Stars({ value, onChange, size = 'sm', label }: StarsProp
                     type="button"
                     aria-label={t('recipes.rate', { count: n })}
                     onClick={() => onChange(n === value ? null : n)}
-                    className={`${text} px-1 ${n <= filled ? 'text-amber-300' : 'text-slate-600'} hover:text-amber-200`}
+                    className={`${text} px-1 ${n <= filled ? 'text-amber-300' : ICON_OFF} hover:text-amber-200`}
                 >
                     ★
                 </button>

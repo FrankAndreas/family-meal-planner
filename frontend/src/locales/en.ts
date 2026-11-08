@@ -20,6 +20,7 @@ const en: typeof de = {
         history: 'History',
         settings: 'Settings',
         logout: 'Log out',
+        skipToContent: 'Skip to content',
     },
     roles: { PARENT: 'Parent', CHILD: 'Child' },
     weekdays: {

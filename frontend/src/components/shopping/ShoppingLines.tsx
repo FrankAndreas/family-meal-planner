@@ -45,7 +45,7 @@ export default function ShoppingLines({ list, placed, changed, busy, spec, onCho
                     onChange={(e) => onChoose(line, e.target.checked)}
                 />
                 <span className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2">
-                    <span className={line.buy ? '' : 'text-slate-500 line-through'}>
+                    <span className={line.buy ? '' : 'text-slate-400 line-through'}>
                         {spec(line) ? `${spec(line)} ${line.name}` : line.name}
                     </span>
                     {/* The meals go on the next line rather than squeeze the item */}

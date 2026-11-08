@@ -51,7 +51,7 @@ export default function RecipeCard({ recipe, onClick, compact = false, selected 
                     <FamilyStars recipe={recipe} />
                     {recipe.my_favorite && <span className="ml-1 text-fuchsia-300">♥</span>}
                 </div>
-                <div className="text-xs text-slate-500">
+                <div className="text-xs text-slate-400">
                     {recipe.last_eaten ? t('recipes.lastEaten', { when: sinceText(recipe.last_eaten) }) : t('recipes.neverEaten')}
                 </div>
             </div>

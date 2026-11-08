@@ -41,7 +41,7 @@ export default function ShoppingMeals({ list, busy, onTick }: ShoppingMealsProps
                     </li>
                 ))}
                 {list.notes.map((note) => (
-                    <li key={`${note.date}-${note.slot}-${note.note}`} className="pl-6 text-slate-500">
+                    <li key={`${note.date}-${note.slot}-${note.note}`} className="pl-6 text-slate-400">
                         {weekday(note.date)} · {t(`plan.slots.${note.slot}`)} · {note.note}
                     </li>
                 ))}

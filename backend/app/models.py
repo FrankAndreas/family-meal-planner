@@ -310,7 +310,9 @@ class ShoppingExtra(Base):
 
 class BringLogin(Base):
     """The Bring! account the planner logs in with (single row, id 1): its session, never the password (a copy of
-    the database or a backup gives no password away). Nothing of it but the e-mail goes to a browser."""
+    the database or a backup gives no password away). The refresh token still opens the account until Bring! ends
+    it (a password change there does): keep the database and its backups private. Nothing of it but the e-mail goes
+    to a browser."""
 
     __tablename__ = "bring_login"
 

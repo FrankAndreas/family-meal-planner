@@ -398,6 +398,34 @@ def test_a_session_bring_ended_early_is_renewed_and_tried_again(client, admin_he
     assert _stored(db).access_token == "Bearer fake-renewed" and fake_bring
 
 
+def test_a_session_renewed_meanwhile_is_not_renewed_again(client, admin_headers, week, db, monkeypatch, fake_bring):
+    """Bring! refuses the token (401) because another request renewed the session meanwhile: the renewed one is used,
+    without renewing it a second time (with a rotating refresh token that second renewal would fail)."""
+    from app import models
+
+    _setup_bring(client, admin_headers)
+    refreshed: list = []
+    real_add, real_refresh = bring.FakeBring.add, bring.FakeBring.refresh
+
+    def add(self, session, list_uuid, items):
+        if session.token == "Bearer fake":
+            # Another request renews the session while this one is under way
+            with type(db)(bind=db.get_bind()) as other:
+                other.get(models.BringLogin, 1).access_token = "Bearer other"
+                other.commit()
+            raise bring.BringFailed("bring_failed", "HTTP 401", 401)
+        return real_add(self, session, list_uuid, items)
+
+    def refresh(self, session):
+        refreshed.append(session.token)
+        return real_refresh(self, session)
+
+    monkeypatch.setattr(bring.FakeBring, "add", add)
+    monkeypatch.setattr(bring.FakeBring, "refresh", refresh)
+    assert _send(client, admin_headers, _start(client, admin_headers).json()).status_code == 200
+    assert refreshed == [] and fake_bring
+
+
 def test_send_after_bring_ended_the_login_keeps_list(client, admin_headers, week, db):
     """Bring! refuses to renew the session (password changed there): log in again in the settings."""
     _setup_bring(client, admin_headers)
@@ -406,7 +434,7 @@ def test_send_after_bring_ended_the_login_keeps_list(client, admin_headers, week
     db.commit()
     shopping = _start(client, admin_headers).json()
     response = _send(client, admin_headers, shopping)
-    assert response.status_code == 502 and response.json()["detail"] == "bring_login_expired"
+    assert response.status_code == 400 and response.json()["detail"] == "bring_login_expired"
     assert _get(client, admin_headers) is not None
 
 

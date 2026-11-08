@@ -149,6 +149,8 @@ def test_refresh_asks_for_a_new_token(network):
     assert (session.uuid, session.token, session.refresh_token) == ("u-1", "Bearer new", "ref")
     request = calls[0]
     assert request.full_url == "https://api.getbring.com/rest/v2/bringauth/token" and request.get_method() == "POST"
+    # As the Bring! apps (bring-api) renew: with the session's headers
+    assert request.get_header("Authorization") == "Bearer tok" and request.get_header("X-bring-user-uuid") == "u-1"
     assert urllib.parse.parse_qs(request.data.decode()) == {"grant_type": ["refresh_token"], "refresh_token": ["ref"]}
 
 

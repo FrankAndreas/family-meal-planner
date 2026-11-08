@@ -115,10 +115,12 @@ class HttpBring:
         """A new token for the session, as the Bring! apps renew theirs (bring-api's retrieve_new_access_token)."""
         form = {"grant_type": "refresh_token", "refresh_token": session.refresh_token}
         try:
-            data = self._json(self._call("POST", "v2/bringauth/token", form=form))
+            # With the session's headers, as bring-api sends it
+            data = self._json(self._call("POST", "v2/bringauth/token", session, form=form))
         except BringFailed as failed:
-            if failed.code == "bring_login_failed":
-                raise BringFailed("bring_login_expired", str(failed)) from failed
+            # Refused: the refresh token ended or was revoked (e.g. the password changed in Bring!)
+            if failed.status in (400, 401):
+                raise BringFailed("bring_login_expired", str(failed), failed.status) from failed
             raise
         try:
             token = f"{data.get('token_type', 'Bearer')} {data['access_token']}"

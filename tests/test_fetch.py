@@ -47,6 +47,9 @@ HTML = {"content-type": "text/html; charset=utf-8"}
         "http://[64:ff9b::c0a8:10a]/",
         "http://[64:ff9b:1::a00:5]/",
         "http://[::127.0.0.1]/",
+        # SIIT's IPv4-translated form, and the old site-local range
+        "http://[::ffff:0:c0a8:10a]/",
+        "http://[fec0::1]/",
         "http://nat64.example/",
         "http://inside.example/",
         "http://nas.local/",

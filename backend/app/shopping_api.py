@@ -6,6 +6,7 @@ when the list has changed since, so nothing goes to Bring! that nobody looked at
 
 import hashlib
 import json
+import threading
 import time
 from datetime import timedelta
 
@@ -44,9 +45,11 @@ def _bring_call(action):
     try:
         return action()
     except bring.BringFailed as failed:
-        raise api_error(400 if failed.code in ("bring_login_failed", "bring_login_expired") else 502, failed.code)
+        raise api_error(400 if failed.code in LOGIN_CODES else 502, failed.code)
 
 
+# Bring! refused the login: the parent has to log in again in the settings (answered with 400, the rest with 502)
+LOGIN_CODES = ("bring_login_failed", "bring_login_expired")
 # A session is renewed this long before Bring! says it ends, so it doesn't end halfway through a send
 RENEW_BEFORE_SECONDS = 300
 
@@ -68,24 +71,37 @@ def _kept(login: models.BringLogin) -> bring.Session:
     )
 
 
+# One renewal at a time: two requests renewing at once (or a new login meanwhile) mustn't overwrite each other, and with
+# a refresh token Bring! may only accept once, the second renewal would fail although the first worked
+_session_lock = threading.Lock()
+
+
+def _current_session(db: Session, login: models.BringLogin, refused: str | None = None) -> bring.Session:
+    """The session to use, as stored now: a password from before becomes one, an ended one is renewed, and one Bring!
+    refused (`refused`: its token) is renewed unless another request renewed it meanwhile."""
+    with _session_lock:
+        db.refresh(login)
+        client = bring.client()
+        if login.password:
+            _keep(login, client.login(login.email, login.password))
+            db.commit()
+        elif (login.expires_at or 0) - RENEW_BEFORE_SECONDS <= time.time() or login.access_token == refused:
+            _keep(login, client.refresh(_kept(login)))
+            db.commit()
+        return _kept(login)
+
+
 def _with_session(db: Session, login: models.BringLogin, call):
-    """Runs a Bring! call with the kept session: a password from before becomes one first, an ended one is renewed,
-    and one Bring! ended early (401) is renewed once and the call tried again. Raises bring.BringFailed."""
+    """Runs a Bring! call with the kept session; one Bring! ended early (401) is renewed once and the call tried
+    again. Raises bring.BringFailed."""
     client = bring.client()
-    if login.password:
-        _keep(login, client.login(login.email, login.password))
-        db.commit()
-    elif (login.expires_at or 0) - RENEW_BEFORE_SECONDS <= time.time():
-        _keep(login, client.refresh(_kept(login)))
-        db.commit()
+    session = _current_session(db, login)
     try:
-        return call(client, _kept(login))
+        return call(client, session)
     except bring.BringFailed as failed:
         if failed.status != 401:
             raise
-    _keep(login, client.refresh(_kept(login)))
-    db.commit()
-    return call(client, _kept(login))
+    return call(client, _current_session(db, login, refused=session.token))
 
 
 def _lists(db: Session, login: models.BringLogin) -> list[tuple[str, str]]:
@@ -107,11 +123,12 @@ def bring_login(body: schemas.BringLoginIn, _parent: models.User = Depends(auth.
     client = bring.client()
     session = _bring_call(lambda: client.login(body.email, body.password))
     lists = _bring_call(lambda: client.lists(session))
-    login = _login(db) or models.BringLogin(id=1)
-    login.email, login.list_uuid, login.list_name = body.email, None, None
-    _keep(login, session)
-    db.add(login)
-    db.commit()
+    with _session_lock:
+        login = _login(db) or models.BringLogin(id=1)
+        login.email, login.list_uuid, login.list_name = body.email, None, None
+        _keep(login, session)
+        db.add(login)
+        db.commit()
     return _lists_out(lists)
 
 
@@ -353,11 +370,10 @@ def send_shopping(body: schemas.ShoppingSendIn, _parent: models.User = Depends(a
     items = [(line.name, body.specs.get(line.key, "")) for line in current.lines if line.buy]
     if not items:
         raise api_error(400, "shopping_empty")
-    client = bring.client()
     try:
         _with_session(db, login, lambda client, session: client.add(session, login.list_uuid, items))
     except bring.BringFailed as failed:
-        raise api_error(502, failed.code)
+        raise api_error(400 if failed.code in LOGIN_CODES else 502, failed.code)
     # Someone changed the list while Bring! was called: keep it, so that change isn't thrown away unseen
     db.expire_all()
     shopping = _open(db)

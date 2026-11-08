@@ -21,6 +21,10 @@ TIMEOUT = 10
 TOTAL_SECONDS = 30
 # NAT64 (RFC 6052): IPv6 addresses standing for an IPv4 address, which a NAT64 gateway at home would reach
 NAT64 = ipaddress.ip_network("64:ff9b::/96")
+# SIIT's IPv4-translated addresses (RFC 2765): an IPv4 address too
+IPV4_TRANSLATED = ipaddress.ip_network("::ffff:0:0:0/96")
+# Site-local (deprecated, but routed as inside where still set up)
+SITE_LOCAL = ipaddress.ip_network("fec0::/10")
 USER_AGENT = "Mozilla/5.0 (Menüplaner; family use)"
 PAGE_TYPES = ("text/html", "application/ld+json", "application/xhtml+xml")
 
@@ -51,12 +55,14 @@ class Page:
 
 
 def _public(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
-    """A public address, also when it is an IPv6 form of an IPv4 address (NAT64, or the old IPv4-compatible
-    ::a.b.c.d): then the IPv4 address it stands for must be public too. IPv4-mapped (::ffff:a.b.c.d) is checked by
-    is_global itself."""
+    """A public address, also when it is an IPv6 form of an IPv4 address (NAT64, SIIT's ::ffff:0:a.b.c.d, or the old
+    IPv4-compatible ::a.b.c.d): then the IPv4 address it stands for must be public too. IPv4-mapped (::ffff:a.b.c.d),
+    6to4 and Teredo are refused by is_global itself."""
     if not ip.is_global:
         return False
-    if ip.version == 6 and (ip in NAT64 or int(ip) >> 32 == 0):
+    if ip.version == 6 and ip in SITE_LOCAL:
+        return False
+    if ip.version == 6 and (ip in NAT64 or ip in IPV4_TRANSLATED or int(ip) >> 32 == 0):
         return ipaddress.IPv4Address(int(ip) & 0xFFFFFFFF).is_global
     return True
 

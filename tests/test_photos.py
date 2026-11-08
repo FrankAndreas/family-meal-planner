@@ -236,3 +236,28 @@ def test_only_known_sizes(client, admin_headers):
     url = _upload(client, admin_headers, r["id"], _jpeg()).json()["photo_url"]
     assert client.get(f"{url}?size=huge").status_code == 422
     assert client.get(f"/api/photos/{'0' * 32}.jpg?size=card").status_code == 404
+
+
+def test_a_photo_too_damaged_for_a_card_is_shown_whole(client):
+    """A file that can't be decoded (cut off on copying, say): the card shows what the browser makes of the photo,
+    as before, and nothing is retried or left behind."""
+    folder = config.data_dir() / "photos"
+    folder.mkdir(parents=True, exist_ok=True)
+    name = f"{'a' * 32}.jpg"
+    (folder / name).write_bytes(b"\xff\xd8 not really a jpeg")
+    card = client.get(f"/api/photos/{name}?size=card")
+    assert card.status_code == 200 and card.content == (folder / name).read_bytes()
+    assert not (folder / "cards").exists() or not any((folder / "cards").iterdir())
+
+
+def test_a_photo_removed_while_its_card_is_made_is_not_found(client, monkeypatch):
+    folder = config.data_dir() / "photos"
+    folder.mkdir(parents=True, exist_ok=True)
+    name = f"{'b' * 32}.jpg"
+    (folder / name).write_bytes(_jpeg())
+
+    def gone(self):
+        raise FileNotFoundError(str(self))
+
+    monkeypatch.setattr(photos.Path, "read_bytes", gone)
+    assert client.get(f"/api/photos/{name}?size=card").status_code == 404

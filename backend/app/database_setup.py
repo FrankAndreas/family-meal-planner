@@ -6,7 +6,7 @@ from alembic import command
 from alembic.config import Config
 from sqlalchemy.engine import Engine
 
-HEAD = "0011"
+HEAD = "0012"
 
 
 def run(engine: Engine, action, *args) -> None:

@@ -2,13 +2,12 @@ import { expect, test } from '@playwright/test';
 import { call, createRecipe, login, newPerson, sendMail, uniqueName } from './helpers';
 
 test('a child shares a recipe by mail; it waits for a parent', async ({ page, request }) => {
-    const child = await newPerson(request, 'CHILD');
     const address = `${uniqueName('k')}@example.ch`;
+    const child = await newPerson(request, 'CHILD', address);
     await login(page, child.name);
+    // The address the child confirmed in the family hub, shown (not changed) in the settings
     await page.goto('/einstellungen');
-    await page.getByLabel('New mail address').fill(address);
-    await page.getByRole('button', { name: 'Add address' }).click();
-    await expect(page.getByText(address)).toBeVisible();
+    await expect(page.getByText(`Your address: ${address}`)).toBeVisible();
 
     const subject = uniqueName('Kuchen ');
     await sendMail(request, address, subject);
@@ -23,9 +22,8 @@ test('a child shares a recipe by mail; it waits for a parent', async ({ page, re
 });
 
 test('a parent processes a mail, checks the draft and saves it', async ({ page, request }) => {
-    const parent = await newPerson(request);
     const address = `${uniqueName('p')}@example.ch`;
-    await call(request, parent, 'POST', '/emails', { address });
+    const parent = await newPerson(request, 'PARENT', address);
     const subject = uniqueName('Risotto ');
     await sendMail(request, address, subject);
 
@@ -78,9 +76,8 @@ test('a recipe link is pasted on the recipes page and lands in the inbox', async
 });
 
 test('an imported draft comes with its categories; an older draft without any still opens', async ({ page, request }) => {
-    const parent = await newPerson(request);
     const address = `${uniqueName('p')}@example.ch`;
-    await call(request, parent, 'POST', '/emails', { address });
+    const parent = await newPerson(request, 'PARENT', address);
     const subject = uniqueName('Risotto ');
     await sendMail(request, address, subject);
     const errors = await login(page, parent.name);

@@ -1,8 +1,8 @@
 """The planner's people come from the family hub (spec 2026-10-30), as in the budget app.
 
-Everyone the hub lets use the planner gets a row here, linked by `hub_id`; name, role and language follow the hub. A
-row the hub no longer lists is hidden (`is_active` False) with its stars, favourites and sender addresses, until the
-person comes back or a parent deletes the data here. Rows from before the hub are linked by name the first time."""
+Everyone the hub lets use the planner gets a row here, linked by `hub_id`; name, role, language and the confirmed
+mail address (if the hub shares it) follow the hub. A row the hub no longer lists is hidden (`is_active` False) with
+its stars and favourites, and loses its address, until the person comes back or a parent deletes the data here. Rows from before the hub are linked by name the first time."""
 
 import threading
 import time
@@ -115,8 +115,12 @@ def _apply(db: Session, people: list[hub.HubPerson]) -> None:
         _set_name(row, person.name)
         row.role = models.UserRole(person.role)
         row.language = person.language if person.language in ("de", "en") else None
+        # Only an address the hub shares (the planner's tile shares them): none, else
+        row.email = person.email if person.email_shared else None
         row.is_active = True
     for row in rows:
         if row.id not in listed:
             row.is_active = False
+            # Their address isn't the hub's to share any more
+            row.email = None
     db.commit()

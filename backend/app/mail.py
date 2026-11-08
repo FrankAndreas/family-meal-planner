@@ -53,6 +53,30 @@ def _attachment_parts(message) -> list:
     return parts
 
 
+# How the email worker (cloudflare/email-worker, fromDomain) reads the sender's domain from the From header for its DMARC
+# check: the address in <…>, else the first thing that looks like one
+WORKER_ANGLE = re.compile(r"<([^<>\s]+@[^<>\s]+)>")
+WORKER_BARE = re.compile(r"[^\s<>,\"]+@[^\s<>,\"]+")
+
+
+def _raw_from(raw: bytes) -> str:
+    """The first From header as it came (not decoded), its folded lines joined."""
+    head = raw.split(b"\r\n\r\n", 1)[0].split(b"\n\n", 1)[0].decode("utf-8", "replace")
+    for field in re.sub(r"\r?\n[ \t]+", " ", head).splitlines():
+        if field.lower().startswith("from:"):
+            return field[5:]
+    return ""
+
+
+def _worker_domain(raw: bytes) -> str | None:
+    header = _raw_from(raw)
+    found = WORKER_ANGLE.search(header) or WORKER_BARE.search(header)
+    if not found:
+        return None
+    address = found.group(1) if found.re is WORKER_ANGLE else found.group(0)
+    return address.split("@")[1].casefold()
+
+
 def summarize(raw: bytes) -> MailSummary:
     """Sender, subject, date and the attachments' names, types and sizes; no part is decoded."""
     try:
@@ -60,8 +84,13 @@ def summarize(raw: bytes) -> MailSummary:
     except Exception:
         return MailSummary(None, "?", None, "sha256:" + hashlib.sha256(raw).hexdigest())
     try:
-        addresses = [a.lower() for _, a in email.utils.getaddresses([str(v) for v in message.get_all("From") or []])]
+        # Casefolded, as the family hub keeps a confirmed address
+        addresses = [a.casefold() for _, a in email.utils.getaddresses([str(v) for v in message.get_all("From") or []])]
         senders = [a for a in addresses if "@" in a]
+        # The sender is only someone if the worker checked that same domain (DMARC): a header read two ways (a comment,
+        # an address inside an encoded-word) is nobody's
+        if len(senders) == 1 and senders[0].split("@")[1] != _worker_domain(raw):
+            senders = []
     except Exception:
         senders = []
     try:

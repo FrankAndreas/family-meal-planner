@@ -5,7 +5,7 @@ import time
 
 import fake_hub
 import pytest
-from helpers import ADMIN, bearer, create_recipe, create_user, login, remove_from_hub
+from helpers import ADMIN, bearer, confirm_email, create_recipe, create_user, login, remove_from_hub
 from mails import build_mail
 from test_inbound import SECRET
 
@@ -199,8 +199,8 @@ def inbound(monkeypatch, client):
 
 def test_mail_from_a_removed_persons_address_refused(client, inbound):
     admin = login(client)
-    lena = create_user(client, None, "Lena")
-    client.post("/api/emails", json={"address": "lena@example.ch", "user_id": lena["id"]}, headers=admin)
+    create_user(client, None, "Lena")
+    confirm_email(client, "Lena", "lena@example.ch")
     remove_from_hub("Lena")
     client.get("/api/users", headers=admin)
     response = inbound(build_mail(from_addr="lena@example.ch"))

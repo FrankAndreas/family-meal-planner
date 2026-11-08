@@ -51,6 +51,9 @@ class User(Base):
     hub_id = Column(Integer, unique=True)
     # False: the hub no longer lists the person for the planner; hidden with their data until a parent deletes it
     is_active = Column(Boolean, default=True, nullable=False)
+    # The address the person confirmed in the hub (lowercase), if the hub shares it with the planner: recipe mails
+    # come only from such addresses (security review 2026-11-08)
+    email = Column(String(254))
     created_at = Column(DateTime, default=utcnow, nullable=False)
 
     @property
@@ -185,19 +188,6 @@ class WeekClosure(Base):
     end = Column(Date, nullable=False)
     closed_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"))
     closed_at = Column(DateTime, default=utcnow, nullable=False)
-
-
-class UserEmail(Base):
-    """An address a family member sends recipes from; mail from any other address is refused."""
-
-    __tablename__ = "user_emails"
-
-    id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    # Lowercase
-    address = Column(String(200), nullable=False, unique=True)
-
-    user = relationship("User")
 
 
 class InboxItem(Base):

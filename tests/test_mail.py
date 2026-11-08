@@ -32,3 +32,26 @@ def test_summary_without_message_id_uses_a_hash():
 def test_summary_survives_garbage():
     summary = mail.summarize(b"\xff\xfe not a mail at all")
     assert summary.from_addr is None and summary.attachments == []
+
+
+def _from(header: str) -> str | None:
+    raw = f"From: {header}\r\nTo: rezepte@example.ch\r\nSubject: x\r\nMessage-ID: <m@x>\r\n\r\nText\r\n".encode()
+    return mail.summarize(raw).from_addr
+
+
+def test_the_sender_is_the_one_the_worker_checked():
+    """The email worker checks DMARC for the domain it reads from the raw From header; a header the backend reads
+    differently (a comment, an address in an encoded-word) would file the mail under someone else's address."""
+    assert _from("victim@family.ch (<attacker@evil.com>)") is None
+    assert _from("=?utf-8?q?victim=40family=2Ech?= (<attacker@evil.com>)") is None
+
+
+def test_ordinary_senders_are_read():
+    assert _from("Papa <papa@example.ch>") == "papa@example.ch"
+    assert _from("papa@example.ch") == "papa@example.ch"
+    # A name with umlauts comes as an encoded-word
+    assert _from("=?utf-8?q?M=C3=BCller?= <mueller@example.ch>") == "mueller@example.ch"
+
+
+def test_the_sender_is_casefolded_as_the_hub_does():
+    assert _from("Papa <Papa@Example.CH>") == "papa@example.ch"

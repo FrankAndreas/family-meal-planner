@@ -1,6 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 import path from 'node:path';
-import { PYTHON as python } from './tests/helpers';
+import { HUB_OUTBOX, PYTHON as python } from './tests/helpers';
 
 // The tests start their own family hub (from a family-hub checkout: logins and people, Admin PIN 1111), backend
 // (fresh SQLite database) and frontend on ports of their own, so a dev server on 8000/5173 and its data are never
@@ -44,6 +44,11 @@ export default defineConfig({
                 DEFAULT_LANGUAGE: 'en',
                 // Plain http in the tests: a Secure cookie would never come back
                 COOKIE_INSECURE: '1',
+                // The hub's mails (confirming a person's address) go to a file the tests read, never sent
+                RESEND_API_KEY: 'test',
+                MAIL_FROM: 'hub@example.org',
+                HUB_PUBLIC_URL: HUB,
+                MAIL_OUTBOX: HUB_OUTBOX,
             },
             reuseExistingServer: false,
             timeout: 60_000,

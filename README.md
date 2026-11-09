@@ -73,6 +73,7 @@ python3 -m venv venv
 venv/bin/pip install -r backend/requirements.txt -r tests/requirements.txt
 scripts/dev-backend.sh                      # API on :8000, database in backend/data; logins from a family hub on :8086
 cd frontend && npm install && npm run dev   # app on :5173, /api forwarded to :8000
+git config core.hooksPath .githooks         # pre-commit: frontend type-check and lint when frontend files change
 ```
 
 ## Tests

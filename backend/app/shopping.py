@@ -46,7 +46,10 @@ def line_key(name: str) -> str:
 
 
 def _key(name: str) -> str:
-    # A name of no letters ("1") has no canonical form; it stays apart from other such names
+    # canonical() reads letters only: a name with a number ("Zutat 3", "Gewürzmischung Nr. 5") keeps it, so it stays
+    # apart from its neighbours, and one of no letters ("1") has no canonical form at all
+    if any(c.isdigit() for c in name):
+        return sort_key(name.strip())
     return canonical(name) or sort_key(name.strip())
 
 

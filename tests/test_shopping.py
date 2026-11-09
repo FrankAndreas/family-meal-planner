@@ -159,3 +159,8 @@ def test_a_free_item_is_never_probably_at_home():
 def test_a_free_item_joins_the_line_of_its_synonym():
     lines = combine([Source("glatter Peterli", 1, "bunch", "A")], [("Petersilie", "2 Bund")], [])
     assert [(line.name, line.extras) for line in lines] == [("Petersilie", ["2 Bund"])]
+
+
+def test_names_that_differ_by_a_number_stay_apart():
+    lines = combine([Source(f"Zutat {n}", 1, "piece", "A") for n in (1, 2, 3)], [], [])
+    assert [line.name for line in lines] == ["Zutat 1", "Zutat 2", "Zutat 3"]

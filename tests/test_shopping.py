@@ -1,6 +1,6 @@
 """Combining the week's ingredients into a shopping list (spec 2026-11-06)."""
 
-from app.shopping import Source, add_up, combine
+from app.shopping import Source, add_up, combine, line_key
 from app.text import sort_key
 
 
@@ -15,7 +15,8 @@ def test_same_name_same_unit_adds():
 
 def test_case_and_accents_combine():
     lines = combine([Source("Rüebli", 1, "piece", "A"), Source("rüebli", 2, "piece", "B")], [], [])
-    assert [(line.name, line.amounts) for line in lines] == [("Rüebli", [(3, "piece")])]
+    # Bring!'s Swiss catalog calls them Karotten (issue #70)
+    assert [(line.name, line.amounts) for line in lines] == [("Karotten", [(3, "piece")])]
 
 
 def test_mass_adds_across_units():
@@ -71,7 +72,7 @@ def test_extra_alone_is_its_own_line():
     lines = combine([Source("Hörnli", 200, "g", "A")], [("WC-Papier", "")], [])
     last = lines[-1]
     assert (last.key, last.name, last.amounts, last.extras, last.meals) == (
-        sort_key("WC-Papier"), "WC-Papier", [], [""], []
+        line_key("WC-Papier"), "WC-Papier", [], [""], []
     )
 
 
@@ -79,7 +80,8 @@ DEFAULT = ["Salz", "Pfeffer", "Öl", "Wasser", "Zucker", "Mehl", "Bouillon"]
 
 
 def _staples(names, staples=DEFAULT):
-    return {line.name: line.staple for line in combine([Source(n, None, None, "A") for n in names], [], staples)}
+    """Staple or not, by the name as the recipe wrote it (each its own meal; 100 g, so none is a small amount)."""
+    return {meal: line.staple for line in combine([Source(n, 100, "g", n) for n in names], [], staples) for meal in line.meals}
 
 
 def test_only_the_staple_itself_starts_dropped():
@@ -95,3 +97,65 @@ def test_staples_as_recipes_write_them():
 
 def test_staple_added_in_settings_matches_itself_only():
     assert _staples(["Reis", "Basmatireis"], ["Reis"]) == {"Reis": True, "Basmatireis": False}
+
+
+# --- Bring! names (issue #70) -----------------------------------------------------------------------------------
+
+
+def test_describing_words_move_to_details_and_names_map_to_bring_articles():
+    lines = combine(
+        [Source("mehligkochende Kartoffeln", 800, "g", "A"), Source("glatter Peterli", 1, "bunch", "A")], [], []
+    )
+    assert [(line.name, line.details) for line in lines] == [
+        ("Kartoffeln", ["mehligkochende"]),
+        ("Petersilie", ["glatter"]),
+    ]
+
+
+def test_plurals_and_synonyms_become_one_line():
+    lines = combine(
+        [
+            Source("Schalotte", 1, None, "A"),
+            Source("Schalotten", 1.5, None, "B"),
+            Source("Rahm", 3, "dl", "A"),
+            Source("Vollrahm", 2, "dl", "B"),
+        ],
+        [],
+        [],
+    )
+    assert [(line.name, line.amounts) for line in lines] == [("Schalotte", [(3, None)]), ("Rahm", [(5, "dl")])]
+
+
+def test_alias_gives_a_unitless_amount_its_unit():
+    lines = combine([Source("Knoblauchzehe", 2, None, "A"), Source("Knoblauch", 1, "clove", "B")], [], [])
+    assert [(line.name, line.amounts) for line in lines] == [("Knoblauch", [(3, "clove")])]
+
+
+def test_counted_amounts_round_up_to_whole_ones():
+    assert add_up([(1.5, "bunch")]) == [(2, "bunch")]
+    assert add_up([(0.5, None)]) == [(1, None)]
+    assert add_up([(2.0000001, None)]) == [(2, None)]
+
+
+def test_spoonfuls_or_no_amount_start_as_probably_at_home():
+    lines = combine(
+        [
+            Source("Muskatnuss", None, None, "A"),
+            Source("Bratbutter", 0.75, "tbsp", "A"),
+            Source("Milch", 3, "dl", "A"),
+            Source("Milch", 3, "tbsp", "B"),
+        ],
+        [],
+        [],
+    )
+    assert [(line.name, line.staple) for line in lines] == [("Muskatnuss", True), ("Bratbutter", True), ("Milch", False)]
+
+
+def test_a_free_item_is_never_probably_at_home():
+    lines = combine([], [("Muskatnuss", "")], [])
+    assert [(line.name, line.staple) for line in lines] == [("Muskatnuss", False)]
+
+
+def test_a_free_item_joins_the_line_of_its_synonym():
+    lines = combine([Source("glatter Peterli", 1, "bunch", "A")], [("Petersilie", "2 Bund")], [])
+    assert [(line.name, line.extras) for line in lines] == [("Petersilie", ["2 Bund"])]

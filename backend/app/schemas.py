@@ -476,6 +476,8 @@ class ShoppingLineOut(BaseModel):
     extras: list[str]
     meals: list[str]
     staple: bool
+    # Describing words of the recipes ("mehligkochende"), part of the amount text Bring! gets
+    details: list[str]
     buy: bool
 
 

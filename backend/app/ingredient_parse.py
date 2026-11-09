@@ -23,6 +23,8 @@ UNIT_WORDS: dict[str, str | tuple[str, float]] = {
     **dict.fromkeys(["pck", "packung", "päckchen", "pack"], "pack"),
     **dict.fromkeys(["handvoll", "handful"], "handful"),
 }
+# Lengths: "2 cm Ingwer" is a piece of ginger, the length kept as a note
+LENGTH_WORDS = {"cm", "mm"}
 VULGAR = {"½": 0.5, "¼": 0.25, "¾": 0.75, "⅓": 1 / 3, "⅔": 2 / 3}
 _AMOUNT = r"(?:\d+\s+\d+/\d+|\d+/\d+|\d*[½¼¾⅓⅔]|\d+(?:[.,]\d+)?)"
 _LINE = re.compile(rf"^({_AMOUNT})(?:\s*(?:–|-|bis)\s*({_AMOUNT}))?\s*(.*)$")
@@ -61,6 +63,11 @@ def parse_line(line: str) -> dict:
             unit, factor = (known, 1) if isinstance(known, str) else known
             amount = round(amount * factor, 4)
             text = rest
+        elif first.lower().rstrip(".") in LENGTH_WORDS and amount is not None and rest:
+            if match.group(2):
+                notes.pop()  # the range is in the length note
+            notes.append(match.string[: match.start(3)].strip() + " " + first)
+            amount, unit, text = 1, "piece", rest
     # Parentheses and what follows a comma are notes: "Hörnli (z. B. Barilla)", "Kartoffeln, festkochend"
     for inner in re.findall(r"\(([^)]*)\)", text):
         notes.append(inner.strip())

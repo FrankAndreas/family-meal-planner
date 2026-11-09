@@ -15,7 +15,7 @@ from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from . import auth, bring, models, scaling, schemas
+from . import auth, bring, bring_names, models, scaling, schemas
 from .database import get_db
 from .http_errors import api_error
 from .plan import entries_in_week
@@ -223,6 +223,7 @@ def _out(db: Session, shopping: models.ShoppingList) -> schemas.ShoppingOut:
             "extras": line.extras,
             "meals": line.meals,
             "staple": line.staple,
+            "details": line.details,
             "buy": choices.get(line.key, not line.staple),
         }
         for line in combine(sources, [(e["name"], e["amount"]) for e in extras], settings.staples)
@@ -367,7 +368,8 @@ def send_shopping(body: schemas.ShoppingSendIn, _parent: models.User = Depends(a
     current = _out(db, shopping)
     if current.version != body.version:
         raise api_error(409, "shopping_changed")
-    items = [(line.name, body.specs.get(line.key, "")) for line in current.lines if line.buy]
+    # Under Bring!'s article id, so it gets its icon and aisle (issue #70)
+    items = [(bring_names.article_id(line.name), body.specs.get(line.key, "")) for line in current.lines if line.buy]
     if not items:
         raise api_error(400, "shopping_empty")
     try:

@@ -4465,6 +4465,13 @@
             "type": "boolean",
             "title": "Staple"
           },
+          "details": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Details"
+          },
           "buy": {
             "type": "boolean",
             "title": "Buy"
@@ -4478,6 +4485,7 @@
           "extras",
           "meals",
           "staple",
+          "details",
           "buy"
         ],
         "title": "ShoppingLineOut"

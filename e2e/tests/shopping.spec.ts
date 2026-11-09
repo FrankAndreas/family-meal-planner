@@ -91,7 +91,7 @@ test('list from the week', async ({ page, request }) => {
     await expect(salz).not.toBeChecked();
     await expect(items.getByText('usually at home')).toBeVisible();
     await meals.getByRole('checkbox', { name: /Gemüsesuppe/ }).uncheck();
-    await expect(items.getByRole('checkbox', { name: /Rüebli/ })).toHaveCount(0);
+    await expect(items.getByRole('checkbox', { name: /Karotten/ })).toHaveCount(0);
     await expect(page.getByText(`Started by ${parent.name}`)).toBeVisible();
     expect(errors).toEqual([]);
 });
@@ -102,8 +102,8 @@ test('drop, add and send', async ({ page, request }) => {
     const errors = await login(page, parent.name);
     await openList(page, start);
     const items = page.getByRole('region', { name: /What do we need/ });
-    await items.getByRole('checkbox', { name: /Rüebli/ }).uncheck();
-    await expect(items.getByRole('checkbox', { name: /Rüebli/ })).not.toBeChecked();
+    await items.getByRole('checkbox', { name: /Karotten/ }).uncheck();
+    await expect(items.getByRole('checkbox', { name: /Karotten/ })).not.toBeChecked();
     await items.getByLabel('Add something').fill('Toilet paper');
     await items.getByLabel('Amount').fill('2 packs');
     await items.getByRole('button', { name: 'Add', exact: true }).click();
@@ -131,10 +131,10 @@ test('changed meanwhile', async ({ page, request }) => {
     await expect(items.getByRole('checkbox', { name: /Hörnli/ })).not.toBeChecked();
     // What changed is marked, so checking means looking at the changes
     await expect(items.getByRole('listitem').filter({ hasText: 'Hörnli' })).toContainText('changed');
-    await expect(items.getByRole('listitem').filter({ hasText: 'Rüebli' })).not.toContainText('changed');
+    await expect(items.getByRole('listitem').filter({ hasText: 'Karotten' })).not.toContainText('changed');
     // Working through the list doesn't wipe the marks
-    await items.getByRole('checkbox', { name: /Rüebli/ }).uncheck();
-    await items.getByRole('checkbox', { name: /Rüebli/ }).check();
+    await items.getByRole('checkbox', { name: /Karotten/ }).uncheck();
+    await items.getByRole('checkbox', { name: /Karotten/ }).check();
     await expect(items.getByRole('listitem').filter({ hasText: 'Hörnli' })).toContainText('changed');
     await page.getByRole('button', { name: 'Send to Bring! (1)' }).click();
     await expect(page.getByText('1 item in Bring!')).toBeVisible();

@@ -3,13 +3,14 @@ import de from './locales/de';
 import en from './locales/en';
 import { formatSpec, type ShoppingLine } from './shoppingSpec';
 
-const line = (amounts: [number, string | null][], extras: string[] = []): ShoppingLine => ({
+const line = (amounts: [number, string | null][], extras: string[] = [], details: string[] = []): ShoppingLine => ({
     key: 'x',
     name: 'X',
     amounts: amounts.map(([amount, unit]) => ({ amount, unit })),
     extras,
     meals: [],
     staple: false,
+    details,
     buy: true,
 });
 
@@ -19,6 +20,11 @@ const english = (unit: string) => en.units[unit as keyof typeof en.units];
 describe('formatSpec', () => {
     it('writes an amount with its unit', () => {
         expect(formatSpec(line([[500, 'g']]), german, 'de')).toBe('500 g');
+    });
+
+    it('adds the describing words after the amounts', () => {
+        expect(formatSpec(line([[800, 'g']], [], ['mehligkochende']), german, 'de')).toBe('800 g, mehligkochende');
+        expect(formatSpec(line([], [], ['glatter']), german, 'de')).toBe('glatter');
     });
 
     it('joins amounts that do not add up', () => {

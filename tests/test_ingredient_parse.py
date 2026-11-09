@@ -27,6 +27,8 @@ from app.ingredient_parse import parse_line
         ("1 Pck. Vanillezucker", 1, "pack", "Vanillezucker", ""),
         ("1 Handvoll Rucola", 1, "handful", "Rucola", ""),
         ("  ", None, None, "", ""),
+        ("2 cm frisch geriebener Ingwer", 1, "piece", "frisch geriebener Ingwer", "2 cm"),
+        ("1–2 cm Ingwer", 1, "piece", "Ingwer", "1–2 cm"),
     ],
 )
 def test_parse_line(line, amount, unit, name, note):

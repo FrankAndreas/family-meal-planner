@@ -9,6 +9,7 @@ const line = (key: string, buy: boolean, amount = 1): ShoppingLine => ({
     extras: [],
     meals: [],
     staple: false,
+    details: [],
     buy,
 });
 const list = (week: string, lines: ShoppingLine[]) => ({ week_start: week, lines }) as unknown as ShoppingList;

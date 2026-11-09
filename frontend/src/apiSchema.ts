@@ -1589,6 +1589,8 @@ export interface components {
             meals: string[];
             /** Staple */
             staple: boolean;
+            /** Details */
+            details: string[];
             /** Buy */
             buy: boolean;
         };

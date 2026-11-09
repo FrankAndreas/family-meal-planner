@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Checks CI would fail on, before they reach a commit. Enable once per clone: git config core.hooksPath .githooks
+# Skip in an emergency with: git commit --no-verify
+set -euo pipefail
+cd "$(git rev-parse --show-toplevel)"
+
+staged="$(git diff --cached --name-only --diff-filter=ACMR)"
+
+if grep -q '^frontend/' <<<"$staged"; then
+    echo "pre-commit: frontend type-check and lint"
+    # tsc -b covers test files too (vitest and eslint don't check types; the build does)
+    (cd frontend && npm run --silent type-check && npm run --silent lint)
+fi

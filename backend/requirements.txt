@@ -1,8 +1,8 @@
-fastapi==0.162.5
+fastapi==0.165.0
 uvicorn==0.54.0
-sqlalchemy==2.1.8
-pydantic==2.14.3
-python-multipart==0.0.33
+sqlalchemy==2.1.9
+pydantic==2.14.4
+python-multipart==0.0.34
 alembic==1.20.1
 # Time zone database for zoneinfo; the slim Docker image has none
 tzdata==2026.6

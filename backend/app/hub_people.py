@@ -115,6 +115,7 @@ def _apply(db: Session, people: list[hub.HubPerson]) -> None:
         _set_name(row, person.name)
         row.role = models.UserRole(person.role)
         row.language = person.language if person.language in ("de", "en") else None
+        row.theme = person.theme
         # Only an address the hub shares (the planner's tile shares them): none, else
         row.email = person.email if person.email_shared else None
         row.is_active = True

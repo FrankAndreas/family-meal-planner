@@ -43,7 +43,7 @@ export default function Recipes() {
                         tabIndex={useUp.tab === key ? 0 : -1}
                         onClick={() => changeUseUp({ ...useUp, tab: key })}
                         className={`rounded-lg px-3 py-1.5 text-sm ${
-                            useUp.tab === key ? 'bg-fuchsia-400/20 text-fuchsia-100' : 'text-slate-400 hover:bg-white/5'
+                            useUp.tab === key ? 'bg-accent-2/20 text-accent-2' : 'text-muted hover:bg-hover'
                         }`}
                     >
                         {t(`useUp.tabs.${key}`)}

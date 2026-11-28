@@ -13,8 +13,8 @@ export default function EntryChip({ entry, familySize, onOpen }: EntryChipProps)
     const { t, i18n } = useTranslation();
     const title = entry.recipe ? entry.recipe.title : entry.note;
     const style = entry.recipe
-        ? 'border-cyan-400/40 bg-cyan-400/15 text-cyan-50'
-        : 'border-slate-400/30 bg-slate-400/15 italic text-slate-200';
+        ? 'border-accent/40 bg-accent/15 text-accent'
+        : 'border-line-strong/30 bg-pressed italic text-ink';
     return (
         <button
             type="button"
@@ -27,10 +27,10 @@ export default function EntryChip({ entry, familySize, onOpen }: EntryChipProps)
             }`}
         >
             <span className={entry.recipe_deleted ? 'line-through' : ''}>{title}</span>
-            {entry.recipe_deleted && <span className="ml-1 text-slate-400">{t('plan.deleted')}</span>}
+            {entry.recipe_deleted && <span className="ml-1 text-muted">{t('plan.deleted')}</span>}
             {/* People only when they differ from the family: the usual case needs no reading */}
             {entry.people !== null && entry.people !== familySize && (
-                <span className="ml-1 text-cyan-300">
+                <span className="ml-1 text-accent">
                     {t('plan.peopleShort', { amount: formatAmount(entry.people, i18n.language as Language) })}
                 </span>
             )}

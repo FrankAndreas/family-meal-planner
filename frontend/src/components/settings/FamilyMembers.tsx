@@ -42,14 +42,14 @@ export default function FamilyMembers() {
     return (
         <section className={`${CARD} space-y-4`}>
             <h2 className="text-lg">{t('settings.members')}</h2>
-            <p className="text-sm text-slate-400">{t('settings.membersFromHub')}</p>
-            <ul className="divide-y divide-white/10">
+            <p className="text-sm text-muted">{t('settings.membersFromHub')}</p>
+            <ul className="divide-y divide-line">
                 {users.map((u) => (
                     <li key={u.id} className="flex flex-wrap items-center gap-2 py-3">
                         <span className="font-semibold">{u.name}</span>
-                        <span className="rounded-full bg-white/10 px-2 py-0.5 text-xs text-slate-300">{t(`roles.${u.role}`)}</span>
+                        <span className="rounded-full bg-pressed px-2 py-0.5 text-xs text-ink">{t(`roles.${u.role}`)}</span>
                         {/* The address recipe mails come from: the one confirmed in the hub */}
-                        <span className={`text-sm ${u.email ? 'text-slate-300' : 'text-slate-400'}`}>
+                        <span className={`text-sm ${u.email ? 'text-ink' : 'text-muted'}`}>
                             {u.email ?? t('settings.memberNoMail')}
                         </span>
                     </li>
@@ -57,9 +57,9 @@ export default function FamilyMembers() {
             </ul>
             {removed.length > 0 && (
                 <div className="space-y-2">
-                    <h3 className="text-sm font-semibold text-slate-300">{t('settings.removedTitle')}</h3>
-                    <p className="text-sm text-slate-400">{t('settings.removedHint')}</p>
-                    <ul className="divide-y divide-white/10">
+                    <h3 className="text-sm font-semibold text-ink">{t('settings.removedTitle')}</h3>
+                    <p className="text-sm text-muted">{t('settings.removedHint')}</p>
+                    <ul className="divide-y divide-line">
                         {removed.map((u) => (
                             <li key={u.id} className="flex flex-wrap items-center gap-2 py-3">
                                 <span className="mr-auto">{u.name}</span>

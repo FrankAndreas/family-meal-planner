@@ -10,7 +10,7 @@ interface PeopleStepperProps {
 // Big − / + buttons: easy to hit on an iPad propped up in the kitchen
 export default function PeopleStepper({ value, onChange }: PeopleStepperProps) {
     const { t, i18n } = useTranslation();
-    const button = 'h-10 w-10 rounded-full border border-white/15 text-xl hover:bg-white/10 disabled:opacity-40';
+    const button = 'h-10 w-10 rounded-full border border-line text-xl hover:bg-pressed disabled:opacity-40';
     return (
         <div className="inline-flex items-center gap-3">
             <button

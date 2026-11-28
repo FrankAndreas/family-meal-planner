@@ -99,7 +99,7 @@ export default function RecipeView() {
     return error ? (
       <p role="alert" className={ERROR}>{error}</p>
     ) : (
-      <p className="text-slate-400">{t("common.loading")}</p>
+      <p className="text-muted">{t("common.loading")}</p>
     );
 
   const shown = showOriginal ? withOriginal(recipe) : recipe;
@@ -136,7 +136,7 @@ export default function RecipeView() {
                 onClick={() =>
                   change(() => favoriteRecipe(recipe.id, !recipe.my_favorite))
                 }
-                className={`text-3xl ${recipe.my_favorite ? "text-fuchsia-300" : `${ICON_OFF} hover:text-fuchsia-200`}`}
+                className={`text-3xl ${recipe.my_favorite ? "text-accent-2" : `${ICON_OFF} hover:text-accent-2`}`}
               >
                 ♥
               </button>
@@ -144,7 +144,7 @@ export default function RecipeView() {
           )}
           {recipe.ratings.length > 0 && (
             <ul
-              className="flex flex-wrap gap-x-4 text-sm text-slate-300"
+              className="flex flex-wrap gap-x-4 text-sm text-ink"
               aria-label={t("recipes.ratingsBy")}
             >
               {recipe.ratings.map((r) => (
@@ -218,7 +218,7 @@ export default function RecipeView() {
       {/* Always there, so screen readers announce the text when it comes */}
       <div role="status">
         {justPlanned?.recipe?.id === recipe.id && (
-          <p className="rounded-lg border border-emerald-400/30 bg-emerald-900/30 p-3 text-sm text-emerald-100">
+          <p className="rounded-lg border border-success/30 bg-success/30 p-3 text-sm text-success">
             {t("plan.plannedAt", {
               place: place(justPlanned.date, justPlanned.slot),
             })}{" "}
@@ -255,7 +255,7 @@ export default function RecipeView() {
         <div className="flex justify-end">
           <button
             type="button"
-            className="rounded-lg px-3 py-2 text-sm text-red-300/80 hover:bg-red-900/30 hover:text-red-200"
+            className="rounded-lg px-3 py-2 text-sm text-danger/80 hover:bg-danger/30 hover:text-danger"
             onClick={remove}
           >
             {t("recipes.delete")}

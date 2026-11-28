@@ -51,7 +51,7 @@ export default function DayView({ week, familySize, version, onPlan, onNote, onO
                         tabIndex={d === shown ? 0 : -1}
                         onClick={() => setDay(d)}
                         className={`rounded-lg py-1.5 text-center ${
-                            d === shown ? 'bg-cyan-400/20 text-cyan-100' : d === week.today ? 'text-cyan-300' : 'text-slate-400'
+                            d === shown ? 'bg-accent/20 text-accent' : d === week.today ? 'text-accent' : 'text-muted'
                         }`}
                     >
                         {/* The name is the whole weekday and the date (the two letters are for the eye) */}
@@ -63,7 +63,7 @@ export default function DayView({ week, familySize, version, onPlan, onNote, onO
             </div>
             {SLOTS.map((slot) => (
                 <section key={slot} data-testid={`day-${slot}`} className={`${CARD} space-y-2 p-3`}>
-                    <h2 className="text-sm text-slate-400">{t(`plan.slots.${slot}`)}</h2>
+                    <h2 className="text-sm text-muted">{t(`plan.slots.${slot}`)}</h2>
                     {week.entries
                         .filter((e) => e.date === shown && e.slot === slot)
                         .map((entry) => (
@@ -74,7 +74,7 @@ export default function DayView({ week, familySize, version, onPlan, onNote, onO
                         aria-label={t(moving ? 'plan.moveTo' : 'plan.addTo', { place: place(slot) })}
                         onClick={() => (moving ? onMoveTo(shown, slot) : setAdding(slot))}
                         className={`w-full rounded-md border border-dashed py-1.5 text-sm ${
-                            moving ? 'border-cyan-400/60 text-cyan-300' : 'border-white/15 text-slate-400'
+                            moving ? 'border-accent/60 text-accent' : 'border-line text-muted'
                         }`}
                     >
                         {moving ? t('plan.moveHere') : t('plan.add')}
@@ -85,8 +85,8 @@ export default function DayView({ week, familySize, version, onPlan, onNote, onO
                 <Modal
                     label={place(adding)}
                     onClose={() => setAdding(null)}
-                    overlayClassName="fixed inset-0 z-30 flex items-end bg-black/50"
-                    className="flex h-[80vh] w-full flex-col gap-2 rounded-t-2xl bg-slate-900 p-3"
+                    overlayClassName="fixed inset-0 z-30 flex items-end bg-page/70"
+                    className="flex h-[80vh] w-full flex-col gap-2 rounded-t-2xl bg-page p-3"
                 >
                     <div className="flex items-center gap-2">
                         <h2 className="mr-auto text-base">{place(adding)}</h2>

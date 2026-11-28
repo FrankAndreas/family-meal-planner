@@ -30,10 +30,10 @@ export default function PlanCell({ day, slot, entries, mode, past, familySize, f
             data-testid={`cell-${weekdayKey(day)}-${slot}`}
             className={`flex min-h-20 ${fill} flex-col gap-1 rounded-lg border p-0.5 ${
                 isOver
-                    ? 'border-fuchsia-300 bg-fuchsia-400/10'
+                    ? 'border-accent-2 bg-accent-2/10'
                     : target
-                      ? 'border-cyan-400/50 bg-cyan-400/5'
-                      : 'border-dashed border-white/10'
+                      ? 'border-accent/50 bg-accent/5'
+                      : 'border-dashed border-line'
             } ${past ? 'opacity-60' : ''}`}
         >
             {entries.map((entry) => (
@@ -47,7 +47,7 @@ export default function PlanCell({ day, slot, entries, mode, past, familySize, f
                 aria-label={label}
                 onClick={onTap}
                 className={`min-h-6 flex-1 rounded text-xs ${
-                    target ? 'text-cyan-300 hover:bg-cyan-400/10' : 'text-transparent hover:bg-white/5 hover:text-slate-400 focus-visible:text-slate-400'
+                    target ? 'text-accent hover:bg-accent/10' : 'text-transparent hover:bg-hover hover:text-muted focus-visible:text-muted'
                 }`}
             >
                 {mode === 'plan' ? t('plan.planHere') : mode === 'move' ? t('plan.moveHere') : '+'}

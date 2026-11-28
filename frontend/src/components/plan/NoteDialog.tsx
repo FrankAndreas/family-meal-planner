@@ -24,19 +24,19 @@ export default function NoteDialog({ place, onAdd, onClose }: NoteDialogProps) {
             label={t('plan.addNote')}
             onClose={onClose}
             onSubmit={submit}
-            overlayClassName="fixed inset-0 z-30 flex items-end justify-center bg-black/50 p-4 sm:items-center"
-            className="glass-card w-full max-w-md space-y-4 bg-slate-900/90 p-5"
+            overlayClassName="fixed inset-0 z-30 flex items-end justify-center bg-page/70 p-4 sm:items-center"
+            className="glass-card w-full max-w-md space-y-4 bg-page/90 p-5"
         >
             <div>
                 <h2 className="text-lg">{t('plan.addNote')}</h2>
-                <p className="text-sm text-slate-400">{place}</p>
+                <p className="text-sm text-muted">{place}</p>
             </div>
             <div className="flex flex-wrap gap-2">
                 {QUICK.map((key) => (
                     <button
                         key={key}
                         type="button"
-                        className="rounded-full border border-white/15 px-3 py-1.5 text-sm hover:bg-white/10"
+                        className="rounded-full border border-line px-3 py-1.5 text-sm hover:bg-pressed"
                         onClick={() => onAdd(t(`plan.quickNotes.${key}`))}
                     >
                         {t(`plan.quickNotes.${key}`)}

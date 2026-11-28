@@ -59,7 +59,7 @@ export default function Inbox() {
         <div className={`${PAGE} space-y-5`}>
             <div>
                 <h1 className="text-2xl">{t('nav.inbox')}</h1>
-                <p className="text-sm text-slate-400">{parent ? t('inbox.introParent') : t('inbox.introChild')}</p>
+                <p className="text-sm text-muted">{parent ? t('inbox.introParent') : t('inbox.introChild')}</p>
             </div>
             <UrlPaste onAdded={load} />
             <button type="button" className={BUTTON_SECONDARY} aria-expanded={pasting} onClick={() => setPasting(!pasting)}>
@@ -74,7 +74,7 @@ export default function Inbox() {
                 />
             )}
             {error && <p role="alert" className={ERROR}>{error}</p>}
-            {items?.length === 0 && <p className="text-slate-400">{t('inbox.empty')}</p>}
+            {items?.length === 0 && <p className="text-muted">{t('inbox.empty')}</p>}
             {items?.map((item) => (
                 <InboxItemCard
                     key={item.id}

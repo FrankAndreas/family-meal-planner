@@ -33,7 +33,7 @@ export default function PasteText({ onAdded }: { onAdded: () => void }) {
     };
     return (
         <form onSubmit={submit} className="glass-card space-y-3 p-4">
-            <p className="text-sm text-slate-400">{t('inbox.pasteIntro')}</p>
+            <p className="text-sm text-muted">{t('inbox.pasteIntro')}</p>
             <textarea
                 className={`${INPUT} min-h-48`}
                 aria-label={t('inbox.text')}

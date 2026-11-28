@@ -54,25 +54,25 @@ export default function IngredientChips({ values, onChange, label, placeholder, 
 
     return (
         <div>
-            <label htmlFor={inputId} className="mb-1 block text-sm text-slate-300">
+            <label htmlFor={inputId} className="mb-1 block text-sm text-ink">
                 {label}
             </label>
             <div className={`${FIELD} flex flex-wrap items-center gap-2`}>
                 {values.map((value) => (
-                    <span key={value} className="inline-flex items-center gap-1 rounded-full bg-cyan-400/15 py-1 pl-3 pr-1 text-sm text-cyan-100">
+                    <span key={value} className="inline-flex items-center gap-1 rounded-full bg-accent/15 py-1 pl-3 pr-1 text-sm text-accent">
                         {value}
                         <button
                             type="button"
                             aria-label={t('useUp.remove', { name: value })}
                             onClick={() => onChange(values.filter((v) => v !== value))}
-                            className="h-8 w-8 rounded-full hover:bg-white/10"
+                            className="h-8 w-8 rounded-full hover:bg-pressed"
                         >
                             ×
                         </button>
                     </span>
                 ))}
                 {values.length >= max ? (
-                    <span className="p-1 text-sm text-slate-400">{t('useUp.full', { max })}</span>
+                    <span className="p-1 text-sm text-muted">{t('useUp.full', { max })}</span>
                 ) : (
                     <input
                         id={inputId}

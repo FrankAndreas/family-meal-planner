@@ -34,14 +34,14 @@ export default function ShoppingMeals({ list, busy, onTick }: ShoppingMealsProps
                             <span className="min-w-0 break-words">
                                 {weekday(meal.date)} · {t(`plan.slots.${meal.slot}`)} · <b>{meal.title}</b>
                                 {meal.people !== null && (
-                                    <span className="text-slate-400"> ({t('shopping.people', { count: meal.people })})</span>
+                                    <span className="text-muted"> ({t('shopping.people', { count: meal.people })})</span>
                                 )}
                             </span>
                         </label>
                     </li>
                 ))}
                 {list.notes.map((note) => (
-                    <li key={`${note.date}-${note.slot}-${note.note}`} className="pl-6 text-slate-400">
+                    <li key={`${note.date}-${note.slot}-${note.note}`} className="pl-6 text-muted">
                         {weekday(note.date)} · {t(`plan.slots.${note.slot}`)} · {note.note}
                     </li>
                 ))}

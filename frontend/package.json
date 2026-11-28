@@ -9,7 +9,7 @@
     "dev": "vite",
     "prebuild": "npm run theme:copy",
     "build": "tsc -b && vite build",
-    "lint": "eslint . --report-unused-disable-directives --max-warnings 0 && npm run check-texts && npm run check-types",
+    "lint": "eslint . --report-unused-disable-directives --max-warnings 0 && npm run check-texts && npm run check-colors && npm run check-types",
     "preview": "vite preview",
     "type-check": "tsc -b",
     "check-texts": "node scripts/check-texts.mjs",

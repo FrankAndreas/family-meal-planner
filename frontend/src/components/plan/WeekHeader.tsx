@@ -15,12 +15,12 @@ export default function WeekHeader({ week, onWeek }: WeekHeaderProps) {
     const { user } = useAuth();
     const locale = i18n.language === 'de' ? de : enUS;
     const label = (day: string) => format(parseISO(day), 'EEEEEE d.M.', { locale });
-    const arrow = 'h-10 w-10 rounded-full border border-white/15 text-lg hover:bg-white/10';
+    const arrow = 'h-10 w-10 rounded-full border border-line text-lg hover:bg-pressed';
     return (
         <div className="space-y-3">
             {week.previous_needs_closing && (
-                <div className="glass-card flex flex-wrap items-center gap-3 border-amber-300/30 p-3">
-                    <span className="mr-auto text-sm text-amber-100">{t('plan.closePrevious')}</span>
+                <div className="glass-card flex flex-wrap items-center gap-3 border-warning/30 p-3">
+                    <span className="mr-auto text-sm text-warning">{t('plan.closePrevious')}</span>
                     <Link to={`/woche-abschliessen?start=${addDays(week.start, -7)}`} className="btn-primary text-sm">
                         {t('plan.closeWeek')}
                     </Link>
@@ -37,11 +37,11 @@ export default function WeekHeader({ week, onWeek }: WeekHeaderProps) {
                     ›
                 </button>
                 {user?.role === 'PARENT' && (
-                    <Link to={`/einkaufsliste?start=${week.start}`} className="ml-auto rounded-full border border-white/15 px-3 py-1 text-sm hover:bg-white/10">
+                    <Link to={`/einkaufsliste?start=${week.start}`} className="ml-auto rounded-full border border-line px-3 py-1 text-sm hover:bg-pressed">
                         {t('shopping.link')}
                     </Link>
                 )}
-                <span className={`${user?.role === 'PARENT' ? '' : 'ml-auto '}rounded-full bg-emerald-400/15 px-3 py-1 text-sm text-emerald-200`}>
+                <span className={`${user?.role === 'PARENT' ? '' : 'ml-auto '}rounded-full bg-success/15 px-3 py-1 text-sm text-success`}>
                     {t('plan.counter', { planned: week.planned_slots, total: week.total_slots })}
                 </span>
             </div>

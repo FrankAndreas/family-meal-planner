@@ -14,7 +14,7 @@ export default function MailAddresses() {
                 <h2 id="mail-addresses" className="text-lg">
                     {t('settings.mailAddresses')}
                 </h2>
-                <p className="text-sm text-slate-400">{t('settings.mailAddressesHint')}</p>
+                <p className="text-sm text-muted">{t('settings.mailAddressesHint')}</p>
             </div>
             <p className="text-sm">
                 {user?.email ? t('settings.mailAddressMine', { address: user.email }) : t('settings.mailAddressMissing')}

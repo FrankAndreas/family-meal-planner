@@ -14,7 +14,7 @@ export default function RecipeSteps({ steps, notes }: { steps: string[]; notes: 
                     </li>
                 ))}
             </ol>
-            {notes && <p className="whitespace-pre-line text-slate-300">{notes}</p>}
+            {notes && <p className="whitespace-pre-line text-ink">{notes}</p>}
         </section>
     );
 }

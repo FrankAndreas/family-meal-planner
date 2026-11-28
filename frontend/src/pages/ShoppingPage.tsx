@@ -39,7 +39,7 @@ export default function ShoppingPage() {
     const feedback = (
         <>
             {message && (
-                <p role="status" className="rounded-lg border border-emerald-400/30 bg-emerald-900/30 p-3 text-sm text-emerald-100">
+                <p role="status" className="rounded-lg border border-success/30 bg-success/30 p-3 text-sm text-success">
                     {message}
                 </p>
             )}
@@ -117,7 +117,7 @@ export default function ShoppingPage() {
                 <h1 className="text-2xl">
                     {t('shopping.title')} · {range(list.week_start, list.week_end)}
                 </h1>
-                <p className="text-sm text-slate-400">
+                <p className="text-sm text-muted">
                     {list.started_by && t('shopping.startedBy', { name: list.started_by })}
                     {list.changed_by && ` · ${t('shopping.changedBy', { name: list.changed_by, time: time(list.changed_at) })}`}
                 </p>
@@ -139,7 +139,7 @@ export default function ShoppingPage() {
 
             {/* Sending stays in reach on a long list: above the phone's bottom bar, at the bottom of the screen elsewhere */}
             {bringReady(bring) && (
-                <div className="sticky bottom-[4.25rem] z-10 -mx-3 rounded-2xl border border-white/10 bg-slate-900/90 p-3 backdrop-blur-md sm:bottom-2">
+                <div className="sticky bottom-[4.25rem] z-10 -mx-3 rounded-2xl border border-line bg-page/90 p-3 backdrop-blur-md sm:bottom-2">
                     <button type="button" className={`${BUTTON} w-full sm:w-auto`} disabled={busy || toBuy === 0} onClick={() => send(list, spec)}>
                         {t('shopping.send', { count: toBuy })}
                     </button>
@@ -147,7 +147,7 @@ export default function ShoppingPage() {
             )}
             <div className="flex flex-wrap items-center gap-3">
                 {!bringReady(bring) && (
-                    <Link to="/einstellungen" className="text-cyan-300 underline">
+                    <Link to="/einstellungen" className="text-accent underline">
                         {t('shopping.setUpBring')}
                     </Link>
                 )}

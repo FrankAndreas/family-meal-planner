@@ -35,7 +35,7 @@ export default function ShoppingLines({ list, placed, changed, busy, spec, onCho
     };
 
     const lineItem = (line: ShoppingLine) => (
-        <li key={line.key} className={changed.keys.has(line.key) ? '-mx-2 rounded-lg bg-amber-400/15 px-2' : ''}>
+        <li key={line.key} className={changed.keys.has(line.key) ? '-mx-2 rounded-lg bg-warning/15 px-2' : ''}>
             <label className="flex items-start gap-2">
                 <input
                     type="checkbox"
@@ -45,17 +45,17 @@ export default function ShoppingLines({ list, placed, changed, busy, spec, onCho
                     onChange={(e) => onChoose(line, e.target.checked)}
                 />
                 <span className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2">
-                    <span className={line.buy ? '' : 'text-slate-400 line-through'}>
+                    <span className={line.buy ? '' : 'text-muted line-through'}>
                         {spec(line) ? `${spec(line)} ${line.name}` : line.name}
                     </span>
                     {/* The meals go on the next line rather than squeeze the item */}
-                    <span className="text-sm text-slate-400">
+                    <span className="text-sm text-muted">
                         {line.meals.length > 0 && t('shopping.from', { meals: line.meals.join(', ') })}
                         {line.staple && !line.buy && ` ${t('shopping.usuallyAtHome')}`}
                     </span>
                 </span>
                 {changed.keys.has(line.key) && (
-                    <span className="shrink-0 rounded-full bg-amber-400/20 px-2 text-xs text-amber-100">
+                    <span className="shrink-0 rounded-full bg-warning/20 px-2 text-xs text-warning">
                         {t('shopping.changed')}
                     </span>
                 )}
@@ -68,20 +68,20 @@ export default function ShoppingLines({ list, placed, changed, busy, spec, onCho
             <h2 id="shopping-items" className="text-lg">
                 {t('shopping.items')}
             </h2>
-            {list.lines.length === 0 && <p className="text-sm text-slate-400">{t('shopping.noItems')}</p>}
+            {list.lines.length === 0 && <p className="text-sm text-muted">{t('shopping.noItems')}</p>}
             <ul className="space-y-1">{toBuyFirst.map(lineItem)}</ul>
             {atTheEnd.length > 0 && (
                 <>
-                    <h3 className="pt-2 text-sm font-semibold text-slate-400">{t('shopping.notBuying')}</h3>
+                    <h3 className="pt-2 text-sm font-semibold text-muted">{t('shopping.notBuying')}</h3>
                     <ul className="space-y-1">{atTheEnd.map(lineItem)}</ul>
                 </>
             )}
             {changed.gone.length > 0 && (
-                <p className="text-sm text-amber-100">{t('shopping.gone', { names: changed.gone.join(', ') })}</p>
+                <p className="text-sm text-warning">{t('shopping.gone', { names: changed.gone.join(', ') })}</p>
             )}
             <form className="flex flex-wrap items-end gap-2" onSubmit={add}>
                 <label className="min-w-0 flex-1 space-y-1">
-                    <span className="block text-sm text-slate-300">{t('shopping.addName')}</span>
+                    <span className="block text-sm text-ink">{t('shopping.addName')}</span>
                     <input
                         className={`${FIELD} w-full`}
                         maxLength={100}
@@ -92,7 +92,7 @@ export default function ShoppingLines({ list, placed, changed, busy, spec, onCho
                     />
                 </label>
                 <label className="w-32 space-y-1">
-                    <span className="block text-sm text-slate-300">{t('shopping.addAmount')}</span>
+                    <span className="block text-sm text-ink">{t('shopping.addAmount')}</span>
                     <input
                         className={`${FIELD} w-full`}
                         maxLength={50}
@@ -111,7 +111,7 @@ export default function ShoppingLines({ list, placed, changed, busy, spec, onCho
                         <li key={extra.id}>
                             <button
                                 type="button"
-                                className="rounded-full border border-white/15 px-3 py-1 text-sm hover:bg-white/10"
+                                className="rounded-full border border-line px-3 py-1 text-sm hover:bg-pressed"
                                 aria-label={t('shopping.removeExtra', { name: extra.name })}
                                 disabled={busy}
                                 onClick={() => onRemoveExtra(extra.id)}

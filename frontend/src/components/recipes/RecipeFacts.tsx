@@ -28,7 +28,7 @@ export default function RecipeFacts({ recipe, eatenOn, planned }: RecipeFactsPro
     const place = usePlaceText();
     return (
         <>
-            <div className="flex flex-wrap gap-2 text-sm text-slate-400">
+            <div className="flex flex-wrap gap-2 text-sm text-muted">
                 {recipe.prep_minutes !== null && <span>{t('recipes.prep', { count: recipe.prep_minutes })}</span>}
                 {recipe.cook_minutes !== null && <span>{t('recipes.cook', { count: recipe.cook_minutes })}</span>}
                 {recipe.servings_unit && (
@@ -36,11 +36,11 @@ export default function RecipeFacts({ recipe, eatenOn, planned }: RecipeFactsPro
                 )}
             </div>
             {(recipe.source_url || recipe.source_mail) && (
-                <p className="text-sm text-slate-300">
+                <p className="text-sm text-ink">
                     {t('recipes.sourceLabel')}{' '}
                     {recipe.source_url &&
                         (isWebLink(recipe.source_url) ? (
-                            <a href={recipe.source_url} target="_blank" rel="noreferrer" className="text-cyan-300 underline">
+                            <a href={recipe.source_url} target="_blank" rel="noreferrer" className="text-accent underline">
                                 {siteName(recipe.source_url)}
                                 <span aria-hidden> ↗</span>
                             </a>
@@ -56,24 +56,24 @@ export default function RecipeFacts({ recipe, eatenOn, planned }: RecipeFactsPro
                 </p>
             )}
             {recipe.last_eaten ? (
-                <details className="text-sm text-slate-300">
+                <details className="text-sm text-ink">
                     <summary className="cursor-pointer">
                         {t('recipes.lastEatenOn', {
                             date: format(parseISO(recipe.last_eaten), 'd.M.yyyy'),
                             count: recipe.times_eaten,
                         })}
                     </summary>
-                    <ul className="mt-1 flex flex-wrap gap-x-3 text-slate-400">
+                    <ul className="mt-1 flex flex-wrap gap-x-3 text-muted">
                         {eatenOn.map((day) => (
                             <li key={day}>{format(parseISO(day), 'd.M.yyyy')}</li>
                         ))}
                     </ul>
                 </details>
             ) : (
-                <p className="text-sm text-slate-400">{t('recipes.neverEaten')}</p>
+                <p className="text-sm text-muted">{t('recipes.neverEaten')}</p>
             )}
             {planned.length > 0 && (
-                <p className="text-sm text-cyan-200" data-testid="planned-ahead">
+                <p className="text-sm text-accent" data-testid="planned-ahead">
                     {t('plan.plannedAhead', { places: planned.map((p) => place(p.date, p.slot)).join(' · ') })}
                 </p>
             )}
@@ -82,7 +82,7 @@ export default function RecipeFacts({ recipe, eatenOn, planned }: RecipeFactsPro
                     {recipe.categories.map((category) => (
                         <li
                             key={category}
-                            className="rounded-full border border-amber-300/40 px-2 py-0.5 text-xs text-amber-100"
+                            className="rounded-full border border-warning/40 px-2 py-0.5 text-xs text-warning"
                         >
                             {t(`recipes.category.${category}`)}
                         </li>
@@ -92,7 +92,7 @@ export default function RecipeFacts({ recipe, eatenOn, planned }: RecipeFactsPro
             {recipe.tags.length > 0 && (
                 <div className="flex flex-wrap gap-2">
                     {recipe.tags.map((tag) => (
-                        <span key={tag} className="rounded-full bg-white/10 px-2 py-0.5 text-xs">
+                        <span key={tag} className="rounded-full bg-pressed px-2 py-0.5 text-xs">
                             {tag}
                         </span>
                     ))}

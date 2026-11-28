@@ -24,11 +24,11 @@ const TITLES = [
 
 const topLink = ({ isActive }: { isActive: boolean }) =>
     `rounded-lg px-3 py-2 text-sm font-medium ${
-        isActive ? 'bg-white/10 text-white' : 'text-slate-300 hover:bg-white/5 hover:text-white'
+        isActive ? 'bg-pressed text-ink' : 'text-muted hover:bg-hover hover:text-ink'
     }`;
 
 const bottomLink = ({ isActive }: { isActive: boolean }) =>
-    `flex flex-1 flex-col items-center gap-0.5 py-2 text-xs ${isActive ? 'text-cyan-300' : 'text-slate-400'}`;
+    `flex flex-1 flex-col items-center gap-0.5 py-2 text-xs ${isActive ? 'text-accent' : 'text-muted'}`;
 
 export default function Layout() {
     const { t } = useTranslation();
@@ -55,7 +55,7 @@ export default function Layout() {
 
     const badge = (key: string) =>
         key === 'nav.inbox' && waiting > 0 ? (
-            <span className="ml-1 rounded-full bg-fuchsia-500/80 px-1.5 text-xs text-white">{waiting}</span>
+            <span className="ml-1 rounded-full bg-accent-2/80 px-1.5 text-xs text-page">{waiting}</span>
         ) : null;
 
     return (
@@ -67,14 +67,14 @@ export default function Layout() {
                     e.preventDefault();
                     document.getElementById('main')?.focus();
                 }}
-                className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-50 focus:rounded-lg focus:bg-slate-900 focus:px-3 focus:py-2 focus:text-white"
+                className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-50 focus:rounded-lg focus:bg-page focus:px-3 focus:py-2 focus:text-ink"
             >
                 {t('nav.skipToContent')}
             </a>
-            <header className="sticky top-0 z-10 border-b border-white/10 bg-slate-900/70 backdrop-blur-md">
+            <header className="sticky top-0 z-10 border-b border-line bg-page/70 backdrop-blur-md">
                 <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3">
                     <span className="mr-auto text-lg font-bold">
-                        <span aria-hidden>🍽️</span> <span className="bg-gradient-to-r from-cyan-300 to-fuchsia-300 bg-clip-text text-transparent">{t('common.appName')}</span>
+                        <span aria-hidden>🍽️</span> <span className="bg-gradient-to-r from-accent to-accent-2 bg-clip-text text-transparent">{t('common.appName')}</span>
                     </span>
                     <nav className="hidden gap-1 sm:flex">
                         {NAV.map((item) => (
@@ -84,8 +84,8 @@ export default function Layout() {
                             </NavLink>
                         ))}
                     </nav>
-                    <span className="text-sm text-slate-400">{user?.name}</span>
-                    <button type="button" onClick={logout} className="text-sm text-slate-400 hover:text-white">
+                    <span className="text-sm text-muted">{user?.name}</span>
+                    <button type="button" onClick={logout} className="text-sm text-muted hover:text-ink">
                         {t('nav.logout')}
                     </button>
                 </div>
@@ -94,7 +94,7 @@ export default function Layout() {
                 <Outlet />
             </main>
             {/* Phones: the navigation sits at the bottom, within reach of the thumb */}
-            <nav className="fixed inset-x-0 bottom-0 z-10 flex border-t border-white/10 bg-slate-900/90 backdrop-blur-md sm:hidden">
+            <nav className="fixed inset-x-0 bottom-0 z-10 flex border-t border-line bg-page/90 backdrop-blur-md sm:hidden">
                 {NAV.map((item) => (
                     <NavLink key={item.to} to={item.to} end={item.end} className={bottomLink}>
                         <span className="text-lg">{item.icon}</span>

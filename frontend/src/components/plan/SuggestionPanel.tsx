@@ -63,7 +63,7 @@ export default function SuggestionPanel({ selectedId, onPick, version, slot: ope
                 aria-labelledby="suggest-for"
                 className="flex items-center gap-1 overflow-x-auto whitespace-nowrap py-1"
             >
-                <span id="suggest-for" className="mr-1 shrink-0 text-xs text-slate-400">
+                <span id="suggest-for" className="mr-1 shrink-0 text-xs text-muted">
                     {t('plan.suggestFor')}
                 </span>
                 {[null, ...SLOTS].map((key) => (
@@ -73,7 +73,7 @@ export default function SuggestionPanel({ selectedId, onPick, version, slot: ope
                         aria-pressed={slot === key}
                         onClick={() => chooseSlot(key)}
                         className={`shrink-0 rounded-full px-2 py-0.5 text-xs ${
-                            slot === key ? 'bg-cyan-400/20 text-cyan-100' : 'text-slate-400 hover:bg-white/5'
+                            slot === key ? 'bg-accent/20 text-accent' : 'text-muted hover:bg-hover'
                         }`}
                     >
                         {key ? t(`plan.slots.${key}`) : t('plan.allSlots')}
@@ -89,7 +89,7 @@ export default function SuggestionPanel({ selectedId, onPick, version, slot: ope
                         aria-selected={tab === key}
                         onClick={() => setTab(key)}
                         className={`rounded-lg px-2 py-1.5 text-sm ${
-                            tab === key ? 'bg-fuchsia-400/20 text-fuchsia-200' : 'text-slate-400 hover:bg-white/5'
+                            tab === key ? 'bg-accent-2/20 text-accent-2' : 'text-muted hover:bg-hover'
                         }`}
                     >
                         {t(`plan.tabs.${key}`)}
@@ -106,7 +106,7 @@ export default function SuggestionPanel({ selectedId, onPick, version, slot: ope
             />
             {error && <p role="alert" className={ERROR}>{error}</p>}
             <div className="flex-1 space-y-2 overflow-y-auto pr-1">
-                {recipes?.length === 0 && <p className="p-2 text-sm text-slate-400">{t(`plan.empty.${tab}`)}</p>}
+                {recipes?.length === 0 && <p className="p-2 text-sm text-muted">{t(`plan.empty.${tab}`)}</p>}
                 {recipes?.map((recipe) => (
                     <Draggable key={recipe.id} id={`recipe|${recipe.id}|${recipe.title}`}>
                         <RecipeCard
@@ -118,7 +118,7 @@ export default function SuggestionPanel({ selectedId, onPick, version, slot: ope
                     </Draggable>
                 ))}
             </div>
-            {selectedId !== null && <p className="text-xs text-cyan-300">{t('plan.pickCell')}</p>}
+            {selectedId !== null && <p className="text-xs text-accent">{t('plan.pickCell')}</p>}
         </aside>
     );
 }

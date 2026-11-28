@@ -57,7 +57,7 @@ export default function UseUp({ have, mode, onChange }: UseUpProps) {
 
     const modeButton = (key: UseUpMode) =>
         `rounded-full border px-3 py-1 text-sm ${
-            mode === key ? 'border-cyan-400 bg-cyan-400/15 text-white' : 'border-white/10 text-slate-300 hover:bg-white/5'
+            mode === key ? 'border-accent bg-accent/15 text-ink' : 'border-line text-ink hover:bg-hover'
         }`;
 
     return (
@@ -95,36 +95,36 @@ export default function UseUp({ have, mode, onChange }: UseUpProps) {
             </div>
             {/* What each mode does: the chosen one's shown, both read out with their button */}
             {MODES.map((key) => (
-                <p key={key} id={`use-up-mode-${key}`} hidden={mode !== key} className="-mt-2 text-sm text-slate-400">
+                <p key={key} id={`use-up-mode-${key}`} hidden={mode !== key} className="-mt-2 text-sm text-muted">
                     {t(`useUp.explain.${key}`, { max: MAX_MISSING })}
                 </p>
             ))}
             {error && <p role="alert" className={ERROR}>{error}</p>}
             {!have.length ? (
-                <p className="text-slate-400">{t('useUp.hint')}</p>
+                <p className="text-muted">{t('useUp.hint')}</p>
             ) : (
                 results && (
                     <>
-                        {results.length === 0 && <p className="text-slate-400">{t('useUp.none')}</p>}
+                        {results.length === 0 && <p className="text-muted">{t('useUp.none')}</p>}
                         <ul className="grid gap-3 md:grid-cols-2">
                             {results.map((recipe) => (
                                 <li key={recipe.id}>
                                     <Link
                                         to={`/rezepte/${recipe.id}`}
-                                        className="glass-card flex items-center gap-3 p-2 transition hover:border-cyan-400/40"
+                                        className="glass-card flex items-center gap-3 p-2 transition hover:border-accent/40"
                                     >
                                         <RecipeThumb recipe={recipe} className="h-16 w-16 flex-none rounded-lg" />
                                         <div className="min-w-0 space-y-0.5">
                                             <div className="font-semibold leading-tight">{recipe.title}</div>
-                                            <div className="text-sm text-emerald-300">
+                                            <div className="text-sm text-success">
                                                 {t('useUp.used', { names: recipe.used.join(', ') })}
                                             </div>
                                             {recipe.missing.length > 0 && (
-                                                <div className="text-sm text-rose-300">
+                                                <div className="text-sm text-danger">
                                                     {t('useUp.missing', { names: recipe.missing.join(', ') })}
                                                 </div>
                                             )}
-                                            <div className="text-xs text-slate-400">
+                                            <div className="text-xs text-muted">
                                                 {recipe.last_eaten
                                                     ? t('recipes.lastEaten', { when: sinceText(recipe.last_eaten) })
                                                     : t('recipes.neverEaten')}

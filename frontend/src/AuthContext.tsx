@@ -1,3 +1,4 @@
+import { applyTheme } from 'family-hub-theme';
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import { errorCode, errorStatus, goToHubLogout } from './api';
 import { applyLanguage } from './i18n';
@@ -29,6 +30,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const loadUser = useCallback(async () => {
         const me = await fetchMe();
         applyLanguage(me.language);
+        applyTheme(me.theme);
         setUser(me);
         return me;
     }, []);
@@ -45,6 +47,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     return;
                 }
                 applyLanguage(me.language);
+                applyTheme(me.theme);
                 setUser(me);
                 setState('in');
             } catch (error) {
@@ -53,6 +56,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 const code = errorCode(error);
                 const away = errorStatus(error) === 401;
                 setState(code === 'no_access' ? 'no_access' : away ? 'away' : 'hub_unavailable');
+                // Nobody logged in here: the default look
+                applyTheme(null);
                 applyLanguage(await guestLanguage());
             }
         };
@@ -60,6 +65,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }, [attempt]);
 
     const logout = useCallback(async () => {
+        // The hub's login page comes next: the default look there, not this person's
+        applyTheme(null);
         await goToHubLogout();
     }, []);
 

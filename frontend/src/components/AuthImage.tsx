@@ -19,5 +19,5 @@ export default function AuthImage({ src, alt, className }: { src: string; alt: s
             if (made) URL.revokeObjectURL(made);
         };
     }, [src]);
-    return url ? <img src={url} alt={alt} className={className} /> : <div className={`${className} bg-white/5`} aria-hidden />;
+    return url ? <img src={url} alt={alt} className={className} /> : <div className={`${className} bg-hover`} aria-hidden />;
 }

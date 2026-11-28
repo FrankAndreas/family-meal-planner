@@ -27,14 +27,14 @@ export default function WeekGrid({ week, mode, familySize, onCell, onOpenEntry }
                 {week.days.map((day) => (
                     <div
                         key={day}
-                        className={`rounded-lg py-1 text-center ${day === week.today ? 'bg-cyan-400/15 text-cyan-100' : ''}`}
+                        className={`rounded-lg py-1 text-center ${day === week.today ? 'bg-accent/15 text-accent' : ''}`}
                     >
                         <div className="text-sm font-semibold">{format(parseISO(day), 'EEEEEE', { locale })}</div>
-                        <div className="text-xs text-slate-400">{format(parseISO(day), 'd.M.')}</div>
+                        <div className="text-xs text-muted">{format(parseISO(day), 'd.M.')}</div>
                     </div>
                 ))}
                 {SLOTS.map((slot) => [
-                    <div key={slot} className="flex items-center pr-1 text-xs font-medium text-slate-400">
+                    <div key={slot} className="flex items-center pr-1 text-xs font-medium text-muted">
                         {t(`plan.slots.${slot}`)}
                     </div>,
                     ...week.days.map((day) => (

@@ -100,10 +100,10 @@ export default function RecipeEdit() {
     return error ? (
       <p role="alert" className={ERROR}>{error}</p>
     ) : (
-      <p className="text-slate-400">{t("common.loading")}</p>
+      <p className="text-muted">{t("common.loading")}</p>
     );
 
-  const label = "mb-1 block text-sm text-slate-300";
+  const label = "mb-1 block text-sm text-ink";
   return (
     <form onSubmit={save} className={`${PAGE} space-y-6`}>
       <h1 className="text-2xl">
@@ -114,11 +114,11 @@ export default function RecipeEdit() {
             : t("recipes.newTitle")}
       </h1>
       {draftItem && draftItem.draft!.uncertain.length > 0 && (
-        <section className="glass-card space-y-2 border-amber-300/40 p-4">
-          <h2 className="text-base text-amber-100">{t("inbox.pleaseCheck")}</h2>
+        <section className="glass-card space-y-2 border-warning/40 p-4">
+          <h2 className="text-base text-warning">{t("inbox.pleaseCheck")}</h2>
           <ul
             aria-label={t("inbox.pleaseCheck")}
-            className="list-disc space-y-1 pl-5 text-sm text-amber-50"
+            className="list-disc space-y-1 pl-5 text-sm text-warning"
           >
             {draftItem.draft!.uncertain.map((text) => (
               <li key={text}>{text}</li>
@@ -230,7 +230,7 @@ export default function RecipeEdit() {
             onChange={set("source")}
           />
           {isOtherLink(form.source) && (
-            <p className="mt-1 text-sm text-amber-200">
+            <p className="mt-1 text-sm text-warning">
               {t("errors.not_a_web_link")}
             </p>
           )}
@@ -254,7 +254,7 @@ export default function RecipeEdit() {
         <label htmlFor="steps" className="block text-lg font-bold">
           {t("recipes.steps")}
         </label>
-        <p className="text-xs text-slate-400">{t("recipes.stepsHint")}</p>
+        <p className="text-xs text-muted">{t("recipes.stepsHint")}</p>
         <textarea
           id="steps"
           rows={8}

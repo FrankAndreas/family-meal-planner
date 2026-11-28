@@ -46,6 +46,8 @@ class User(Base):
     role = Column(Enum(UserRole), default=UserRole.CHILD, nullable=False)
     # The person's language in the family hub (None: the default language, DEFAULT_LANGUAGE)
     language = Column(String(2))
+    # The person's look in the family hub (family-hub-theme), as the hub sends it; None: the default (Aurora)
+    theme = Column(String(20))
     # The person in the family hub (spec 2026-10-30): login, name, role and language come from there. None: a row from
     # before the hub, linked by name at the first sync
     hub_id = Column(Integer, unique=True)

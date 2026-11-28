@@ -60,26 +60,26 @@ export default function CloseWeek() {
         }
     };
 
-    if (!week) return error ? <p role="alert" className={ERROR}>{error}</p> : <p className="text-slate-400">{t('common.loading')}</p>;
+    if (!week) return error ? <p role="alert" className={ERROR}>{error}</p> : <p className="text-muted">{t('common.loading')}</p>;
 
     return (
         <div className={`${PAGE} space-y-5`}>
             <div>
                 <h1 className="text-2xl">{t('close.title')}</h1>
-                <p className="text-slate-400">{t('close.intro')}</p>
+                <p className="text-muted">{t('close.intro')}</p>
             </div>
             {week.days.map((day) => {
                 const entries = week.entries.filter((e) => e.date === day);
                 if (entries.length === 0) return null;
                 return (
                     <section key={day} className={`${CARD} space-y-2`}>
-                        <h2 className="text-base text-cyan-200">
+                        <h2 className="text-base text-accent">
                             {t(`weekdays.${weekdayKey(day)}`)} {format(parseISO(day), 'd.M.', { locale })}
                         </h2>
-                        <ul className="divide-y divide-white/5">
+                        <ul className="divide-y divide-line">
                             {entries.map((entry) => (
                                 <li key={entry.id} className="flex flex-wrap items-center gap-3 py-2">
-                                    <span className="w-24 text-xs text-slate-400">{t(`plan.slots.${entry.slot}`)}</span>
+                                    <span className="w-24 text-xs text-muted">{t(`plan.slots.${entry.slot}`)}</span>
                                     {entry.recipe ? (
                                         <>
                                             <label className="mr-auto flex items-center gap-2">
@@ -90,7 +90,7 @@ export default function CloseWeek() {
                                                     onChange={(e) => setEaten(entry, e.target.checked)}
                                                     className="h-5 w-5"
                                                 />
-                                                <span className={entry.eaten ? '' : 'text-slate-400 line-through'}>
+                                                <span className={entry.eaten ? '' : 'text-muted line-through'}>
                                                     {entry.recipe.title}
                                                 </span>
                                             </label>
@@ -103,13 +103,13 @@ export default function CloseWeek() {
                                                 />
                                             )}
                                             {!entry.eaten && (
-                                                <button type="button" className="text-sm text-cyan-300 underline" onClick={() => setInstead(entry)}>
+                                                <button type="button" className="text-sm text-accent underline" onClick={() => setInstead(entry)}>
                                                     {t('close.instead')}
                                                 </button>
                                             )}
                                         </>
                                     ) : (
-                                        <span className="italic text-slate-300">{entry.note}</span>
+                                        <span className="italic text-ink">{entry.note}</span>
                                     )}
                                 </li>
                             ))}

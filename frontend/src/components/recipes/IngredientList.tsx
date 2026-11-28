@@ -17,7 +17,7 @@ function IngredientLine({ ingredient }: { ingredient: Ingredient }) {
     return (
         <li className="flex gap-2 py-1">
             <span>{parts.join(' ')}</span>
-            {ingredient.note && <span className="text-slate-400">({ingredient.note})</span>}
+            {ingredient.note && <span className="text-muted">({ingredient.note})</span>}
         </li>
     );
 }
@@ -36,10 +36,10 @@ export default function IngredientList({ ingredients, people, onPeople }: Ingred
         <section className={`${CARD} space-y-3`}>
             <h2 className="text-lg">{t('recipes.ingredients')}</h2>
             {people !== null && <PeopleStepper value={people} onChange={onPeople} />}
-            <ul aria-label={t('recipes.ingredients')} className="divide-y divide-white/5">
+            <ul aria-label={t('recipes.ingredients')} className="divide-y divide-line">
                 {ingredientGroups(ingredients).map((group, n) => [
                     group.name && (
-                        <li key={`g${n}`} className="pt-3 text-sm font-semibold text-cyan-200">
+                        <li key={`g${n}`} className="pt-3 text-sm font-semibold text-accent">
                             {group.name}
                         </li>
                     ),

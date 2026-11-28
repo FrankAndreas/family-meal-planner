@@ -64,7 +64,7 @@ export default function FamilySettings() {
                 <div className="space-y-4">
                     <div className="grid gap-4 sm:grid-cols-2">
                         <div>
-                            <label htmlFor="family-size" className="mb-1 block text-sm text-slate-300">
+                            <label htmlFor="family-size" className="mb-1 block text-sm text-ink">
                                 {t('settings.familySize')}
                             </label>
                             <input
@@ -81,10 +81,10 @@ export default function FamilySettings() {
                                         setSettings({ ...settings, family_size: savedSize.current });
                                 }}
                             />
-                            <p className="mt-1 text-xs text-slate-400">{t('settings.familySizeHint')}</p>
+                            <p className="mt-1 text-xs text-muted">{t('settings.familySizeHint')}</p>
                         </div>
                         <div>
-                            <label htmlFor="week-start" className="mb-1 block text-sm text-slate-300">
+                            <label htmlFor="week-start" className="mb-1 block text-sm text-ink">
                                 {t('settings.weekStart')}
                             </label>
                             <select
@@ -109,9 +109,9 @@ export default function FamilySettings() {
                             // As many as the server takes (backend/app/schemas.py SettingsPatch)
                             max={50}
                         />
-                        <p className="mt-1 text-xs text-slate-400">{t('settings.staplesHint')}</p>
+                        <p className="mt-1 text-xs text-muted">{t('settings.staplesHint')}</p>
                     </div>
-                    <p role="status" className="min-h-5 text-sm text-emerald-300">
+                    <p role="status" className="min-h-5 text-sm text-success">
                         {status === 'saving' ? t('common.saving') : status === 'saved' && !error ? t('common.saved') : ''}
                     </p>
                 </div>

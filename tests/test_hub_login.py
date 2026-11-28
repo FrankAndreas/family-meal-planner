@@ -133,6 +133,14 @@ def test_new_person_name_role_language_from_the_hub(client, family_hub):
     assert (found["name"], found["role"], found["language"]) == ("Lena", "CHILD", "en")
 
 
+def test_theme_follows_the_hub(client, family_hub):
+    family_hub.add("Lena", "CHILD")
+    assert me(client, login(client, "Lena")).json()["theme"] == "aurora"
+    # Passed on as the hub sends it: the page decides what it can show
+    family_hub.set_theme("Lena", "daely")
+    assert me(client, login(client, "Lena")).json()["theme"] == "daely"
+
+
 def test_rename_and_role_follow_the_hub(client, family_hub):
     lena = create_user(client, None, "Lena")
     family_hub.rename("Lena", "Lea")

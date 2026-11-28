@@ -83,8 +83,8 @@ export default function SwissmilkResults({ have, mode }: SwissmilkResultsProps) 
         <section aria-label={t('swissmilk.title')} className="space-y-3">
             <h2 className="text-lg">{t('swissmilk.title')}</h2>
             {error && <p role="alert" className={ERROR}>{error}</p>}
-            {!results && !error && <p className="text-slate-400">{t('swissmilk.searching')}</p>}
-            {results && results.length === 0 && <p className="text-slate-400">{t('swissmilk.none')}</p>}
+            {!results && !error && <p className="text-muted">{t('swissmilk.searching')}</p>}
+            {results && results.length === 0 && <p className="text-muted">{t('swissmilk.none')}</p>}
             {results && results.length > 0 && (
                 <ul className="grid gap-3 md:grid-cols-2">
                     {results.map((recipe) => {
@@ -94,36 +94,36 @@ export default function SwissmilkResults({ have, mode }: SwissmilkResultsProps) 
                                 {recipe.photo ? (
                                     <AuthImage src={recipe.photo} alt="" className="h-16 w-16 flex-none rounded-lg object-cover" />
                                 ) : (
-                                    <div className="h-16 w-16 flex-none rounded-lg bg-white/5" aria-hidden />
+                                    <div className="h-16 w-16 flex-none rounded-lg bg-hover" aria-hidden />
                                 )}
                                 <div className="min-w-0 flex-1 space-y-1">
                                     <div className="font-semibold leading-tight">{recipe.title}</div>
-                                    <div className="text-sm text-emerald-300">
+                                    <div className="text-sm text-success">
                                         {t('useUp.used', { names: recipe.used.join(', ') })}
                                     </div>
                                     {recipe.missing.length > 0 && (
-                                        <div className="text-sm text-rose-300">
+                                        <div className="text-sm text-danger">
                                             {t('useUp.missing', { names: recipe.missing.join(', ') })}
                                         </div>
                                     )}
                                     <div className="flex flex-wrap items-center gap-3 pt-1 text-sm">
-                                        <a href={recipe.url} target="_blank" rel="noopener noreferrer" className="text-cyan-300 underline">
+                                        <a href={recipe.url} target="_blank" rel="noopener noreferrer" className="text-accent underline">
                                             {t('swissmilk.view')}
                                         </a>
                                         {recipe.recipe_id !== null ? (
-                                            <Link to={`/rezepte/${recipe.recipe_id}`} className="text-slate-300 underline">
+                                            <Link to={`/rezepte/${recipe.recipe_id}`} className="text-ink underline">
                                                 {t('swissmilk.already')}
                                             </Link>
                                         ) : sending.includes(recipe.url) ? (
-                                            <span className="text-slate-400">{t('swissmilk.waiting')}</span>
+                                            <span className="text-muted">{t('swissmilk.waiting')}</span>
                                         ) : waiting ? (
-                                            <Link to="/posteingang" className="text-slate-300 underline">
+                                            <Link to="/posteingang" className="text-ink underline">
                                                 {t('swissmilk.waiting')}
                                             </Link>
                                         ) : (
                                             <button
                                                 type="button"
-                                                className="rounded-lg border border-white/15 px-3 py-1 hover:bg-white/5"
+                                                className="rounded-lg border border-line px-3 py-1 hover:bg-hover"
                                                 onClick={() => takeOver(recipe.url)}
                                             >
                                                 {t('swissmilk.takeOver')}

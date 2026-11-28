@@ -127,7 +127,7 @@ export default function PlanPage() {
         else run(() => updateEntry(Number(key), { date: day, slot }));
     };
 
-    if (!week) return error ? <p role="alert" className={ERROR}>{error}</p> : <p className="text-slate-400">{t('common.loading')}</p>;
+    if (!week) return error ? <p role="alert" className={ERROR}>{error}</p> : <p className="text-muted">{t('common.loading')}</p>;
 
     const mode = moving ? 'move' : picked ? 'plan' : 'idle';
     const place = (day: string, slot: Slot) =>
@@ -138,7 +138,7 @@ export default function PlanPage() {
             <WeekHeader week={week} onWeek={(start) => setSearch({ woche: start })} />
             {error && <p role="alert" className={ERROR}>{error}</p>}
             {moving && (
-                <p className="text-sm text-cyan-300">
+                <p className="text-sm text-accent">
                     {t('plan.movingHint', { title: moving.recipe?.title ?? moving.note })}{' '}
                     <button type="button" className="underline" onClick={() => setMoving(null)}>
                         {t('common.cancel')}
@@ -165,7 +165,7 @@ export default function PlanPage() {
                     </div>
                     <DragOverlay dropAnimation={null}>
                         {dragging && (
-                            <div className="rounded-md border border-fuchsia-300 bg-slate-900/90 px-2 py-1 text-xs shadow-lg">
+                            <div className="rounded-md border border-accent-2 bg-page/90 px-2 py-1 text-xs shadow-lg">
                                 {dragTitle(dragging)}
                             </div>
                         )}

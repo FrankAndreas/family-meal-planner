@@ -30,11 +30,11 @@ export default function AiUsage() {
             <h2 id="ai-usage" className="text-lg">
                 {t('settings.aiUsage')}
             </h2>
-            {!enabled && <p className="text-sm text-amber-200">{t('errors.ai_off')}</p>}
+            {!enabled && <p className="text-sm text-warning">{t('errors.ai_off')}</p>}
             {usage && (
                 <>
                     {usage.month.length === 0 ? (
-                        <p className="text-sm text-slate-400">{t('settings.aiNoCalls')}</p>
+                        <p className="text-sm text-muted">{t('settings.aiNoCalls')}</p>
                     ) : (
                         <ul className="text-sm">
                             {usage.month.map((row) => (
@@ -44,7 +44,7 @@ export default function AiUsage() {
                             ))}
                         </ul>
                     )}
-                    <p className="text-xs text-slate-400">{t('settings.aiTotal', { count: usage.total })}</p>
+                    <p className="text-xs text-muted">{t('settings.aiTotal', { count: usage.total })}</p>
                 </>
             )}
             {error && <p role="alert" className={ERROR}>{error}</p>}

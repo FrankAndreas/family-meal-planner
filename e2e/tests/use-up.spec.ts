@@ -132,7 +132,7 @@ test('no old results or errors once the ingredients change', async ({ page, requ
     await page.route('**/api/use-up?*', (route) => route.fulfill({ status: 500, body: '{}' }));
     await input.fill('Lauch');
     await input.press('Enter');
-    const failure = page.locator('.border-red-400\\/30');
+    const failure = page.getByRole('alert').filter({ hasText: /./ });
     await expect(failure).toBeVisible();
     await clear.click();
     await expect(failure).toHaveCount(0);

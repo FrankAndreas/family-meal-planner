@@ -20,9 +20,9 @@ interface PlanRecipeDialogProps {
 
 type Place = { day: string; slot: Slot };
 
-const ARROW = 'h-9 w-9 rounded-full border border-white/15 text-lg hover:bg-white/10';
+const ARROW = 'h-9 w-9 rounded-full border border-line text-lg hover:bg-pressed';
 const CHIP = 'rounded-full border px-3 py-1.5 text-sm disabled:opacity-30';
-const chipColor = (on: boolean) => (on ? 'border-cyan-400 bg-cyan-400/20 text-cyan-100' : 'border-white/15 hover:bg-white/10');
+const chipColor = (on: boolean) => (on ? 'border-accent bg-accent/20 text-accent' : 'border-line hover:bg-pressed');
 
 // Plans one recipe from its own page: the week as a small grid on the big screen, day and meal buttons on the phone
 export default function PlanRecipeDialog({ recipeId, title, people: initialPeople, onPlanned, onClose }: PlanRecipeDialogProps) {
@@ -103,8 +103,8 @@ export default function PlanRecipeDialog({ recipeId, title, people: initialPeopl
         <Modal
             label={t('plan.planRecipeTitle', { title })}
             onClose={onClose}
-            overlayClassName="fixed inset-0 z-30 flex items-end justify-center bg-black/50 sm:items-center sm:p-4"
-            className="glass-card max-h-[90vh] w-full max-w-3xl space-y-4 overflow-y-auto rounded-b-none bg-slate-900/95 p-4 sm:rounded-b-2xl sm:p-5"
+            overlayClassName="fixed inset-0 z-30 flex items-end justify-center bg-page/70 sm:items-center sm:p-4"
+            className="glass-card max-h-[90vh] w-full max-w-3xl space-y-4 overflow-y-auto rounded-b-none bg-page/95 p-4 sm:rounded-b-2xl sm:p-5"
         >
             <h2 ref={heading} tabIndex={-1} className="text-lg focus:outline-none">{t('plan.planRecipeTitle', { title })}</h2>
             {week && (
@@ -121,14 +121,14 @@ export default function PlanRecipeDialog({ recipeId, title, people: initialPeopl
                 </div>
             )}
             {!week ? (
-                !error && <p className="text-slate-400">{t('common.loading')}</p>
+                !error && <p className="text-muted">{t('common.loading')}</p>
             ) : wide ? (
                 <table className="w-full table-fixed border-separate border-spacing-1 text-xs">
                     <thead>
                         <tr>
                             <th className="w-24" />
                             {week.days.map((day) => (
-                                <th key={day} className={`font-medium ${day === week.today ? 'text-cyan-300' : 'text-slate-400'}`}>
+                                <th key={day} className={`font-medium ${day === week.today ? 'text-accent' : 'text-muted'}`}>
                                     <div>{t(`weekdays.${weekdayKey(day)}`).slice(0, 2)}</div>
                                     <div className="font-normal">{format(parseISO(day), 'd.M.')}</div>
                                 </th>
@@ -138,7 +138,7 @@ export default function PlanRecipeDialog({ recipeId, title, people: initialPeopl
                     <tbody>
                         {SLOTS.map((slot) => (
                             <tr key={slot}>
-                                <th className="text-left font-medium text-slate-400">{t(`plan.slots.${slot}`)}</th>
+                                <th className="text-left font-medium text-muted">{t(`plan.slots.${slot}`)}</th>
                                 {week.days.map((day) => {
                                     const here = entriesAt(day, slot);
                                     const on = picked?.day === day && picked.slot === slot;
@@ -152,10 +152,10 @@ export default function PlanRecipeDialog({ recipeId, title, people: initialPeopl
                                                 onClick={() => pick({ day, slot })}
                                                 className={`flex h-12 w-full flex-col items-center justify-center overflow-hidden rounded-md px-1 disabled:opacity-30 ${
                                                     on
-                                                        ? 'bg-cyan-500 font-semibold text-white'
+                                                        ? 'bg-accent font-semibold text-page'
                                                         : here.length
-                                                          ? 'bg-white/10 text-slate-200 hover:bg-white/15'
-                                                          : 'bg-white/5 text-slate-400 hover:bg-white/10'
+                                                          ? 'bg-pressed text-ink'
+                                                          : 'bg-hover text-muted hover:bg-pressed'
                                                 }`}
                                             >
                                                 {on ? (
@@ -180,7 +180,7 @@ export default function PlanRecipeDialog({ recipeId, title, people: initialPeopl
             ) : (
                 <div className="space-y-3">
                     <div>
-                        <h3 className="mb-1 text-sm text-slate-400">{t('plan.pickDay')}</h3>
+                        <h3 className="mb-1 text-sm text-muted">{t('plan.pickDay')}</h3>
                         <div className="grid grid-cols-7 gap-1">
                             {week.days.map((d) => (
                                 <button
@@ -199,7 +199,7 @@ export default function PlanRecipeDialog({ recipeId, title, people: initialPeopl
                         </div>
                     </div>
                     <div>
-                        <h3 className="mb-1 text-sm text-slate-400">{t('plan.pickMeal')}</h3>
+                        <h3 className="mb-1 text-sm text-muted">{t('plan.pickMeal')}</h3>
                         <div className="flex flex-wrap gap-2">
                             {SLOTS.map((s) => (
                                 <button
@@ -217,7 +217,7 @@ export default function PlanRecipeDialog({ recipeId, title, people: initialPeopl
                 </div>
             )}
             {picked && (
-                <p className="text-sm text-slate-400" data-testid="plan-dialog-taken">
+                <p className="text-sm text-muted" data-testid="plan-dialog-taken">
                     {takenText(taken)}
                 </p>
             )}

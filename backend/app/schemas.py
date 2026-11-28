@@ -29,6 +29,8 @@ class UserOut(BaseModel):
     # The language the person sees: their own choice, or the default language
     language: Language
     language_chosen: bool
+    # The person's look from the family hub (family-hub-theme); the page shows the default for one it doesn't know
+    theme: str
     # Confirmed in the family hub and shared with the planner: recipe mails come from it
     email: str | None
 

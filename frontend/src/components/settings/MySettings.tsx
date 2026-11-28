@@ -17,9 +17,9 @@ export default function MySettings() {
     return (
         <section className={`${CARD} space-y-3`}>
             <h2 className="text-lg">{t('settings.mine')}</h2>
-            <p className="text-sm text-slate-300">{t('settings.inHub')}</p>
+            <p className="text-sm text-ink">{t('settings.inHub')}</p>
             {hub && (
-                <a href={`${hub}/settings`} className="inline-block text-sm text-blue-300 hover:underline">
+                <a href={`${hub}/settings`} className="inline-block text-sm text-accent hover:underline">
                     {t('settings.toHub')}
                 </a>
             )}

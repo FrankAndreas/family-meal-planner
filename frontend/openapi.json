@@ -5101,6 +5101,10 @@
             "type": "boolean",
             "title": "Language Chosen"
           },
+          "theme": {
+            "type": "string",
+            "title": "Theme"
+          },
           "email": {
             "anyOf": [
               {
@@ -5120,6 +5124,7 @@
           "role",
           "language",
           "language_chosen",
+          "theme",
           "email"
         ],
         "title": "UserOut"

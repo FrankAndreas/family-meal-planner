@@ -54,7 +54,7 @@ export default function ScanRecipe({ onDone }: { onDone: () => void }) {
     const full = shots.length >= MAX_PHOTOS;
     return (
         <section className="glass-card space-y-3 p-4">
-            <p className="text-sm text-slate-400">{t('recipes.scanIntro')}</p>
+            <p className="text-sm text-muted">{t('recipes.scanIntro')}</p>
             <input ref={camera} type="file" accept="image/*" capture="environment" aria-label={t('recipes.scanCamera')} onChange={taken} className="sr-only" />
             <input ref={library} type="file" accept="image/*" multiple aria-label={t('recipes.scanLibrary')} onChange={taken} className="sr-only" />
             {shots.length > 0 && (
@@ -64,7 +64,7 @@ export default function ScanRecipe({ onDone }: { onDone: () => void }) {
                             <img src={shot.url} alt={t('recipes.scanPhoto', { n: index + 1 })} className="h-28 w-24 rounded-lg object-cover" />
                             <button
                                 type="button"
-                                className="mt-1 text-slate-400 underline disabled:opacity-50"
+                                className="mt-1 text-muted underline disabled:opacity-50"
                                 disabled={sending}
                                 aria-label={t('recipes.scanRemove', { n: index + 1 })}
                                 onClick={() => setShots((list) => list.filter((other) => other.key !== shot.key))}

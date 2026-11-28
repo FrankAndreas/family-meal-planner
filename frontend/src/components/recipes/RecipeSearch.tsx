@@ -9,7 +9,7 @@ const CHIP_ROW = 'flex gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visib
 
 const chip = (active: boolean) =>
     `shrink-0 whitespace-nowrap rounded-full border px-3 py-1 text-sm ${
-        active ? 'border-cyan-400 bg-cyan-400/15 text-white' : 'border-white/10 text-slate-300 hover:bg-white/5'
+        active ? 'border-accent bg-accent/15 text-ink' : 'border-line text-ink hover:bg-hover'
     }`;
 
 // The collection, searched and filtered by category, tag and the person's favourites (the state lives in the page:
@@ -29,7 +29,7 @@ export default function RecipeSearch({ search }: { search: ReturnType<typeof use
                     value={q}
                     onChange={(e) => change({ q: e.target.value })}
                 />
-                <label className="flex items-center gap-2 text-sm text-slate-300">
+                <label className="flex items-center gap-2 text-sm text-ink">
                     <input type="checkbox" checked={onlyMine} onChange={(e) => change({ onlyMine: e.target.checked })} />
                     {t('recipes.onlyMyFavorites')}
                 </label>
@@ -61,7 +61,7 @@ export default function RecipeSearch({ search }: { search: ReturnType<typeof use
                         {t('recipes.categorizeAll', { count: unsorted })}
                     </button>
                     {sorting && (
-                        <span role="status" className="text-sm text-slate-300">
+                        <span role="status" className="text-sm text-ink">
                             {t('recipes.categorizeProgress', sorting)}
                         </span>
                     )}
@@ -79,13 +79,13 @@ export default function RecipeSearch({ search }: { search: ReturnType<typeof use
                             className={chip(tag === item.name)}
                             onClick={() => change({ tag: tag === item.name ? '' : item.name })}
                         >
-                            {item.name} <span className="text-slate-400">{item.count}</span>
+                            {item.name} <span className="text-muted">{item.count}</span>
                         </button>
                     ))}
                 </div>
             )}
             {error && <p role="alert" className={ERROR}>{error}</p>}
-            {recipes && recipes.length === 0 && <p className="text-slate-400">{t('recipes.none')}</p>}
+            {recipes && recipes.length === 0 && <p className="text-muted">{t('recipes.none')}</p>}
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
                 {recipes?.map((recipe) => (
                     <RecipeCard key={recipe.id} recipe={recipe} />

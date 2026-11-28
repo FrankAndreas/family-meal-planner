@@ -13,11 +13,11 @@ interface InboxItemCardProps {
 }
 
 const CHIP: Record<InboxItem['status'], string> = {
-    waiting: 'bg-slate-400/15 text-slate-200',
-    processing: 'bg-cyan-400/15 text-cyan-200',
-    draft: 'bg-emerald-400/15 text-emerald-200',
-    failed: 'bg-red-400/15 text-red-200',
-    done: 'bg-slate-400/15 text-slate-300',
+    waiting: 'bg-pressed text-ink',
+    processing: 'bg-accent/15 text-accent',
+    draft: 'bg-success/15 text-success',
+    failed: 'bg-danger/15 text-danger',
+    done: 'bg-pressed text-ink',
 };
 
 export default function InboxItemCard({ item, parent, onProcess, onDiscard }: InboxItemCardProps) {
@@ -33,12 +33,12 @@ export default function InboxItemCard({ item, parent, onProcess, onDiscard }: In
             <div className="flex flex-wrap items-start gap-2">
                 <div className="mr-auto min-w-0">
                     <h2 className="truncate text-base">{item.subject}</h2>
-                    <p className="text-xs text-slate-400">
+                    <p className="text-xs text-muted">
                         {item.user_name ?? item.from_addr} · {format(parseISO(`${item.received_at}Z`), 'd.M. HH:mm')}
                         {item.url && (
                             <>
                                 {' · '}
-                                <a href={item.url} target="_blank" rel="noreferrer" className="text-cyan-300 underline">
+                                <a href={item.url} target="_blank" rel="noreferrer" className="text-accent underline">
                                     {t('inbox.openLink')}
                                 </a>
                             </>

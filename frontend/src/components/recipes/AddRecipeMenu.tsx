@@ -68,7 +68,7 @@ export default function AddRecipeMenu({ title }: { title: string }) {
             </div>
             {panel && (
                 <div className="flex justify-end">
-                    <button type="button" className="text-sm text-slate-400 hover:text-white" onClick={() => setPanel(null)}>
+                    <button type="button" className="text-sm text-muted hover:text-ink" onClick={() => setPanel(null)}>
                         {t('recipes.closePanel')}
                     </button>
                 </div>

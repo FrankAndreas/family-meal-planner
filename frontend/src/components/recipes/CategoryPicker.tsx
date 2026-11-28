@@ -30,8 +30,8 @@ export default function CategoryPicker({ value, onChange, labelClass }: Category
                             onClick={() => toggle(category)}
                             className={`rounded-full border px-3 py-1 text-sm ${
                                 on
-                                    ? 'border-amber-300 bg-amber-300/15 text-white'
-                                    : 'border-white/10 text-slate-300 hover:bg-white/5'
+                                    ? 'border-warning bg-warning/15 text-ink'
+                                    : 'border-line text-ink hover:bg-hover'
                             }`}
                         >
                             {t(`recipes.category.${category}`)}

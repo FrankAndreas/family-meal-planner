@@ -55,7 +55,7 @@ export default function PhotoPicker({ current, choice, onChange }: Props) {
     const link = choice.kind === 'link' ? choice.url : '';
     const shown = preview ?? (choice.kind === 'keep' && current ? apiUrl(current) : null);
     const hasPhoto = shown !== null || choice.kind === 'link';
-    const label = 'mb-1 block text-sm text-slate-300';
+    const label = 'mb-1 block text-sm text-ink';
 
     return (
         <div className="space-y-3">
@@ -64,7 +64,7 @@ export default function PhotoPicker({ current, choice, onChange }: Props) {
                 {shown ? (
                     <img src={shown} alt={t('recipes.photoPreview')} className="h-32 w-44 rounded-xl object-cover" />
                 ) : (
-                    <div className="flex h-32 w-44 items-center justify-center rounded-xl border border-dashed border-white/20 p-3 text-center text-sm text-slate-400">
+                    <div className="flex h-32 w-44 items-center justify-center rounded-xl border border-dashed border-line p-3 text-center text-sm text-muted">
                         {choice.kind === 'link' && isWebLink(link) ? t('recipes.photoFromLink') : t('recipes.photoNone')}
                     </div>
                 )}
@@ -93,7 +93,7 @@ export default function PhotoPicker({ current, choice, onChange }: Props) {
                     )}
                 </div>
             </div>
-            {clipboardEmpty && <p className="text-sm text-amber-200">{t('recipes.photoClipboardEmpty')}</p>}
+            {clipboardEmpty && <p className="text-sm text-warning">{t('recipes.photoClipboardEmpty')}</p>}
             <div>
                 <label htmlFor="photo-link" className={label}>
                     {t('recipes.photoLink')}
@@ -108,7 +108,7 @@ export default function PhotoPicker({ current, choice, onChange }: Props) {
                     onPaste={onPaste}
                     onChange={(e) => onChange(e.target.value.trim() ? { kind: 'link', url: e.target.value } : { kind: 'keep' })}
                 />
-                {link.trim() && !isWebLink(link) && <p className="mt-1 text-sm text-amber-200">{t('errors.not_a_web_link')}</p>}
+                {link.trim() && !isWebLink(link) && <p className="mt-1 text-sm text-warning">{t('errors.not_a_web_link')}</p>}
             </div>
         </div>
     );

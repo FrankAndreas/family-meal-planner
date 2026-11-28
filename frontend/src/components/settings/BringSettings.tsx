@@ -66,7 +66,7 @@ export default function BringSettings() {
                 <h2 id="bring-settings" className="text-lg">
                     {t('bring.title')}
                 </h2>
-                <p className="text-sm text-slate-400">{t('bring.hint')}</p>
+                <p className="text-sm text-muted">{t('bring.hint')}</p>
             </div>
             {login?.email ? (
                 <div className="space-y-3">
@@ -77,7 +77,7 @@ export default function BringSettings() {
                     )}
                     {!login.list_uuid && (
                         <label className="block space-y-1">
-                            <span className="text-sm text-slate-300">{t('bring.list')}</span>
+                            <span className="text-sm text-ink">{t('bring.list')}</span>
                             <select
                                 className={INPUT}
                                 value=""
@@ -101,7 +101,7 @@ export default function BringSettings() {
                 login && (
                     <form className="flex flex-wrap items-end gap-3" onSubmit={signIn}>
                         <label className="space-y-1">
-                            <span className="block text-sm text-slate-300">{t('bring.email')}</span>
+                            <span className="block text-sm text-ink">{t('bring.email')}</span>
                             <input
                                 className={FIELD}
                                 type="email"
@@ -112,7 +112,7 @@ export default function BringSettings() {
                             />
                         </label>
                         <label className="space-y-1">
-                            <span className="block text-sm text-slate-300">{t('bring.password')}</span>
+                            <span className="block text-sm text-ink">{t('bring.password')}</span>
                             <input
                                 className={FIELD}
                                 type="password"

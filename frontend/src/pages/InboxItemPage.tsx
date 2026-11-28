@@ -39,17 +39,17 @@ export default function InboxItemPage() {
         }
     };
 
-    if (!item) return error ? <p role="alert" className={ERROR}>{error}</p> : <p className="text-slate-400">{t('common.loading')}</p>;
+    if (!item) return error ? <p role="alert" className={ERROR}>{error}</p> : <p className="text-muted">{t('common.loading')}</p>;
 
     return (
         <div className={`${PAGE} space-y-5`}>
             <section className={`${CARD} space-y-2`}>
                 <h1 className="text-2xl">{item.subject}</h1>
-                <p className="text-sm text-slate-400">
+                <p className="text-sm text-muted">
                     {[item.user_name, item.from_addr].filter(Boolean).join(' · ')} · {format(parseISO(`${item.received_at}Z`), 'd.M.yyyy HH:mm')}
                 </p>
                 {item.url && (
-                    <a href={item.url} target="_blank" rel="noreferrer" className="break-all text-cyan-300 underline">
+                    <a href={item.url} target="_blank" rel="noreferrer" className="break-all text-accent underline">
                         {item.url}
                     </a>
                 )}
@@ -68,7 +68,7 @@ export default function InboxItemPage() {
             </section>
             {item.text && (
                 <section className={`${CARD} space-y-2`}>
-                    <h2 className="text-sm text-slate-300">{t('inbox.pastedText')}</h2>
+                    <h2 className="text-sm text-ink">{t('inbox.pastedText')}</h2>
                     <p className="whitespace-pre-wrap break-words">{item.text}</p>
                 </section>
             )}
@@ -77,8 +77,8 @@ export default function InboxItemPage() {
             ))}
             {item.ai_raw && (
                 <details className={CARD}>
-                    <summary className="cursor-pointer text-sm text-slate-300">{t('inbox.aiAnswer')}</summary>
-                    <pre className="mt-2 overflow-x-auto whitespace-pre-wrap text-xs text-slate-400">{item.ai_raw}</pre>
+                    <summary className="cursor-pointer text-sm text-ink">{t('inbox.aiAnswer')}</summary>
+                    <pre className="mt-2 overflow-x-auto whitespace-pre-wrap text-xs text-muted">{item.ai_raw}</pre>
                 </details>
             )}
             {error && <p role="alert" className={ERROR}>{error}</p>}

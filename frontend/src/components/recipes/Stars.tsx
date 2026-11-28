@@ -16,7 +16,7 @@ export default function Stars({ value, onChange, size = 'sm', label }: StarsProp
     const text = size === 'lg' ? 'text-3xl' : 'text-sm';
     if (!onChange) {
         return (
-            <span role="img" className={`${text} tracking-tight text-amber-300`} aria-label={label ?? t('recipes.ratingShown', { value: value ?? 0 })}>
+            <span role="img" className={`${text} tracking-tight text-warning`} aria-label={label ?? t('recipes.ratingShown', { value: value ?? 0 })}>
                 {[1, 2, 3, 4, 5].map((n) => (
                     <span key={n} className={n <= filled ? '' : ICON_OFF}>
                         ★
@@ -33,7 +33,7 @@ export default function Stars({ value, onChange, size = 'sm', label }: StarsProp
                     type="button"
                     aria-label={t('recipes.rate', { count: n })}
                     onClick={() => onChange(n === value ? null : n)}
-                    className={`${text} px-1 ${n <= filled ? 'text-amber-300' : ICON_OFF} hover:text-amber-200`}
+                    className={`${text} px-1 ${n <= filled ? 'text-warning' : ICON_OFF} hover:text-warning`}
                 >
                     ★
                 </button>

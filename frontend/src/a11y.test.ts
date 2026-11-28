@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-// Accessibility review (2026-11-08): on the app's dark background (slate-900) slate-500 text reaches 3.75:1 and
-// slate-600 2.36:1, below the 4.5:1 text needs (WCAG AA). Text uses slate-400 or brighter; an icon that is "off" (an
-// empty star) uses ICON_OFF from ui.ts, 3:1 as an icon needs
-const DIM = /\btext-slate-(500|600|700|800|900)\b/;
+// Accessibility review (2026-11-08), with the theme's roles (themes 2026-11-28): text is text-ink or text-muted, both
+// readable on the page. The theme's state and accent colours are light, so on a fill of them that is (nearly) solid,
+// light text drops below the 4.5:1 text needs: it uses text-page (dark) there
+const SOLID_FILL = /(?<![\w:/-])bg-(danger|success|warning|accent|accent-2|accent-3)(\/([7-9]\d|100))?(?![\w/-])/;
+const LIGHT_TEXT = /(?<![\w:-])text-ink(?![\w-])/;
 
 // Every source file's text (Vite reads them; ui.ts defines ICON_OFF and is left out)
 const SOURCES = import.meta.glob(['./**/*.{ts,tsx}', '!./**/*.test.ts', '!./ui.ts'], {
@@ -17,14 +18,14 @@ describe('contrast', () => {
         expect(Object.keys(SOURCES)).toContain('./components/recipes/Stars.tsx');
     });
 
-    it('no text in a colour too dim to read on the dark background', () => {
-        const dim = Object.entries(SOURCES).flatMap(([path, text]) =>
+    it('no light text on a (nearly) solid state or accent fill', () => {
+        const light = Object.entries(SOURCES).flatMap(([path, text]) =>
             text
                 .split('\n')
-                .map((line, n) => (DIM.test(line) ? `${path}:${n + 1}` : null))
+                .map((line, n) => (SOLID_FILL.test(line) && LIGHT_TEXT.test(line) ? `${path}:${n + 1}` : null))
                 .filter(Boolean),
         );
-        expect(dim).toEqual([]);
+        expect(light).toEqual([]);
     });
 });
 

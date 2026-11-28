@@ -31,15 +31,15 @@ export default function IngredientEditor({ rows, units, onChange }: IngredientEd
             {rows.map((row, index) => {
                 const tools = (
                     <div className="flex gap-1">
-                        <button type="button" className="px-2 text-slate-400 hover:text-white" aria-label={t('recipes.moveUp')} onClick={() => move(index, -1)}>
+                        <button type="button" className="px-2 text-muted hover:text-ink" aria-label={t('recipes.moveUp')} onClick={() => move(index, -1)}>
                             ↑
                         </button>
-                        <button type="button" className="px-2 text-slate-400 hover:text-white" aria-label={t('recipes.moveDown')} onClick={() => move(index, 1)}>
+                        <button type="button" className="px-2 text-muted hover:text-ink" aria-label={t('recipes.moveDown')} onClick={() => move(index, 1)}>
                             ↓
                         </button>
                         <button
                             type="button"
-                            className="px-2 text-red-300 hover:text-red-200"
+                            className="px-2 text-danger hover:opacity-80"
                             aria-label={t('recipes.removeRow')}
                             onClick={() => onChange(rows.length > 1 ? rows.filter((r) => r.key !== row.key) : [emptyRow()])}
                         >
@@ -66,7 +66,7 @@ export default function IngredientEditor({ rows, units, onChange }: IngredientEd
                 return (
                     <div key={row.key} className="grid grid-cols-[5rem_6rem_1fr] gap-2 sm:grid-cols-[5rem_7rem_1fr_1fr_auto] [&>*]:min-w-0">
                         <input
-                            className={`${FIELD} ${badAmount ? 'border-red-400' : ''}`}
+                            className={`${FIELD} ${badAmount ? 'border-danger' : ''}`}
                             aria-label={t('recipes.amountN', { n: number })}
                             aria-invalid={badAmount}
                             placeholder={t('recipes.amountPlaceholder')}

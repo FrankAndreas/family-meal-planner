@@ -30,7 +30,7 @@ export function RecipeThumb({ recipe, className, full = false }: { recipe: Recip
     // No photo: a gradient with the first letter, so cards still differ at a glance
     return (
         <div
-            className={`${className} flex items-center justify-center bg-gradient-to-br from-indigo-400/70 to-fuchsia-400/70 text-2xl font-bold text-white/90`}
+            className={`${className} flex items-center justify-center bg-gradient-to-br from-accent-3/70 to-accent-2/70 text-2xl font-bold text-ink`}
         >
             {recipe.title.charAt(0).toUpperCase()}
         </div>
@@ -58,11 +58,11 @@ export default function RecipeCard({ recipe, onClick, compact = false, selected 
             <RecipeThumb recipe={recipe} className="h-12 w-12 flex-none rounded-lg" />
             <div className="min-w-0">
                 <div className="truncate font-semibold">{recipe.title}</div>
-                <div className="text-xs text-slate-400">
+                <div className="text-xs text-muted">
                     <FamilyStars recipe={recipe} />
-                    {recipe.my_favorite && <span className="ml-1 text-fuchsia-300">♥</span>}
+                    {recipe.my_favorite && <span className="ml-1 text-accent-2">♥</span>}
                 </div>
-                <div className="text-xs text-slate-400">
+                <div className="text-xs text-muted">
                     {recipe.last_eaten ? t('recipes.lastEaten', { when: sinceText(recipe.last_eaten) }) : t('recipes.neverEaten')}
                 </div>
             </div>
@@ -73,17 +73,17 @@ export default function RecipeCard({ recipe, onClick, compact = false, selected 
             <div className="space-y-1 p-3">
                 <div className="flex items-start gap-2">
                     <span className="mr-auto font-semibold leading-tight">{recipe.title}</span>
-                    {recipe.my_favorite && <span className="text-fuchsia-300">♥</span>}
+                    {recipe.my_favorite && <span className="text-accent-2">♥</span>}
                 </div>
-                <div className="flex items-center gap-2 text-xs text-slate-400">
+                <div className="flex items-center gap-2 text-xs text-muted">
                     {recipe.rating_avg !== null ? <FamilyStars recipe={recipe} /> : t('recipes.notRated')}
                     {recipe.total_minutes !== null && <span>· {t('recipes.minutes', { count: recipe.total_minutes })}</span>}
                 </div>
             </div>
         </>
     );
-    const className = `glass-card block w-full overflow-hidden text-left transition hover:border-cyan-400/40 ${
-        selected ? 'ring-2 ring-cyan-400' : ''
+    const className = `glass-card block w-full overflow-hidden text-left transition hover:border-accent/40 ${
+        selected ? 'ring-2 ring-accent' : ''
     }`;
     if (onClick) {
         return (

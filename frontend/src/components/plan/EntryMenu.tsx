@@ -26,8 +26,8 @@ export default function EntryMenu({ entry, past, onPeople, onEaten, onMove, onRe
         <Modal
             label={title}
             onClose={onClose}
-            overlayClassName="fixed inset-0 z-30 flex items-end justify-center bg-black/50 p-4 sm:items-center"
-            className="glass-card w-full max-w-sm space-y-4 bg-slate-900/90 p-5"
+            overlayClassName="fixed inset-0 z-30 flex items-end justify-center bg-page/70 p-4 sm:items-center"
+            className="glass-card w-full max-w-sm space-y-4 bg-page/90 p-5"
         >
             <h2 className="text-lg">{title}</h2>
             {entry.recipe && !entry.recipe_deleted && (

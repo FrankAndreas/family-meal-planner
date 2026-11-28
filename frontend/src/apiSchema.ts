@@ -1812,6 +1812,8 @@ export interface components {
             language: "de" | "en";
             /** Language Chosen */
             language_chosen: boolean;
+            /** Theme */
+            theme: string;
             /** Email */
             email: string | null;
         };

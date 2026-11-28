@@ -13,6 +13,6 @@ export const CARD = 'glass-card p-5';
 export const PAGE = 'mx-auto max-w-4xl';
 export const ERROR = 'rounded-lg border border-danger/30 bg-danger/15 p-3 text-sm text-danger';
 
-// An icon that is "off" (an empty star, a heart not given): 3.75:1 on the dark background, as an icon needs (3:1); text
-// uses slate-400 or brighter (a11y.test.ts)
+// An icon that is "off" (an empty star, a heart not given): the theme's muted colour, at least 3:1 as an icon needs;
+// text uses ink or muted (a11y.test.ts)
 export const ICON_OFF = 'text-muted';

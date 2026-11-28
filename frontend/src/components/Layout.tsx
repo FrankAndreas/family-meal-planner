@@ -55,7 +55,7 @@ export default function Layout() {
 
     const badge = (key: string) =>
         key === 'nav.inbox' && waiting > 0 ? (
-            <span className="ml-1 rounded-full bg-accent-2/80 px-1.5 text-xs text-ink">{waiting}</span>
+            <span className="ml-1 rounded-full bg-accent-2/80 px-1.5 text-xs text-page">{waiting}</span>
         ) : null;
 
     return (
